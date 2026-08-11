@@ -501,8 +501,8 @@ def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
 def coeff_C(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
     """Coefficient C for even L.
 
-    The coefficient is obtained such at l3 fold contraction of the output tensor with
-    A unit vector yields 1.
+    The coefficient is obtained such that the l3-fold contraction of the output tensor
+    with a unit vector yields 1.
 
     Ref: Eq. 54 of [LP89]
     """
@@ -528,8 +528,15 @@ def coeff_C(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
 def coeff_D(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
     """Coefficient D for odd L.
 
-    The coefficient is obtained such at l3 fold contraction of the output tensor with
-    A unit vector yields 1.
+    The normalization condition differs from that of coeff_C. For odd L the coupling
+    tensor carries a Levi-Civita symbol, so contracting the output l3 times with a
+    single unit vector vanishes identically by antisymmetry and cannot fix the scale.
+    Instead, D is obtained such that when X_l1 is built from a unit vector r and Y_l2
+    from a unit vector b, the output Z_l3 satisfies
+
+        lim_{b -> r} |Z_l3 (.)^{l3-1} r^{x(l3-1)}| / |r x b| = 1,
+
+    where (.) denotes contraction and |.| the norm of the resulting vector.
 
     Ref: Eq. 55 of [LP89]
     """
@@ -552,15 +559,16 @@ def coeff_D(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
         / factorial((L + 1) // 2, device=device)
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     # Get symbolic
-    l1=2
-    l2=1
-    l3=2
+    l1 = 2
+    l2 = 1
+    l3 = 2
     if (l1 + l2 - l3) % 2 == 0:
         H, X_idx, Y_idx, Z_idx = get_H_even(l1, l2, l3)
     else:
         H, X_idx, Y_idx, Z_idx = get_H_odd(l1, l2, l3)
     H = simplify_linear_combination(H)
-    print(f'H after simplification (l1={l1}, l2={l2}, l3={l3}):', H)
+    print(f"H after simplification (l1={l1}, l2={l2}, l3={l3}):", H)
