@@ -9,6 +9,7 @@ dynamic = ["version"]
 dependencies = [
     "torch",
     "numpy",
+    "scipy",
     "monty",
 ]
 
