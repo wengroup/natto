@@ -1,4 +1,9 @@
+import pytest
+import torch
+
 from natto.EGH import get_E, get_E_rules, get_G_even, get_G_odd
+from natto.evaluate import evaluate_tensors
+from natto.utils import letter_index
 
 
 def test_get_E_rules():
@@ -205,6 +210,17 @@ def test_E():
         "+1/105 δ_ad δ_bc δ_AC δ_BD",
         "+1/105 δ_ad δ_bc δ_AD δ_BC",
     }
+
+
+@pytest.mark.parametrize("m", range(5))
+def test_E_trace(m):
+    """Verify that the full contraction of E_(m|m) with I_(m|m) is 2m + 1."""
+    projector = evaluate_tensors(get_E(m), mode="H")
+    indices = letter_index(m)
+    contraction_rule = indices * 2
+    trace = torch.einsum(contraction_rule, projector)
+
+    torch.testing.assert_close(trace, torch.tensor(float(2 * m + 1)))
 
 
 def test_G_even():
