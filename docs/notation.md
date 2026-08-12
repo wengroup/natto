@@ -1,6 +1,6 @@
 # Implementation notation
 
-In natt, the below notation are used (as much as possible) to denote different tensors:
+In natto, the below notation are used (as much as possible) to denote different tensors:
 
 - t, s: general tensor, without any consideration of symmetry
 - u, v: symmetric tensor

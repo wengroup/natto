@@ -1,13 +1,13 @@
 import torch
 
-from natt.symmetrize import (
+from natto.symmetrize import (
     get_permutations,
     get_permutations_2,
     remove_trace,
     remove_trace_rule,
     symmetrize,
 )
-from natt.utils import is_symmetric
+from natto.utils import is_symmetric
 
 
 def test_get_permutations():

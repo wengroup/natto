@@ -9,8 +9,8 @@ from pathlib import Path
 import torch
 from carnet.core.unit_vector_2 import get_H, get_H_numerical
 
-from natt.ops import simplify_linear_combination
-from natt.utils import yaml_dump
+from natto.ops import simplify_linear_combination
+from natto.utils import yaml_dump
 
 
 def generate_H_unit_vector(max_l: int, dtype: torch.dtype = torch.float64) -> dict:
@@ -30,9 +30,9 @@ def generate_H_unit_vector(max_l: int, dtype: torch.dtype = torch.float64) -> di
     torch.set_default_dtype(dtype)
     all_H = {}
 
-    for l in range(2, max_l + 1):
+    for rank in range(2, max_l + 1):
         # Note, symbolic H is not normalized
-        H_symbolic, _, _ = get_H(l)
+        H_symbolic, _, _ = get_H(rank)
         H_symbolic = simplify_linear_combination(H_symbolic)
 
         # replace \u03b4 (delta) by d
@@ -40,8 +40,8 @@ def generate_H_unit_vector(max_l: int, dtype: torch.dtype = torch.float64) -> di
         H_symbolic = str(H_symbolic).replace("\u03b4", "d").replace("\u03b5", "e")
 
         for normalize in ["unity", "none"]:
-            H, rule = get_H_numerical(l, normalize)
-            key = f"{l}-{normalize}"
+            H, rule = get_H_numerical(rank, normalize)
+            key = f"{rank}-{normalize}"
             all_H[key] = {
                 "rule": rule,
                 "H_symbolic": H_symbolic,

@@ -2,7 +2,7 @@ from math import factorial as factorial_math
 
 import torch
 
-from natt.utils import double_factorial, double_index, factorial, get_trace
+from natto.utils import double_factorial, double_index, factorial, get_trace
 
 
 def test_factorial():

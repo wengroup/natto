@@ -6,7 +6,7 @@ import itertools
 from collections import defaultdict
 from fractions import Fraction
 
-from natt.symbolic import (
+from natto.symbolic import (
     CartesianTensor,
     Delta,
     Epsilon,
@@ -370,7 +370,6 @@ def simplify_tensor_product(tp: TensorProduct) -> LinearCombination:
         new_simplified = []
         performed = []
         for i, tp in enumerate(simplified):
-
             # Step 1: simplify epsilon first
             sim, perf = simplify_epsilon(tp)
 

@@ -5,9 +5,9 @@ Evaluating numerical values of G, H, and S tensors and their tensor products.
 import torch
 from torch import Tensor
 
-from natt.ops import simplify_linear_combination
-from natt.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
-from natt.utils import dij, eijk, letter_index
+from natto.ops import simplify_linear_combination
+from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
+from natto.utils import dij, eijk, letter_index
 
 
 def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:

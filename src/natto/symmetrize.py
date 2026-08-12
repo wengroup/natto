@@ -11,7 +11,7 @@ import itertools
 import torch
 from torch import Tensor
 
-from natt.utils import dij, double_index, letter_index, repeat_double_index
+from natto.utils import dij, double_index, letter_index, repeat_double_index
 
 
 def symmetrize_via_permutation(
@@ -124,9 +124,9 @@ def symmetrize(
 
     # symmetrize with the given symmetry
     else:
-        assert (
-            start_dim + len(symmetry) == t.ndim
-        ), "The length of the symmetry string must match the tensor shape."
+        assert start_dim + len(symmetry) == t.ndim, (
+            "The length of the symmetry string must match the tensor shape."
+        )
         permutations = get_permutations(symmetry, start_dim)
 
     if mode == "mean":

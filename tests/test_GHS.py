@@ -5,12 +5,12 @@ from typing import NamedTuple, Optional
 import pytest
 import torch
 
-import natt.GHS
-from natt.GHS import get_G_H_S, get_G_H_S_natural
-from natt.qr import find_independent_tensors
-from natt.sym import symmetrize
-from natt.symmetrize import get_random_natural_tensor
-from natt.utils import letter_index
+import natto.GHS
+from natto.GHS import get_G_H_S, get_G_H_S_natural
+from natto.qr import find_independent_tensors
+from natto.sym import symmetrize
+from natto.symmetrize import get_random_natural_tensor
+from natto.utils import letter_index
 
 
 class TensorClass(NamedTuple):
@@ -45,7 +45,7 @@ PHYSICAL_TENSOR_CLASSES = [
     TensorClass("Kleinman symmetry in SHG", 3, "ijk=ikj=jik", 10, {1: 1, 3: 1}),
     TensorClass("optical mixing", 4, None, 81, {0: 3, 1: 6, 2: 6, 3: 3, 4: 1}),
     # the j=1 sector of the photoelastic class is what the unpivoted-QR selection in
-    # `natt.qr` used to get wrong, see tests/test_qr.py
+    # `natto.qr` used to get wrong, see tests/test_qr.py
     TensorClass(
         "photoelastic effect", 4, "ijkl=jikl", 54, {0: 2, 1: 3, 2: 4, 3: 2, 4: 1}
     ),
@@ -96,15 +96,15 @@ def get_tensor_class_params(
 
 @contextlib.contextmanager
 def selection_scheme(method: str):
-    """Make `GHS` select independent tensors with the given `natt.qr` scheme."""
-    original = natt.GHS.find_independent_tensors
-    natt.GHS.find_independent_tensors = functools.partial(
+    """Make `GHS` select independent tensors with the given `natto.qr` scheme."""
+    original = natto.GHS.find_independent_tensors
+    natto.GHS.find_independent_tensors = functools.partial(
         find_independent_tensors, method=method
     )
     try:
         yield
     finally:
-        natt.GHS.find_independent_tensors = original
+        natto.GHS.find_independent_tensors = original
 
 
 @functools.lru_cache(maxsize=None)
@@ -124,11 +124,11 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
 
     The multiplicities are the ranks found when selecting independent H tensors, so
     this is also where a non-rank-revealing selection scheme shows up; it is checked
-    for both schemes of `natt.qr` since either may be used.
+    for both schemes of `natto.qr` since either may be used.
 
     Args:
         tensor_class: physical tensor class to check
-        method: `natt.qr` scheme used to select the independent H tensors
+        method: `natto.qr` scheme used to select the independent H tensors
     """
     output = get_G_H_S_cached(tensor_class.rank, tensor_class.symmetry, method)
 
@@ -173,9 +173,9 @@ def test_get_G_H_S(tensor_class: TensorClass):
             T_p_2 = torch.einsum(S["rule"], S["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
-            assert torch.allclose(
-                T_p_1, T_p_2, rtol=1e-5, atol=1e-6
-            ), f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
+            assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+                f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
+            )
 
             all_T_prime.append(T_p_1)
 
@@ -218,9 +218,9 @@ def test_get_G_H_S_natural(j1: int, j2: int):
             T_p_2 = torch.einsum(S["rule"], S["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
-            assert torch.allclose(
-                T_p_1, T_p_2, rtol=1e-5, atol=1e-6
-            ), f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
+            assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+                f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
+            )
 
             all_T_prime.append(T_p_1)
 

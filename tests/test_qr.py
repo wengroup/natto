@@ -1,4 +1,4 @@
-"""Tests for the linear-independence selection schemes in `natt.qr`.
+"""Tests for the linear-independence selection schemes in `natto.qr`.
 
 Two situations broke the original unpivoted-QR diagonal test, and both are covered
 here for every implementation:
@@ -15,7 +15,7 @@ from typing import Callable, NamedTuple, Optional
 import pytest
 import torch
 
-from natt.qr import (
+from natto.qr import (
     find_independent_tensors,
     find_independent_tensors_gram_schmidt,
     find_independent_tensors_qr_unpivoted,
@@ -24,7 +24,7 @@ from natt.qr import (
 
 
 class Scheme(NamedTuple):
-    """One selection scheme of `natt.qr`, and the properties it is expected to have."""
+    """One selection scheme of `natto.qr`, and the properties it is expected to have."""
 
     # identifies the scheme, and used as the test id
     name: str
@@ -115,7 +115,7 @@ def test_valid_regime(scheme):
 
     This is the regime where the unpivoted diagonal test is valid: no degenerate
     column precedes an independent one, and there are no more tensors than
-    components. It is the regime all the existing natt results were computed in,
+    components. It is the regime all the existing natto results were computed in,
     so no scheme may disagree about the rank here.
     """
     e = get_e(4)

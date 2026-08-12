@@ -1,6 +1,6 @@
 # Generating Projector YAML Files
 
-`natt` can generate three types of projectors, each stored as a YAML file.
+`natto` can generate three types of projectors, each stored as a YAML file.
 The `generate_*.py` scripts in this directory generate the corresponding YAML files:
 
 - `generate_tensor_product_projector.py` generates `tensor_product_projector.yaml`

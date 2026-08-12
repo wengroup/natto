@@ -2,7 +2,7 @@ import itertools
 
 import torch
 
-from natt.sym import check_symmetry, generate_permutations, symmetrize
+from natto.sym import check_symmetry, generate_permutations, symmetrize
 
 
 def test_generate_permutations():

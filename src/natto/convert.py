@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from natt.GHS import get_G_H_S
+from natto.GHS import get_G_H_S
 
 
 # TODO, this function should be reimplemented for simplicity, not consider batching
@@ -40,15 +40,15 @@ class Converter(nn.Module):
         out = get_G_H_S(rank, symmetry)
 
         self.l_num_p = {}
-        for l, out_l in out.items():
-            self.l_num_p[l] = len(out_l["G"])
+        for weight, out_weight in out.items():
+            self.l_num_p[weight] = len(out_weight["G"])
             # TODO, the tensors of different G_j_p might be batched, which can
             #  accelerate the computation
-            for p, (G, H) in enumerate(zip(out_l["G"], out_l["H"])):
-                self.register_buffer(f"G_{l}_{p}", torch.tensor(G["numerical"]))
-                self.register_buffer(f"H_{l}_{p}", torch.tensor(H["numerical"]))
-                setattr(self, f"G_{l}_{p}_rule", G["rule"])
-                setattr(self, f"H_{l}_{p}_rule", H["rule"])
+            for p, (G, H) in enumerate(zip(out_weight["G"], out_weight["H"])):
+                self.register_buffer(f"G_{weight}_{p}", torch.tensor(G["numerical"]))
+                self.register_buffer(f"H_{weight}_{p}", torch.tensor(H["numerical"]))
+                setattr(self, f"G_{weight}_{p}_rule", G["rule"])
+                setattr(self, f"H_{weight}_{p}_rule", H["rule"])
 
     def to_natural_tensor(self, T: Tensor) -> dict[int, Tensor]:
         """
@@ -70,12 +70,14 @@ class Converter(nn.Module):
 
         # TODO, the looping is very inefficient, need to think about better ways
         out = {}
-        for l, num_p in self.l_num_p.items():
-            out[l] = torch.stack(
+        for weight, num_p in self.l_num_p.items():
+            out[weight] = torch.stack(
                 [
                     torch.einsum(
-                        getattr(self, f"H_{l}_{p}_rule"), getattr(self, f"H_{l}_{p}"), T
-                    ).reshape(*B, 3**l)
+                        getattr(self, f"H_{weight}_{p}_rule"),
+                        getattr(self, f"H_{weight}_{p}"),
+                        T,
+                    ).reshape(*B, 3**weight)
                     for p in range(num_p)
                 ],
                 dim=-2,  # stack to create the new F dimension
@@ -105,17 +107,17 @@ class Converter(nn.Module):
 
         out = []
         # TODO, the looping is very inefficient, need to think about better ways
-        for l, num_p in self.l_num_p.items():
+        for weight, num_p in self.l_num_p.items():
             for p in range(num_p):
-                rule = getattr(self, f"G_{l}_{p}_rule")
-                G = getattr(self, f"G_{l}_{p}")
-                X_ = X[l][..., p, :]
+                rule = getattr(self, f"G_{weight}_{p}_rule")
+                G = getattr(self, f"G_{weight}_{p}")
+                X_ = X[weight][..., p, :]
 
                 # special rule for scalars
-                if l == 0:
+                if weight == 0:
                     X_ = X_[..., 0]
                 else:
-                    X_ = X_.reshape(*B, *(3,) * l)
+                    X_ = X_.reshape(*B, *(3,) * weight)
                 out.append(torch.einsum(rule, G, X_))
 
         out = torch.sum(torch.stack(out), dim=0)

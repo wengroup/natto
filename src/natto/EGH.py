@@ -13,8 +13,8 @@ from fractions import Fraction
 from functools import reduce
 from math import gcd
 
-from natt.ops import multiply_2, simplify_linear_combination
-from natt.symbolic import (
+from natto.ops import multiply_2, simplify_linear_combination
+from natto.symbolic import (
     CartesianTensor,
     Delta,
     Epsilon,
@@ -22,8 +22,8 @@ from natt.symbolic import (
     Scalar,
     TensorProduct,
 )
-from natt.symmetrize import get_permutations_2
-from natt.utils import letter_index
+from natto.symmetrize import get_permutations_2
+from natto.utils import letter_index
 
 
 def get_E(j: int, s_letters: str = None, verbose: int = 0) -> LinearCombination:
@@ -183,7 +183,6 @@ def get_S(
 
     S = []
     for i, (G_i, H_i) in enumerate(zip(G, H)):
-
         # Shift upper letters of H to distinguish those from G
         H_i = shift_index_2(H_i, n, letter_index(24, upper_case=True))
 

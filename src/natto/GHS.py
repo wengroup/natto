@@ -16,21 +16,21 @@ from pprint import pprint
 import torch
 from torch import Tensor
 
-from natt.EGH import get_G_even, get_g_matrix, get_G_odd, get_H, get_S
-from natt.evaluate import embed, evaluate_tensors, extract
-from natt.matrix import (
+from natto.EGH import get_G_even, get_g_matrix, get_G_odd, get_H, get_S
+from natto.evaluate import embed, evaluate_tensors, extract
+from natto.matrix import (
     float_matrix,
     fraction_matrix,
     matrix_inverse,
     matrix_multiply,
     matrix_transpose,
 )
-from natt.ops import simplify_linear_combination
-from natt.qr import find_independent_tensors
-from natt.sym import get_random_tensor_of_symmetry
-from natt.symbolic import LinearCombination
-from natt.symmetrize import get_random_natural_tensor
-from natt.utils import letter_index
+from natto.ops import simplify_linear_combination
+from natto.qr import find_independent_tensors
+from natto.sym import get_random_tensor_of_symmetry
+from natto.symbolic import LinearCombination
+from natto.symmetrize import get_random_natural_tensor
+from natto.utils import letter_index
 
 
 def get_G_H_S(n: int, symmetry: str = None, numerical: bool = True) -> dict:
@@ -118,7 +118,9 @@ def get_G_H_S_natural(
     return out
 
 
-def get_G_H_S_of_j(j: int, n: int, symmetry: str = None) -> tuple[
+def get_G_H_S_of_j(
+    j: int, n: int, symmetry: str = None
+) -> tuple[
     list[LinearCombination],
     list[LinearCombination],
     list[LinearCombination],
@@ -172,7 +174,9 @@ def get_G_H_S_of_j(j: int, n: int, symmetry: str = None) -> tuple[
     return G, H, S, g, h
 
 
-def get_G_H_S_of_j_natural(j1: int, j2: int, j3: int) -> tuple[
+def get_G_H_S_of_j_natural(
+    j1: int, j2: int, j3: int
+) -> tuple[
     LinearCombination,
     LinearCombination,
     LinearCombination,
@@ -231,7 +235,9 @@ def get_G_H_S_of_j_natural(j1: int, j2: int, j3: int) -> tuple[
     return G[0], H[0], S[0], g, h
 
 
-def get_G_H_of_j(j: int, n: int) -> tuple[
+def get_G_H_of_j(
+    j: int, n: int
+) -> tuple[
     list[LinearCombination],
     list[LinearCombination],
     list[list[Fraction]],
@@ -373,7 +379,6 @@ def get_G_H_S_rules_and_values(
 
     # loop over seniority p
     for G_p, H_p, S_p in zip(G, H, S):
-
         lower = letter_index(j)
         upper = letter_index(n, upper_case=True)
         upper2 = letter_index(n, start=n, upper_case=True)
@@ -448,7 +453,6 @@ def group_G(
     indices_zero = []
     indices_group = []
     for i, X in enumerate(all_X):
-
         # Check zeros
         if torch.allclose(X, torch.tensor(0.0), rtol=rtol, atol=atol):
             indices_zero.append(i)
@@ -569,7 +573,6 @@ def get_Q(
 
 
 if __name__ == "__main__":
-
     # # elastic tensor
     # j = 4
     # rank = 4

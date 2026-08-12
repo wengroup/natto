@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from natt.convert import Converter
-from natt.sym import symmetrize
+from natto.convert import Converter
+from natto.sym import symmetrize
 
 
 @pytest.mark.parametrize(

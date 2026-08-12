@@ -17,12 +17,12 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from natt.EGH import create_delta_epsilon_tensors
-from natt.evaluate import evaluate_tensors
-from natt.ops import simplify_linear_combination
-from natt.symbolic import LinearCombination
-from natt.symmetrize import get_permutations_delta
-from natt.utils import (
+from natto.EGH import create_delta_epsilon_tensors
+from natto.evaluate import evaluate_tensors
+from natto.ops import simplify_linear_combination
+from natto.symbolic import LinearCombination
+from natto.symmetrize import get_permutations_delta
+from natto.utils import (
     double_factorial,
     double_index,
     factorial,
@@ -265,7 +265,6 @@ def get_H_rules_even(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[s
 
     all_rules = []
     for perm in all_perms:
-
         # Permute the a indices to symmetrize the output, namely considering the
         # curly braces {}. No need to permute the r and s indices, since r and k come
         # from natural tensors, and thus all r or k indices are symmetric.
@@ -346,7 +345,6 @@ def get_H_rules_odd(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[st
 
     all_rules = []
     for perm in all_perms:
-
         # Permute the a indices to symmetrize the output, namely considering the
         # curly braces {}. No need to permute the r and s indices
         #
@@ -561,7 +559,6 @@ def coeff_D(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
 
 
 if __name__ == "__main__":
-
     # Get symbolic
     l1 = 2
     l2 = 1

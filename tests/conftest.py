@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from natt.symmetrize import symmetrize_and_remove_trace
+from natto.symmetrize import symmetrize_and_remove_trace
 
 
 @pytest.fixture(scope="session")

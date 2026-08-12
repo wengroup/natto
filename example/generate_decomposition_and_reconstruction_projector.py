@@ -2,8 +2,8 @@ from pathlib import Path
 
 import torch
 
-from natt.GHS import get_G_H_S
-from natt.utils import yaml_dump
+from natto.GHS import get_G_H_S
+from natto.utils import yaml_dump
 
 torch.set_default_dtype(torch.float64)
 
@@ -28,7 +28,6 @@ def convert_to_list(tensor):
 
 
 if __name__ == "__main__":
-
     physical_tensors = {
         "nuclear_shielding": {
             "rank": 2,

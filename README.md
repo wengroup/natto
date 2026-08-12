@@ -1,15 +1,15 @@
-# natt
+# natto
 
-`natt` is a Python package for constructing, analyzing, and embedding **natural tensors** — symmetric traceless tensors that form irreducible representations of the rotation group O(3).
+`natto` is a Python package for constructing, analyzing, and embedding **natural tensors** — symmetric traceless tensors that form irreducible representations of the rotation group O(3).
 It provides tools to decompose arbitrary Cartesian tensors into natural tensor components and to embed natural tensors back into the original Cartesian tensor space.
 
 ## Installation
 
-It is recommended to create a virtual environment first (e.g. using conda) before installing `natt`:
+It is recommended to create a virtual environment first (e.g. using conda) before installing `natto`:
 
 ```bash
-git clone https://github.com/wengroup/natt.git
-cd natt
+git clone https://github.com/wengroup/natto.git
+cd natto
 pip install -e .
 ```
 
@@ -19,7 +19,7 @@ The example below converts a rank-2 Cartesian tensor into its natural tensor com
 
 ```python
 import torch
-from natt.GHS import get_G_H_S
+from natto.GHS import get_G_H_S
 
 # Create a rank-2 tensor
 T = torch.arange(9, dtype=torch.float).reshape(3, 3)
@@ -55,7 +55,7 @@ See [`example/get_natural_tensor.py`](example/get_natural_tensor.py) for a compl
 
 ## Generating projectors
 
-`natt` can be used to generate three types of projectors: unit vector projectors, tensor product projectors, and decomposition/reconstruction projectors for physical Cartesian tensors.
+`natto` can be used to generate three types of projectors: unit vector projectors, tensor product projectors, and decomposition/reconstruction projectors for physical Cartesian tensors.
 See the `generate_*.py` scripts in the [`example/`](example/) directory and [`example/README.md`](example/README.md) for details.
 
 

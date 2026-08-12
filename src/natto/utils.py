@@ -159,8 +159,6 @@ def is_symmetric(
         p = list(range(start_dim)) + list(p)
         permuted = T.permute(*p)
         if not torch.allclose(T, permuted, atol=atol, rtol=rtol):
-            e = T - permuted
-            error = torch.sum(torch.abs(e))
             return False
 
     return True
@@ -187,7 +185,6 @@ def is_traceless(T, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5) 
     for i, j in itertools.combinations(range(start_dim, T.ndim), 2):
         trace = get_trace(T, i, j)
         if not torch.allclose(trace, zeros, atol=atol, rtol=rtol):
-            sum_trace = torch.sum(torch.abs(trace))
             return False
 
     return True

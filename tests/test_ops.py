@@ -1,12 +1,12 @@
 from pytest import fixture
 
-from natt.ops import (
+from natto.ops import (
     contract_epsilon_delta,
     contract_two_epsilon,
     contract_with_delta,
     simplify_tensor_product,
 )
-from natt.symbolic import (
+from natto.symbolic import (
     CartesianTensor,
     Delta,
     Epsilon,
