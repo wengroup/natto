@@ -10,7 +10,7 @@ from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
 from natto.utils import dij, eijk, letter_index
 
 
-def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:
+def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) -> Tensor:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
     Note, the order of the indices need to be taken care of.
@@ -32,6 +32,7 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:
         tp: Tensor product of Kronecker delta and Levi-Civita tensors.
         mode: which mode to use, either `G`, `H`, or `S`. This determines how the
             output indices are ordered.
+        dtype: Floating-point dtype of the evaluated tensor.
 
     Returns:
         Tensor product of Kronecker delta and Levi-Civita tensors.
@@ -48,7 +49,7 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:
 
     # The tensor product actually has no delta or epsilon tensors
     if not delta_rules and not epsilon_rules:
-        return torch.tensor(float(tp.factor))
+        return torch.tensor(float(tp.factor), dtype=dtype)
 
     left = ",".join(delta_rules + epsilon_rules)
 
@@ -77,8 +78,8 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:
 
     rule = left + "->" + right
 
-    d = dij()
-    e = eijk()
+    d = dij(dtype=dtype)
+    e = eijk(dtype=dtype)
     deltas = [d for _ in range(len(delta_rules))]
     epsilons = [e for _ in range(len(epsilon_rules))]
     data = deltas + epsilons
@@ -91,7 +92,9 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> Tensor:
     return product
 
 
-def evaluate_tensors(tensors: LinearCombination, mode: str) -> Tensor:
+def evaluate_tensors(
+    tensors: LinearCombination, mode: str, dtype: torch.dtype = None
+) -> Tensor:
     """
     Evaluate the tensor product of Kronecker delta and Levi-Civita tensors to get
     numerical values.
@@ -101,7 +104,7 @@ def evaluate_tensors(tensors: LinearCombination, mode: str) -> Tensor:
     output = 0
     for tp in tensors.components:
         if isinstance(tp, TensorProduct):
-            output += tp_delta_epsilon(tp, mode)
+            output += tp_delta_epsilon(tp, mode, dtype=dtype)
         else:
             raise ValueError(f"Unknown tensor type: {type(tp)}")
 

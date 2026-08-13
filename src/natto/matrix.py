@@ -99,6 +99,78 @@ def matrix_transpose(m: list[list[Fraction]]) -> list[list[Fraction]]:
     return [[m[j][i] for j in range(len(m))] for i in range(len(m[0]))]
 
 
+def matrix_null_space(
+    matrix: list[list[Fraction]], n_columns: int
+) -> list[list[Fraction]]:
+    """Return a basis for the null space of an exact rational matrix.
+
+    Each inner list is one basis vector satisfying ``matrix @ vector = 0``. Gaussian
+    elimination is performed entirely with
+    :class:`fractions.Fraction` objects.
+
+    Args:
+        matrix: Constraint matrix with exact rational entries. It may have no rows.
+        n_columns: Number of columns, needed when ``matrix`` has no rows.
+
+    Returns:
+        Independent null-space vectors of length ``n_columns``.
+    """
+    if not matrix:
+        return [
+            [Fraction(int(i == j)) for i in range(n_columns)] for j in range(n_columns)
+        ]
+    if any(len(row) != n_columns for row in matrix):
+        raise ValueError("Constraint matrix has inconsistent dimensions")
+
+    reduced = [row.copy() for row in matrix]
+    pivot_columns = []
+    pivot_row = 0
+    for column in range(n_columns):
+        row = next(
+            (
+                candidate
+                for candidate in range(pivot_row, len(reduced))
+                if reduced[candidate][column] != 0
+            ),
+            None,
+        )
+        if row is None:
+            continue
+
+        reduced[pivot_row], reduced[row] = reduced[row], reduced[pivot_row]
+        pivot = reduced[pivot_row][column]
+        reduced[pivot_row] = [value / pivot for value in reduced[pivot_row]]
+        for other_row in range(len(reduced)):
+            if other_row == pivot_row:
+                continue
+            factor = reduced[other_row][column]
+            if factor != 0:
+                reduced[other_row] = [
+                    value - factor * pivot_value
+                    for value, pivot_value in zip(
+                        reduced[other_row], reduced[pivot_row]
+                    )
+                ]
+
+        pivot_columns.append(column)
+        pivot_row += 1
+        if pivot_row == len(reduced):
+            break
+
+    free_columns = [
+        column for column in range(n_columns) if column not in pivot_columns
+    ]
+    basis = []
+    for free_column in free_columns:
+        vector = [Fraction(0) for _ in range(n_columns)]
+        vector[free_column] = Fraction(1)
+        for row, pivot_column in enumerate(pivot_columns):
+            vector[pivot_column] = -reduced[row][free_column]
+        basis.append(vector)
+
+    return basis
+
+
 def float_matrix(m: list[list[Fraction]]) -> list[list[float]]:
     """
     Convert a matrix of Fraction objects to a matrix of floats.

@@ -24,33 +24,44 @@ def symmetrize(t: Tensor, symmetry: str, mode: str = "mean") -> Tensor:
         The symmetrized tensor with the specified symmetry.
     """
     rank = len(t.shape)
-    indices = set(symmetry.replace(" ", "").replace("=", ""))
-    if len(indices) != rank:
+    permutations = generate_permutations(symmetry)
+    if len(permutations[0][0]) != rank:
         raise ValueError(f"Symmetry {symmetry} does not match tensor rank {rank}.")
 
-    perms = generate_permutations(symmetry)
+    transformed = [
+        sign * torch.permute(t, permutation) for permutation, sign in permutations
+    ]
     if mode == "mean":
-        return torch.mean(torch.stack([torch.permute(t, p) for p in perms]), dim=0)
+        return torch.mean(torch.stack(transformed), dim=0)
     elif mode == "sum":
-        return torch.sum(torch.stack([torch.permute(t, p) for p in perms]), dim=0)
+        return torch.sum(torch.stack(transformed), dim=0)
     else:
         raise ValueError(f"Unknown pooling operation: {mode}. Use 'mean' or 'sum'.")
 
 
-def check_symmetry(t: Tensor, symmetry: str, rtol=1e-5, atol=1e-8) -> bool:
+def check_symmetry(
+    t: Tensor,
+    symmetry: str,
+    rtol: float = 1e-5,
+    atol: float = 1e-7,
+) -> bool:
     """
     Check if a tensor has the specified symmetry.
 
     Args:
         t: The input tensor to be checked.
         symmetry: The target symmetry of the output tensor. e.g. 'ijk=ikj=jik'.
+        rtol: Relative tolerance used for numerical comparison.
+        atol: Absolute tolerance used for numerical comparison. The default is loose
+            enough for float32 tensors; tighten it for float64 ones.
 
     Returns:
         True if the tensor has the specified symmetry, False otherwise.
     """
-    perms = generate_permutations(symmetry)
-    for perm in perms:
-        if not torch.allclose(t, torch.permute(t, perm), rtol=rtol, atol=atol):
+    for permutation, sign in parse_symmetry_generators(symmetry, rank=t.ndim):
+        if not torch.allclose(
+            torch.permute(t, permutation), sign * t, rtol=rtol, atol=atol
+        ):
             return False
     return True
 
@@ -88,16 +99,19 @@ def generate_closure(generators: list[tuple[int, ...]]) -> list[tuple[int, ...]]
     return list(seen)
 
 
-# TODO, generalize this handel inversion: e.g. "ijk=-jik"
-def generate_permutations(symmetry: str) -> list[tuple[int, ...]]:
+def generate_permutations(symmetry: str) -> list[tuple[tuple[int, ...], int]]:
     """
-    Get the index permutations for symmetrizing a generic tensor to obtain a tensor
-    with the specified symmetry.
+    Get index permutations for a specified tensor symmetry.
+
+    This is the group closure of the generators returned by
+    :func:`parse_symmetry_generators`, so it covers both symmetric and antisymmetric
+    relations.
 
     Args:
         symmetry: A string representing the symmetry of the target tensor. For example,
             - "ij=ji" means that the target is a fully symmetric rank-2 tensor (e.g.
                 stress tensor);
+            - "ij=-ji" means that the target is an antisymmetric rank-2 tensor;
             - "ijk=ikj" means that the target is a rank-3 tensor with the last two
                 indices symmetric (e.g. piezoelectric tensor);
             - "ijk=ikj=jik" means that the target is a fully symmetric rank-3 tensor;
@@ -106,35 +120,72 @@ def generate_permutations(symmetry: str) -> list[tuple[int, ...]]:
                 between ij and kl). For example, the elastic tensor has this symmetry;
             The number of unique letters gives the rank of the tensor (what letters to
             use does not matter).
+    Returns:
+        ``(permutation, sign)`` pairs representing
+        ``permute(tensor, permutation) = sign * tensor``.
+
+    Raises:
+        ValueError: If the relations assign conflicting signs to one permutation.
+    """
+    generators = parse_symmetry_generators(symmetry)
+    rank = len(symmetry.split("=")[0].strip().replace(" ", ""))
+    identity = tuple(range(rank))
+    signs = {identity: 1}
+    queue = [(identity, 1)]
+
+    while queue:
+        permutation, sign = queue.pop(0)
+        for generator, generator_sign in generators:
+            composed = tuple(generator[axis] for axis in permutation)
+            composed_sign = sign * generator_sign
+            if composed in signs:
+                if signs[composed] != composed_sign:
+                    raise ValueError("Inconsistent signed symmetry relations")
+                continue
+            signs[composed] = composed_sign
+            queue.append((composed, composed_sign))
+
+    return list(signs.items())
+
+
+def parse_symmetry_generators(
+    symmetry: str, rank: int | None = None
+) -> list[tuple[tuple[int, ...], int]]:
+    """Parse index equalities into signed permutation generators.
+
+    Args:
+        symmetry: Relations such as ``"ijk=ikj"`` or ``"ij=-ji"``. Every term is
+            interpreted relative to the unsigned first term.
+        rank: Expected tensor rank. If provided, it must match the number of indices
+            in the reference term.
 
     Returns:
-        A list of tuples representing the index permutations. All together, they can
-        be used to symmetrize the tensor by some pooling operation such as sum or mean.
-        For example, if symmetry is "ijk=ikj=jik", the output will be:
-        [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)].
+        ``(permutation, sign)`` pairs representing
+        ``permute(tensor, permutation) = sign * tensor``.
     """
-    parts = [p.strip() for p in symmetry.split("=")]
-    if len(parts) < 1:
-        raise ValueError("Invalid symmetry rule. Use format `ij=ji`.")
+    parts = [part.strip().replace(" ", "") for part in symmetry.split("=")]
+    if not parts or not parts[0] or parts[0].startswith(("+", "-")):
+        raise ValueError("The first symmetry term must be an unsigned index string")
 
     original = parts[0]
-    index_to_axis = {char: idx for idx, char in enumerate(original)}
+    if len(set(original)) != len(original):
+        raise ValueError("Each index must occur once in a symmetry term")
+    if rank is not None and len(original) != rank:
+        raise ValueError(f"Symmetry {symmetry} does not match tensor rank {rank}")
+    index_to_axis = {char: axis for axis, char in enumerate(original)}
 
-    # Get the generators for the permutations according to the symmetry
     generators = []
-    for p in parts:
-        if len(p) != len(original):
-            raise ValueError(f"Permutation {p} has wrong length.")
-        try:
-            perm_tuple = tuple(index_to_axis[char] for char in p)
-        except KeyError as e:
-            raise ValueError(f"Index {e} not in original indices {original}.")
-        generators.append(perm_tuple)
+    for part in parts[1:]:
+        sign = -1 if part.startswith("-") else 1
+        term = part[1:] if part.startswith(("+", "-")) else part
+        if len(term) != len(original):
+            raise ValueError(f"Permutation {part} has wrong length")
+        if set(term) != set(original):
+            raise ValueError(f"Permutation {part} must contain the indices {original}")
+        permutation = tuple(index_to_axis[char] for char in term)
+        generators.append((permutation, sign))
 
-    # Generate all permutations from the generators
-    perms = generate_closure(generators)
-
-    return perms
+    return generators
 
 
 def get_random_tensor_of_symmetry(rank: int, symmetry: str, seed: int = 35) -> Tensor:

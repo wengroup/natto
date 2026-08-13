@@ -23,11 +23,12 @@ from natto.matrix import (
     fraction_matrix,
     matrix_inverse,
     matrix_multiply,
+    matrix_null_space,
     matrix_transpose,
 )
 from natto.ops import simplify_linear_combination
 from natto.qr import find_independent_tensors
-from natto.sym import get_random_tensor_of_symmetry
+from natto.sym import parse_symmetry_generators
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_random_natural_tensor
 from natto.utils import letter_index
@@ -42,6 +43,7 @@ def get_G_H_S(n: int, symmetry: str = None, numerical: bool = True) -> dict:
         symmetry: symmetry of the tensor in space n, if any. For example,
             - "ij=ji" means that the target is a fully symmetric rank-2 tensor (e.g.
                 stress tensor);
+            - "ij=-ji" means that the target is an antisymmetric rank-2 tensor;
             - "ijk=ikj" means that the target is a rank-3 tensor with the last two
                 indices symmetric (e.g. piezoelectric tensor);
             - "ijk=ikj=jik" means that the target is a fully symmetric rank-3 tensor;
@@ -76,7 +78,7 @@ def get_G_H_S(n: int, symmetry: str = None, numerical: bool = True) -> dict:
 def get_G_H_S_natural(
     j1: int, j2: int, max_j3: int = None, numerical: bool = True
 ) -> dict:
-    """
+    r"""
     Get all the G, H, S tensors of a tensor product of two natural tensors.
 
     Z = X \otimes Y, where X and Y are natural tensors.
@@ -138,6 +140,7 @@ def get_G_H_S_of_j(
         symmetry: symmetry of the tensor in space n, if any. For example,
             - "ij=ji" means that the target is a fully symmetric rank-2 tensor (e.g.
                 stress tensor);
+            - "ij=-ji" means that the target is an antisymmetric rank-2 tensor;
             - "ijk=ikj" means that the target is a rank-3 tensor with the last two
                 indices symmetric (e.g. piezoelectric tensor);
             - "ijk=ikj=jik" means that the target is a fully symmetric rank-3 tensor;
@@ -157,14 +160,15 @@ def get_G_H_S_of_j(
     # Get independent G and H tensors for a general tensor
     ind_G, ind_H, g, h = get_G_H_of_j(j, n)
 
-    # Further down select G and H for tensors with symmetry
+    # Further reduce the mappings for tensors with internal symmetry.
     if symmetry is not None:
-        # Get independency of G by using a random tensor of the given symmetry
-        T = get_random_tensor_of_symmetry(n, symmetry)
-        _, indices_group = group_G(T, ind_G)
+        ind_G = _get_symmetry_adapted_mappings(j, n, ind_G, ind_H, symmetry)
+        if not ind_G:
+            return [], [], [], [], []
 
-        # Combine G (and H) to create new independent G (and H) tensors
-        ind_G, ind_H = combine_G_H_of_j(ind_G, ind_H, h, indices_group)
+        g = get_g_matrix(j, n, ind_G)
+        h = matrix_inverse(g)
+        ind_H = get_H(h, ind_G)
 
     # Get S tensors
     G = [simplify_linear_combination(G) for G in ind_G]
@@ -183,7 +187,7 @@ def get_G_H_S_of_j_natural(
     list[list[Fraction]],
     list[list[Fraction]],
 ]:
-    """
+    r"""
     Get the G, H, S tensors Z = X \otimes Y, where X and Y are natural tensors.
 
     There will be a single G, H, S tensors for a given j1, j2, and j3.
@@ -260,6 +264,10 @@ def get_G_H_of_j(
         g: g_pq matrix
         h: h_pq matrix
     """
+    # No isotropic rank-one mapping exists from a scalar natural tensor.
+    if n == 1 and j == 0:
+        return [], [], [], []
+
     # create G mapping operator
     if (n - j) % 2 == 0:
         all_G = get_G_even(j, n)
@@ -413,6 +421,94 @@ def get_G_H_S_rules_and_values(
     return out_j
 
 
+def _get_symmetry_adapted_mappings(
+    weight: int,
+    rank: int,
+    mappings: list[LinearCombination],
+    duals: list[LinearCombination],
+    symmetry: str,
+) -> list[LinearCombination]:
+    """Solve the exact coefficient constraints imposed by internal symmetry."""
+    constraints = []
+    for permutation, sign in parse_symmetry_generators(symmetry, rank=rank):
+        action = _get_symmetry_action_matrix(mappings, duals, weight, rank, permutation)
+        for row_index, row in enumerate(action):
+            constraints.append(
+                [
+                    value - sign * Fraction(int(row_index == column_index))
+                    for column_index, value in enumerate(row)
+                ]
+            )
+
+    coefficients = matrix_null_space(constraints, len(mappings))
+    adapted = []
+    for vector in coefficients:
+        mapping = sum(
+            (
+                coefficient * candidate
+                for coefficient, candidate in zip(vector, mappings)
+            ),
+            LinearCombination(),
+        )
+        adapted.append(simplify_linear_combination(mapping))
+
+    return adapted
+
+
+def _get_symmetry_action_matrix(
+    mappings: list[LinearCombination],
+    duals: list[LinearCombination],
+    weight: int,
+    rank: int,
+    permutation: tuple[int, ...],
+    max_denominator: int = 10000,
+    atol: float = 1e-10,
+) -> list[list[Fraction]]:
+    r"""Evaluate the action of one index permutation on the mapping basis.
+
+    If ``P G[q] = sum_p M[p, q] G[p]``, duality gives
+    ``M[p, q] = (H[p] \odot^(rank+weight) P G[q]) / (2*weight + 1)``.
+    The contractions are evaluated in float64 and recovered as exact rational
+    coefficients.
+    """
+    if len(permutation) != rank:
+        raise ValueError("Symmetry permutation does not match the Cartesian rank")
+
+    numerical_mappings = [
+        evaluate_tensors(
+            simplify_linear_combination(mapping), mode="G", dtype=torch.float64
+        )
+        for mapping in mappings
+    ]
+    numerical_duals = [
+        evaluate_tensors(
+            simplify_linear_combination(dual), mode="H", dtype=torch.float64
+        )
+        for dual in duals
+    ]
+    dual_order = tuple(range(weight, weight + rank)) + tuple(range(weight))
+    mapping_order = permutation + tuple(range(rank, rank + weight))
+    ordered_duals = [dual.permute(dual_order) for dual in numerical_duals]
+    permuted_mappings = [
+        mapping.permute(mapping_order) for mapping in numerical_mappings
+    ]
+
+    action = []
+    for dual in ordered_duals:
+        row = []
+        for mapping in permuted_mappings:
+            numerical = torch.sum(dual * mapping).item() / (2 * weight + 1)
+            exact = Fraction(numerical).limit_denominator(max_denominator)
+            if abs(float(exact) - numerical) > atol:
+                raise RuntimeError(
+                    "Could not recover an exact rational symmetry-action coefficient"
+                )
+            row.append(exact)
+        action.append(row)
+
+    return action
+
+
 # TODO, this can be done symbolically. Probably do it.
 #  We need:
 #  1. symbolic symmetrize() to get T. It is implemented in ops.py, but commented out
@@ -426,9 +522,15 @@ def group_G(
     atol: float = 1e-6,
 ) -> tuple[list[int], list[list[int]]]:
     r"""
-    Group the G tensors by their uniqueness when operating on a tensor T.
+    Group G tensors numerically for validation or exploratory screening.
 
-    This is achieved by numerical experiments:
+    This randomized method only recognizes mappings that vanish individually or give
+    equal outputs. Use :func:`get_G_H_S_of_j` for deterministic internal-symmetry
+    reduction, including signed and general linear relations. This helper remains in
+    the natural tensor-product specialization and is also useful for validation and
+    exploratory screening.
+
+    The grouping is obtained as follows:
     1. For each G, obtain X = G \odot^n T.
     2. Check each X to verify whether:
         a. it is zero;

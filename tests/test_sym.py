@@ -2,29 +2,42 @@ import itertools
 
 import torch
 
-from natto.sym import check_symmetry, generate_permutations, symmetrize
+from natto.sym import (
+    check_symmetry,
+    generate_permutations,
+    parse_symmetry_generators,
+    symmetrize,
+)
+
+
+def unsigned_permutations(symmetry: str) -> set[tuple[int, ...]]:
+    """Return the permutations of an unsigned symmetry as a set."""
+    permutations = generate_permutations(symmetry)
+    assert all(sign == 1 for _, sign in permutations)
+
+    return {permutation for permutation, _ in permutations}
 
 
 def test_generate_permutations():
     # rank-2 symmetric
     symmetry = "ij=ji"
-    perms = generate_permutations(symmetry)
-    assert set(perms) == set(itertools.permutations([0, 1]))
+    perms = unsigned_permutations(symmetry)
+    assert perms == set(itertools.permutations([0, 1]))
 
     # rank-3 partially symmetric
     symmetry = "ijk=ikj"
-    perms = generate_permutations(symmetry)
-    assert set(perms) == {(0, 1, 2), (0, 2, 1)}
+    perms = unsigned_permutations(symmetry)
+    assert perms == {(0, 1, 2), (0, 2, 1)}
 
     # rank-3 fully symmetric
     symmetry = "ijk=jik=ikj"
-    perms = generate_permutations(symmetry)
-    assert set(perms) == set(itertools.permutations([0, 1, 2]))
+    perms = unsigned_permutations(symmetry)
+    assert perms == set(itertools.permutations([0, 1, 2]))
 
     # rank-4 partially symmetric (elastic tensor)
     symmetry = "ijkl=jikl=klij"
-    perms = generate_permutations(symmetry)
-    assert set(perms) == {
+    perms = unsigned_permutations(symmetry)
+    assert perms == {
         (0, 1, 2, 3),
         (0, 1, 3, 2),
         (1, 0, 2, 3),
@@ -37,8 +50,8 @@ def test_generate_permutations():
 
     # rank-4 fully symmetric
     symmetry = "ijkl=jikl=kjil=ljki"
-    perms = generate_permutations(symmetry)
-    assert set(perms) == set(itertools.permutations([0, 1, 2, 3]))
+    perms = unsigned_permutations(symmetry)
+    assert perms == set(itertools.permutations([0, 1, 2, 3]))
 
 
 def test_symmetrize():
@@ -66,3 +79,28 @@ def test_symmetrize():
     symmetry = "ijkl=jikl=kjil=ljki"
     out = symmetrize(t, symmetry)
     assert check_symmetry(out, symmetry)
+
+
+def test_antisymmetric_rank_two():
+    """Check signed parsing and projection onto antisymmetric rank-two tensors."""
+    symmetry = "ij=-ji"
+    assert parse_symmetry_generators(symmetry) == [((1, 0), -1)]
+    assert set(generate_permutations(symmetry)) == {
+        ((0, 1), 1),
+        ((1, 0), -1),
+    }
+
+    torch.manual_seed(35)
+    tensor = torch.randn(3, 3)
+    output = symmetrize(tensor, symmetry)
+    assert check_symmetry(output, symmetry)
+    assert torch.allclose(output, (tensor - tensor.T) / 2)
+
+
+def test_fully_antisymmetric_rank_three():
+    """Check float32 projection onto the fully antisymmetric rank-three space."""
+    symmetry = "ijk=-jik=-ikj"
+    torch.manual_seed(35)
+    output = symmetrize(torch.randn(3, 3, 3), symmetry)
+
+    assert check_symmetry(output, symmetry)

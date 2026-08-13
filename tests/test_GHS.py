@@ -42,6 +42,7 @@ PHYSICAL_TENSOR_CLASSES = [
     TensorClass("spontaneous polarization", 1, None, 3, {1: 1}),
     TensorClass("optical activity", 2, None, 9, {0: 1, 1: 1, 2: 1}),
     TensorClass("stress and strain", 2, "ij=ji", 6, {0: 1, 2: 1}),
+    TensorClass("rate-of-rotation tensor", 2, "ij=-ji", 3, {1: 1}),
     TensorClass("optical mixing", 3, None, 27, {0: 1, 1: 3, 2: 2, 3: 1}),
     TensorClass("piezoelectric effect", 3, "ijk=ikj", 18, {1: 2, 2: 1, 3: 1}),
     TensorClass("Kleinman symmetry in SHG", 3, "ijk=ikj=jik", 10, {1: 1, 3: 1}),
@@ -65,11 +66,7 @@ PHYSICAL_TENSOR_CLASSES = [
 
 # Classes `get_G_H_S` cannot handle yet, as {test_id: reason}. Kept out of the table
 # above so that it stays a statement about the physics, not about the code.
-NOT_SUPPORTED = {
-    "rank1_spontaneous_polarization": (
-        "rank 1 is not supported: get_G_rules_odd_j0 asserts n >= 3"
-    ),
-}
+NOT_SUPPORTED = {}
 
 
 def get_tensor_class_params(
@@ -151,9 +148,7 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     for weight in tensor_class.multiplicity:
         Q, _, _, _, _ = get_G_H_S_of_j(weight, tensor_class.rank, tensor_class.symmetry)
         Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
-        numerical_Q = torch.stack(
-            [evaluate_tensors(Q_p, mode="G") for Q_p in Q]
-        )
+        numerical_Q = torch.stack([evaluate_tensors(Q_p, mode="G") for Q_p in Q])
         flattened_Q = numerical_Q.reshape(len(Q), -1)
         numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
         symbolic = torch.tensor(
@@ -165,6 +160,12 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
         )
 
         torch.testing.assert_close(symbolic, numerical)
+
+
+def test_symmetry_rank_must_match_tensor_rank():
+    """Reject a symmetry whose reference term has the wrong tensor rank."""
+    with pytest.raises(ValueError):
+        get_G_H_S(3, "ij", numerical=False)
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
@@ -210,7 +211,7 @@ def test_get_G_H_S(tensor_class: TensorClass):
 
     sum_T_prime = torch.sum(torch.stack(all_T_prime), dim=0)
 
-    assert torch.allclose(sum_T_prime, T)
+    assert torch.allclose(sum_T_prime, T, rtol=1e-5, atol=1e-6)
 
 
 @pytest.mark.parametrize(

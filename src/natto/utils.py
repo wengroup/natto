@@ -64,14 +64,18 @@ def repeat_double_index(n: int, start: int = 0, upper_case: bool = False) -> lis
     return [s + s for s in indices]
 
 
-def dij(device: Optional[torch.device] = None) -> Tensor:
+def dij(
+    device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None
+) -> Tensor:
     """Kronecker delta tensor."""
-    return torch.eye(3, device=device)
+    return torch.eye(3, device=device, dtype=dtype)
 
 
-def eijk(device: Optional[torch.device] = None) -> Tensor:
+def eijk(
+    device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None
+) -> Tensor:
     """Levi-Civita tensor."""
-    e = torch.zeros(3, 3, 3, device=device)
+    e = torch.zeros(3, 3, 3, device=device, dtype=dtype)
     e[0, 1, 2] = 1.0
     e[1, 2, 0] = 1.0
     e[2, 0, 1] = 1.0
