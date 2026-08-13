@@ -169,7 +169,7 @@ def get_H(
 def get_S(
     G: list[LinearCombination], H: list[LinearCombination], n: int
 ) -> list[LinearCombination]:
-    """
+    r"""
     Get S tensors for a given G and H.
 
     S = G \odot^j H

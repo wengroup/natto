@@ -133,3 +133,4 @@ dmypy.json
 .vscode/
 .DS_Store
 git_commit.txt
+.codegraph/

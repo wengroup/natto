@@ -169,7 +169,7 @@ def symmetrize_2(t: Tensor, num_delta: int, start_dim: int = 0) -> Tensor:
 
 # TODO, this can be refactored to be similar as unit_vector.py
 def remove_trace(u: Tensor, start_dim: int = 0) -> Tensor:
-    """
+    r"""
     Remove the trace of a symmetric tensors to get a natural tensor of the same rank.
 
     Args:
@@ -272,7 +272,7 @@ def get_permutations(symmetry: str, start_dim: int = 0) -> list[list[int]]:
 
 
 def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[int]]:
-    """
+    r"""
 
     Get the unique permutations of the tensor product of a symmetric tensor and deltas.
 
@@ -334,7 +334,7 @@ def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[
 def get_permutations_delta(
     symmetry: str, delta_indices: str, start_dim: int = 0
 ) -> list[list[int]]:
-    """
+    r"""
     Get the unique permutations of the indices to fully symmetrize a tensor.
     that is obtained by tensor product with delta tensors.
 
