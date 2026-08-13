@@ -6,7 +6,9 @@ import pytest
 import torch
 
 import natto.GHS
-from natto.GHS import get_G_H_S, get_G_H_S_natural
+from natto.EGH import get_g_matrix
+from natto.evaluate import evaluate_tensors
+from natto.GHS import get_G_H_S, get_G_H_S_natural, get_G_H_S_of_j
 from natto.qr import find_independent_tensors
 from natto.sym import symmetrize
 from natto.symmetrize import get_random_natural_tensor
@@ -136,6 +138,33 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
 
     assert found == tensor_class.multiplicity
     assert sum(N_m * (2 * m + 1) for m, N_m in found.items()) == tensor_class.n_ind
+
+
+@pytest.mark.parametrize(
+    "tensor_class",
+    get_tensor_class_params(
+        [tc for tc in PHYSICAL_TENSOR_CLASSES if tc.symmetry is not None]
+    ),
+)
+def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
+    """Check exact Gram matrices for every internally symmetric weight sector."""
+    for weight in tensor_class.multiplicity:
+        Q, _, _, _, _ = get_G_H_S_of_j(weight, tensor_class.rank, tensor_class.symmetry)
+        Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
+        numerical_Q = torch.stack(
+            [evaluate_tensors(Q_p, mode="G") for Q_p in Q]
+        )
+        flattened_Q = numerical_Q.reshape(len(Q), -1)
+        numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
+        symbolic = torch.tensor(
+            [
+                [float(value) for value in row]
+                for row in get_g_matrix(weight, tensor_class.rank, Q_with_zeros)
+            ],
+            dtype=numerical.dtype,
+        )
+
+        torch.testing.assert_close(symbolic, numerical)
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())

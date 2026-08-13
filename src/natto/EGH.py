@@ -9,6 +9,7 @@ References:
 """
 
 import itertools
+from collections import Counter
 from fractions import Fraction
 from functools import reduce
 from math import gcd
@@ -466,6 +467,12 @@ def shift_index(
         The new tensor with the shifted index.
     """
 
+    # The zero tensor has no meaningful indices to shift. In particular, a zero
+    # TensorProduct stores a Zero component whose constructor does not accept the
+    # general CartesianTensor arguments used below.
+    if tensor.factor == 0:
+        return tensor
+
     def _shift(t: CartesianTensor):
         if letters is None:
             indices = "".join([chr(ord(i) + shift) for i in t.indices])
@@ -562,99 +569,92 @@ def get_scalar_factor(t1: LinearCombination, t2: LinearCombination) -> Fraction 
 
 def get_g_pq(
     j: int, n: int, G_p: LinearCombination, G_q: LinearCombination
-) -> Fraction | None:
+) -> Fraction:
     r"""
-    Compute a single g_pq value, which is defined as
-     G^p(n|j} \odot^n G^q(n|j) = g_pq E(j|j).
+    Compute one entry of the exact Gram matrix of symbolic mapping tensors.
 
-    Warnings:
-        This function has strict rules on the input G_p and G_q. They should be
-        provided in their original form, before any simplification. Otherwise, the
-        contraction will not work as expected. In other words, the input G_p and G_q
-        should not be simplified or canonized, e.g. using simplify_linear_combination().
+    For rank-``n``, weight-``j`` mapping tensors, this evaluates
+
+    ``g_pq = (G_p \odot^(n+j) G_q) / (2*j + 1)``.
+
+    Every free index of ``G_p`` is paired with the corresponding free index of
+    ``G_q``. Indices repeated within an individual symbolic term are internal dummy
+    indices and are contracted independently. The resulting scalar is evaluated with
+    :class:`fractions.Fraction`, so the result is exact.
 
     Args:
-        j:
+        j: Weight of the natural-tensor space.
+        n: Rank of the Cartesian tensor space.
+        G_p: First rank-``n + j`` symbolic mapping tensor.
+        G_q: Second rank-``n + j`` symbolic mapping tensor.
 
     Returns:
-        The scalar factor g_pq. If None, G_p and G_q are not scalar multiples of each
-        other.
+        The exact Gram-matrix entry ``g_pq``.
     """
-    even = (n - j) % 2 == 0
 
-    # G_p and G_q are using the same set of indices. Should shift one of them to carry
-    # out the contraction.
-    if even:
-        shift = n
-    else:
-        if j == 0:
-            shift = n  # there is no tau
-        else:
-            shift = n + 1  # the additional one for tau
-    G_q = shift_index_2(G_q, shift)
+    def get_free_indices(tensor: LinearCombination) -> str:
+        free_indices = None
+        for term in tensor:
+            if term.factor == 0:
+                continue
+            counts = Counter(term.indices)
+            term_free_indices = "".join(
+                sorted(index for index, count in counts.items() if count == 1)
+            )
+            if free_indices is None:
+                free_indices = term_free_indices
+            elif term_free_indices != free_indices:
+                raise ValueError("All terms must have the same free indices")
 
-    def get_upper_indices(G: LinearCombination) -> str:
-        letters = set()
-        for t in G:
-            letters.update([i for i in t.indices if i.isupper()])
-        return "".join(sorted(letters))
+        return free_indices or ""
 
-    # Contracted indices s1, s2, ..., sn of G_p and G_q (upper case letters)
-    p_idx = get_upper_indices(G_p)
-    q_idx = get_upper_indices(G_q)
+    # Give the second tensor a disjoint index set before pairing corresponding free
+    # indices. Repeated indices within either tensor are internal contraction indices.
+    G_q = shift_index_2(G_q, n + j + 1)
+    p_indices = get_free_indices(G_p)
+    q_indices = get_free_indices(G_q)
+    expected_rank = n + j
+    if len(p_indices) != expected_rank or len(q_indices) != expected_rank:
+        raise ValueError(
+            f"Mapping tensors must have rank {expected_rank}, got "
+            f"{len(p_indices)} and {len(q_indices)}"
+        )
 
-    # For odd n-j and j is not 0, the index tau should not be contracted.
-    # It is the latest upper case letter, see get_G_rules_odd().
-    # For odd n-j, and j is 0, there is no tau index.
-    if not even and j != 0:
-        p_idx = p_idx[:-1]
-        q_idx = q_idx[:-1]
+    contracted = contract_G(G_p, G_q, p_indices, q_indices)
+    if any(term.indices for term in contracted):
+        raise ValueError("Full contraction left unpaired indices")
 
-    contracted = contract_G(G_p, G_q, p_idx, q_idx)
-    # contracted = combine_terms(
-    #     order_tp_components_2(canonize_delta_indices_2(evaluate_delta_2(contracted)))
-    # )
-    contracted = simplify_linear_combination(contracted)
+    full_contraction = sum((term.factor for term in contracted), Fraction())
 
-    # in the contracted tensor, all upper case indices s1, ... sn are contracted.
-    # To ensure contracted and E_jj using the same set of indices, we provide the
-    # remaining indices in G_q to E_jj.
-    remaining_indices = set()
-    for t in G_q:
-        remaining_indices.update([i for i in t.indices if i.islower()])
-    remaining_indices = "".join(sorted(remaining_indices))
-
-    E_jj = get_E(j, remaining_indices)
-    E_jj = simplify_linear_combination(E_jj)
-
-    # Compare contracted and E_jj to get the factor g_pq
-    factor = get_scalar_factor(contracted, E_jj)
-
-    return factor
+    return full_contraction / (2 * j + 1)
 
 
 def get_g_matrix(
     j: int, n: int, all_G: list[LinearCombination]
 ) -> list[list[Fraction]]:
-    """
-    Compute a matrix of g_pq values.
+    r"""Compute the exact Gram matrix of symbolic mapping tensors.
+
+    Each entry is evaluated as
+
+    ``g_pq = (G_p \odot^(n+j) G_q) / (2*j + 1)``
+
+    using :func:`get_g_pq`.
+
     Args:
-        j:
-        n:
-        all_G:
+        j: Weight of the natural-tensor space.
+        n: Rank of the Cartesian tensor space.
+        all_G: Rank-``n + j`` symbolic mapping tensors spanning the weight-``j``
+            sector.
 
     Returns:
+        Symmetric matrix whose entries are exact :class:`fractions.Fraction` values.
     """
     num = len(all_G)
 
     matrix = [[None] * num for _ in range(num)]
     for p in range(num):
         for q in range(num):
-            v = get_g_pq(j, n, all_G[p], all_G[q])
-            # If there is no scalar factor, setting it to 0.
-            if v is None:
-                v = Fraction(0)
-            matrix[p][q] = v
+            matrix[p][q] = get_g_pq(j, n, all_G[p], all_G[q])
 
     return matrix
 

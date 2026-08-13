@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from natto.EGH import get_E, get_E_rules, get_G_even, get_G_odd
+from natto.EGH import get_E, get_E_rules, get_G_even, get_g_matrix, get_G_odd
 from natto.evaluate import evaluate_tensors
 from natto.utils import letter_index
 
@@ -304,6 +304,14 @@ def test_G_even():
         "+1/2 δ_aD δ_bC δ_AB",
         "-1/3 δ_ab δ_CD δ_AB",
     }
+
+
+def test_g_matrix_ignores_symbolic_zero_terms():
+    """Check that explicit zero terms do not affect the symbolic Gram matrix."""
+    all_G = get_G_even(j=2, n=4)
+    mapping_with_zeros = all_G[0] + 0 * all_G[1]
+
+    assert get_g_matrix(2, 4, [mapping_with_zeros]) == get_g_matrix(2, 4, [all_G[0]])
 
 
 def test_G_odd():
