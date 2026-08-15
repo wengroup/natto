@@ -606,9 +606,28 @@ def _get_symmetry_adapted_mappings(
     symmetry: str,
 ) -> list[LinearCombination]:
     """Solve the exact coefficient constraints imposed by internal symmetry."""
+    # Neither the numerical mappings nor the ordered duals depend on the permutation,
+    # so they are evaluated once here rather than once per generator.
+    numerical_mappings = [
+        evaluate_tensors(
+            simplify_linear_combination(mapping), mode="G", dtype=torch.float64
+        )
+        for mapping in mappings
+    ]
+    dual_order = tuple(range(weight, weight + rank)) + tuple(range(weight))
+    ordered_duals = [
+        evaluate_tensors(
+            simplify_linear_combination(dual), mode="H", dtype=torch.float64
+        ).permute(dual_order)
+        for dual in duals
+    ]
+
+    generators = parse_symmetry_generators(symmetry, rank=rank)
     constraints = []
-    for permutation, sign in parse_symmetry_generators(symmetry, rank=rank):
-        action = _get_symmetry_action_matrix(mappings, duals, weight, rank, permutation)
+    for permutation, sign in generators:
+        action = _get_symmetry_action_matrix(
+            numerical_mappings, ordered_duals, weight, rank, permutation
+        )
         for row_index, row in enumerate(action):
             constraints.append(
                 [
@@ -633,8 +652,8 @@ def _get_symmetry_adapted_mappings(
 
 
 def _get_symmetry_action_matrix(
-    mappings: list[LinearCombination],
-    duals: list[LinearCombination],
+    numerical_mappings: list[Tensor],
+    ordered_duals: list[Tensor],
     weight: int,
     rank: int,
     permutation: tuple[int, ...],
@@ -647,25 +666,17 @@ def _get_symmetry_action_matrix(
     ``M[p, q] = (H[p] \odot^(rank+weight) P G[q]) / (2*weight + 1)``.
     The contractions are evaluated in float64 and recovered as exact rational
     coefficients.
+
+    Args:
+        numerical_mappings: mappings evaluated in mode ``G``.
+        ordered_duals: duals evaluated in mode ``H`` and already permuted so that
+            their Cartesian indices lead. Both are independent of the permutation and
+            so are prepared once by the caller.
     """
     if len(permutation) != rank:
         raise ValueError("Symmetry permutation does not match the Cartesian rank")
 
-    numerical_mappings = [
-        evaluate_tensors(
-            simplify_linear_combination(mapping), mode="G", dtype=torch.float64
-        )
-        for mapping in mappings
-    ]
-    numerical_duals = [
-        evaluate_tensors(
-            simplify_linear_combination(dual), mode="H", dtype=torch.float64
-        )
-        for dual in duals
-    ]
-    dual_order = tuple(range(weight, weight + rank)) + tuple(range(weight))
     mapping_order = permutation + tuple(range(rank, rank + weight))
-    ordered_duals = [dual.permute(dual_order) for dual in numerical_duals]
     permuted_mappings = [
         mapping.permute(mapping_order) for mapping in numerical_mappings
     ]
