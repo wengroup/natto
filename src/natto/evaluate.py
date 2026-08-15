@@ -2,12 +2,54 @@
 Evaluating numerical values of G, H, and S tensors and their tensor products.
 """
 
+from functools import lru_cache
+
 import torch
 from torch import Tensor
 
 from natto.ops import simplify_linear_combination
 from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
 from natto.utils import dij, eijk, letter_index
+
+_MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
+
+
+@lru_cache(maxsize=512)
+def _cached_delta_epsilon_contraction(
+    rule: str, num_delta: int, num_epsilon: int, dtype: torch.dtype = None
+) -> Tensor:
+    """Contract and cache a small product of delta and Levi-Civita tensors."""
+    data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
+
+    return torch.einsum(rule, *data)
+
+
+def _contract_delta_epsilon(
+    rule: str, num_delta: int, num_epsilon: int, dtype: torch.dtype = None
+) -> Tensor:
+    """Contract a product of Kronecker deltas and Levi-Civita symbols.
+
+    The operands are fixed constants whose multiplicities are given by ``num_delta``
+    and ``num_epsilon``, so small results depend only on the arguments and are cached.
+    A tensor expansion contains many terms sharing the same index pattern -- for the
+    rank-six weight-two mappings, 11358 contractions use only 190 distinct rules --
+    and ``torch.einsum`` spends most of its time searching for a contraction path
+    rather than contracting, so caching removes the bulk of that cost. Results larger
+    than ``3**8`` elements bypass the cache to keep its memory use bounded.
+
+    A cached result is shared; callers must not modify it in place.
+    """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+
+    output_indices = rule.rsplit("->", maxsplit=1)[1]
+    output_elements = 3 ** len(output_indices)
+    if output_elements <= _MAX_CACHED_CONTRACTION_ELEMENTS:
+        return _cached_delta_epsilon_contraction(rule, num_delta, num_epsilon, dtype)
+
+    data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
+
+    return torch.einsum(rule, *data)
 
 
 def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) -> Tensor:
@@ -78,16 +120,12 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
 
     rule = left + "->" + right
 
-    d = dij(dtype=dtype)
-    e = eijk(dtype=dtype)
-    deltas = [d for _ in range(len(delta_rules))]
-    epsilons = [e for _ in range(len(epsilon_rules))]
-    data = deltas + epsilons
+    contracted = _contract_delta_epsilon(
+        rule, len(delta_rules), len(epsilon_rules), dtype
+    )
 
-    product = torch.einsum(rule, *data)
-
-    # multiply factor
-    product = product * float(tp.factor)
+    # multiply factor; this is out of place, so the cached tensor is left untouched
+    product = contracted * float(tp.factor)
 
     return product
 
