@@ -16,12 +16,21 @@ from pprint import pprint
 import torch
 from torch import Tensor
 
-from natto.EGH import get_G_even, get_g_matrix, get_G_odd, get_H, get_S
+from natto.EGH import (
+    get_G_even,
+    get_g_matrix,
+    get_G_odd,
+    get_g_pq,
+    get_H,
+    get_S,
+    relabel_indices_2,
+)
 from natto.evaluate import embed, evaluate_tensors
 from natto.matrix import (
     float_matrix,
     fraction_matrix,
     matrix_inverse,
+    matrix_multiply,
     matrix_null_space,
 )
 from natto.ops import simplify_linear_combination
@@ -265,7 +274,7 @@ def get_G_H_S_of_j(
 
     # Further reduce the mappings for tensors with internal symmetry.
     if symmetry is not None:
-        ind_G = _get_symmetry_adapted_mappings(j, n, ind_G, ind_H, symmetry)
+        ind_G = _get_symmetry_adapted_mappings(j, n, ind_G, h, symmetry)
         if not ind_G:
             return [], [], [], [], []
 
@@ -449,31 +458,30 @@ def _get_symmetry_adapted_mappings(
     weight: int,
     rank: int,
     mappings: list[LinearCombination],
-    duals: list[LinearCombination],
+    gram_inverse: list[list[Fraction]],
     symmetry: str,
 ) -> list[LinearCombination]:
-    """Solve the exact coefficient constraints imposed by internal symmetry."""
-    # Neither the numerical mappings nor the ordered duals depend on the permutation,
-    # so they are evaluated once here rather than once per generator.
-    numerical_mappings = [
-        evaluate_tensors(
-            simplify_linear_combination(mapping), mode="G", dtype=torch.float64
-        )
-        for mapping in mappings
-    ]
-    dual_order = tuple(range(weight, weight + rank)) + tuple(range(weight))
-    ordered_duals = [
-        evaluate_tensors(
-            simplify_linear_combination(dual), mode="H", dtype=torch.float64
-        ).permute(dual_order)
-        for dual in duals
-    ]
+    """Solve the exact coefficient constraints imposed by internal symmetry.
 
+    Every step is exact: the mixing matrices are built by symbolic contraction
+    and the null space by Gaussian elimination over the rationals, so the
+    symmetry-adapted mappings carry no numerical tolerance at all.
+
+    Args:
+        weight: Weight of the natural-tensor space.
+        rank: Rank of the Cartesian tensor space.
+        mappings: Independent mappings of that weight.
+        gram_inverse: Exact inverse of their Gram matrix.
+        symmetry: Internal index symmetry of the Cartesian tensor.
+
+    Returns:
+        The symmetry-adapted mappings, one per null-space basis vector.
+    """
     generators = parse_symmetry_generators(symmetry, rank=rank)
     constraints = []
     for permutation, sign in generators:
         action = _get_symmetry_action_matrix(
-            numerical_mappings, ordered_duals, weight, rank, permutation
+            mappings, gram_inverse, weight, rank, permutation
         )
         for row_index, row in enumerate(action):
             constraints.append(
@@ -499,49 +507,56 @@ def _get_symmetry_adapted_mappings(
 
 
 def _get_symmetry_action_matrix(
-    numerical_mappings: list[Tensor],
-    ordered_duals: list[Tensor],
+    mappings: list[LinearCombination],
+    gram_inverse: list[list[Fraction]],
     weight: int,
     rank: int,
     permutation: tuple[int, ...],
-    max_denominator: int = 10000,
-    atol: float = 1e-10,
 ) -> list[list[Fraction]]:
     r"""Evaluate the action of one index permutation on the mapping basis.
 
     If ``P G[q] = sum_p M[p, q] G[p]``, duality gives
-    ``M[p, q] = (H[p] \odot^(rank+weight) P G[q]) / (2*weight + 1)``.
-    The contractions are evaluated in float64 and recovered as exact rational
-    coefficients.
+    ``M[p, q] = (G_dual[p] \odot^(rank+weight) P G[q]) / (2*weight + 1)``.
+
+    That form is not the one evaluated. A dual is a combination of all ``N``
+    mappings, so contracting one costs ``N`` times a plain contraction, and the
+    matrix costs ``N^3``. Expanding the dual moves the inverse Gram matrix
+    outside the contraction,
+
+        ``M = g^-1 O``,  ``O[p, q] = (G[p] \odot^(rank+weight) P G[q]) / (2w+1)``
+
+    which is the same matrix from contractions between single mappings. At rank
+    six and weight three that is the difference between eighteen minutes and
+    under one.
 
     Args:
-        numerical_mappings: mappings evaluated in mode ``G``.
-        ordered_duals: duals evaluated in mode ``H`` and already permuted so that
-            their Cartesian indices lead. Both are independent of the permutation and
-            so are prepared once by the caller.
+        mappings: Independent mappings of this weight.
+        gram_inverse: Exact inverse of their Gram matrix.
+        weight: Weight of the natural-tensor space.
+        rank: Rank of the Cartesian tensor space.
+        permutation: The generator, as a permutation of the Cartesian indices.
+
+    Returns:
+        The exact mixing matrix of this generator.
+
+    Raises:
+        ValueError: If the permutation does not match the Cartesian rank.
     """
     if len(permutation) != rank:
         raise ValueError("Symmetry permutation does not match the Cartesian rank")
 
-    mapping_order = permutation + tuple(range(rank, rank + weight))
-    permuted_mappings = [
-        mapping.permute(mapping_order) for mapping in numerical_mappings
+    # Permuting the axes of a tensor renames its indices: the slot that now
+    # holds axis `permutation[k]` carries the letter that axis `k` had.
+    letters = letter_index(rank, upper_case=True)
+    relabeling = {letters[permutation[k]]: letters[k] for k in range(rank)}
+    permuted = [relabel_indices_2(mapping, relabeling) for mapping in mappings]
+
+    overlap = [
+        [get_g_pq(weight, rank, mapping, image) for image in permuted]
+        for mapping in mappings
     ]
 
-    action = []
-    for dual in ordered_duals:
-        row = []
-        for mapping in permuted_mappings:
-            numerical = torch.sum(dual * mapping).item() / (2 * weight + 1)
-            exact = Fraction(numerical).limit_denominator(max_denominator)
-            if abs(float(exact) - numerical) > atol:
-                raise RuntimeError(
-                    "Could not recover an exact rational symmetry-action coefficient"
-                )
-            row.append(exact)
-        action.append(row)
-
-    return action
+    return matrix_multiply(gram_inverse, overlap)
 
 
 # TODO, this can be done symbolically. Probably do it.
