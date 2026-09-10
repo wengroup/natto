@@ -6,7 +6,7 @@ import pytest
 import torch
 
 import natto.GHS
-from natto.EGH import get_g_matrix
+from natto.EGH import get_gram_matrix
 from natto.evaluate import evaluate_tensors
 from natto.GHS import get_G_H_S, get_G_H_S_of_j
 from natto.qr import find_independent_tensors
@@ -119,17 +119,21 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
     Each weight-m sector appears N_m times, and the multiplicities account for all
     N_ind independent components: N_ind = sum_m N_m (2m + 1).
 
-    The multiplicities are the ranks found when selecting independent H tensors, so
+    The multiplicities are the ranks found when selecting independent mappings, so
     this is also where a non-rank-revealing selection scheme shows up; it is checked
     for both schemes of `natto.qr` since either may be used.
 
     Args:
         tensor_class: physical tensor class to check
-        method: `natto.qr` scheme used to select the independent H tensors
+        method: `natto.qr` scheme used to select the independent mappings
     """
     output = get_G_H_S_cached(tensor_class.rank, tensor_class.symmetry, method)
 
-    found = {m: len(out_m["H"]) for m, out_m in output.items() if len(out_m["H"]) > 0}
+    found = {
+        m: len(out_m["extraction"])
+        for m, out_m in output.items()
+        if len(out_m["extraction"]) > 0
+    }
 
     assert found == tensor_class.multiplicity
     assert sum(N_m * (2 * m + 1) for m, N_m in found.items()) == tensor_class.n_ind
@@ -146,13 +150,15 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     for weight in tensor_class.multiplicity:
         Q, _, _, _, _ = get_G_H_S_of_j(weight, tensor_class.rank, tensor_class.symmetry)
         Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
-        numerical_Q = torch.stack([evaluate_tensors(Q_p, mode="G") for Q_p in Q])
+        numerical_Q = torch.stack(
+            [evaluate_tensors(Q_p, mode="embedding") for Q_p in Q]
+        )
         flattened_Q = numerical_Q.reshape(len(Q), -1)
         numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
         symbolic = torch.tensor(
             [
                 [float(value) for value in row]
-                for row in get_g_matrix(weight, tensor_class.rank, Q_with_zeros)
+                for row in get_gram_matrix(weight, tensor_class.rank, Q_with_zeros)
             ],
             dtype=numerical.dtype,
         )
@@ -170,8 +176,8 @@ def test_symmetry_rank_must_match_tensor_rank():
 def test_get_G_H_S(tensor_class: TensorClass):
     """Test the get_G_H_S function.
 
-    For a given tensor T, obtain the natural tensors X (using H), and then obtain the
-    embedding T' in the original tensor space (using G). We check that we can recover T.
+    For a given tensor T, obtain the natural tensors X with the extraction
+    operators, then embed them back with the embedding operators. We check that we can recover T.
 
     Args:
         tensor_class: physical tensor class to check
@@ -190,15 +196,17 @@ def test_get_G_H_S(tensor_class: TensorClass):
 
     all_T_prime = []
     for j, out_j in output.items():
-        for p, (H, G, S) in enumerate(zip(out_j["H"], out_j["G"], out_j["S"])):
-            # X = H T
-            X = torch.einsum(H["rule"], H["numerical"], T)
+        for p, (extraction, embedding, decomposition) in enumerate(
+            zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
+        ):
+            # X = G~ . T
+            X = torch.einsum(extraction["rule"], extraction["numerical"], T)
 
-            # T' = G X
-            T_p_1 = torch.einsum(G["rule"], G["numerical"], X)
+            # T' = G . X
+            T_p_1 = torch.einsum(embedding["rule"], embedding["numerical"], X)
 
-            # T' = S T
-            T_p_2 = torch.einsum(S["rule"], S["numerical"], T)
+            # T' = S . T
+            T_p_2 = torch.einsum(decomposition["rule"], decomposition["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
             assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (

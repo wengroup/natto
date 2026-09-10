@@ -10,13 +10,15 @@ def test_piezoelectric_orthonormal_Q():
     out = get_orthonormal_Q(3, "ijk=ikj")
     out_weight_1 = out[1]
 
-    expected_g_Q = torch.tensor([[3.0, 2.0], [2.0, 8.0]], dtype=torch.float64)
-    assert torch.allclose(out_weight_1["g_Q"], expected_g_Q)
+    expected_gram = torch.tensor([[3.0, 2.0], [2.0, 8.0]], dtype=torch.float64)
+    assert torch.allclose(out_weight_1["gram"], expected_gram)
 
-    Q_tilde = torch.stack([entry["numerical"] for entry in out_weight_1["Q_tilde"]])
-    Q_tilde_flat = Q_tilde.reshape(len(Q_tilde), -1)
-    gram = Q_tilde_flat @ Q_tilde_flat.T / 3
-    assert torch.allclose(gram, torch.eye(2, dtype=Q_tilde.dtype), atol=1e-12)
+    orthonormal = torch.stack(
+        [entry["numerical"] for entry in out_weight_1["orthonormal"]]
+    )
+    orthonormal_flat = orthonormal.reshape(len(orthonormal), -1)
+    gram = orthonormal_flat @ orthonormal_flat.T / 3
+    assert torch.allclose(gram, torch.eye(2, dtype=orthonormal.dtype), atol=1e-12)
 
 
 @pytest.mark.parametrize("rank", [1, 2])
@@ -28,15 +30,17 @@ def test_orthonormal_G_reconstructs_general_tensor(rank: int):
 
     embedded_parts = []
     for out_weight in output.values():
-        G_tilde = torch.stack([entry["numerical"] for entry in out_weight["G_tilde"]])
-        flattened = G_tilde.reshape(len(G_tilde), -1)
-        weight = G_tilde.ndim - tensor.ndim - 1
+        orthonormal = torch.stack(
+            [entry["numerical"] for entry in out_weight["orthonormal"]]
+        )
+        flattened = orthonormal.reshape(len(orthonormal), -1)
+        weight = orthonormal.ndim - tensor.ndim - 1
         gram = flattened @ flattened.T / (2 * weight + 1)
         assert torch.allclose(
-            gram, torch.eye(len(G_tilde), dtype=G_tilde.dtype), atol=1e-12
+            gram, torch.eye(len(orthonormal), dtype=orthonormal.dtype), atol=1e-12
         )
 
-        for mapping in out_weight["G_tilde"]:
+        for mapping in out_weight["orthonormal"]:
             natural = torch.einsum(
                 mapping["extraction_rule"], mapping["numerical"], tensor
             )
@@ -60,12 +64,12 @@ def test_orthonormal_Q_reconstructs_symmetric_tensor(rank: int, symmetry: str):
 
     embedded_parts = []
     for out_weight in output.values():
-        for Q_tilde in out_weight["Q_tilde"]:
+        for orthonormal in out_weight["orthonormal"]:
             natural = torch.einsum(
-                Q_tilde["extraction_rule"], Q_tilde["numerical"], tensor
+                orthonormal["extraction_rule"], orthonormal["numerical"], tensor
             )
             embedded = torch.einsum(
-                Q_tilde["embedding_rule"], Q_tilde["numerical"], natural
+                orthonormal["embedding_rule"], orthonormal["numerical"], natural
             )
             assert check_symmetry(embedded, symmetry, atol=1e-10)
             embedded_parts.append(embedded)

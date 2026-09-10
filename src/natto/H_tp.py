@@ -81,7 +81,7 @@ def get_H_numerical_even(
     # Then, we can use this to do H:XY.
     #
     # TODO, create a new function like evaluate_tensors to deal with this case.
-    H_numerical = evaluate_tensors(H, mode="H")
+    H_numerical = evaluate_tensors(H, mode="extraction")
 
     if normalize == "unity":
         c = coeff_C(l1, l2, l3)
@@ -119,7 +119,7 @@ def get_H_numerical_odd(
     H, X_idx, Y_idx, Z_idx = get_H_odd(l1, l2, l3)
     H = simplify_linear_combination(H)
 
-    H_numerical = evaluate_tensors(H, mode="H")
+    H_numerical = evaluate_tensors(H, mode="extraction")
 
     if normalize == "unity":
         c = coeff_D(l1, l2, l3)

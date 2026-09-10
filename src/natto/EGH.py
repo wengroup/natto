@@ -27,7 +27,9 @@ from natto.symmetrize import get_permutations_2
 from natto.utils import letter_index
 
 
-def get_E(j: int, s_letters: str = None, verbose: int = 0) -> LinearCombination:
+def get_natural_projector(
+    j: int, s_letters: str = None, verbose: int = 0
+) -> LinearCombination:
     """
     Invariant tensors of rank j: E(j | j).
 
@@ -106,7 +108,7 @@ def get_G_even(j: int, n: int) -> list[LinearCombination]:
 
     all_G = []
     for si, rule in zip(E_s_letters, delta_rules):
-        E_j = get_E(j, s_letters=si)
+        E_j = get_natural_projector(j, s_letters=si)
         f_q = create_delta_epsilon_tensors(rule)
         G = multiply_2(E_j, f_q)
         all_G.append(G)
@@ -138,7 +140,7 @@ def get_G_odd(j: int, n: int) -> list[LinearCombination]:
 
     all_G = []
     for si, e_rule, d_rule in zip(E_s_letters, f_epsilon_rules, f_delta_rules):
-        E_j = get_E(j, s_letters=si)
+        E_j = get_natural_projector(j, s_letters=si)
         f_q_epsilon = Epsilon(e_rule)
         f_q_delta = create_delta_epsilon_tensors(d_rule)
         G = multiply_2(E_j, f_q_epsilon, f_q_delta)
@@ -147,23 +149,37 @@ def get_G_odd(j: int, n: int) -> list[LinearCombination]:
     return all_G
 
 
-def get_H(
-    h: list[list[Fraction]], G: list[LinearCombination]
+def get_extraction_operators(
+    gram_inverse: list[list[Fraction]], embedding: list[LinearCombination]
 ) -> list[LinearCombination]:
-    r"""
-    Get the H mapping: H^p = \sum_q h_pq G^q.
-    """
-    H = []
-    for row in h:
-        tensors = []
-        for h_q, G_q in zip(row, G):
-            if h_q == 0:
-                continue
-            t = multiply_2(Scalar(h_q), G_q)
-            tensors.extend(t)
-        H.append(LinearCombination(*tensors))
+    r"""Build the extraction operators dual to a set of embedding operators.
 
-    return H
+    The paper's Eq. (22),
+
+    $$
+    \widetilde{\mathbf{G}}^p_{(\ell|n)}
+        = \sum_q (\mathbf{g}^{-1})_{pq} \mathbf{G}^q_{(\ell|n)}
+    $$
+
+    Contracted with a Cartesian tensor, each returns the natural tensor of its
+    weight and channel.
+
+    Args:
+        gram_inverse: Exact inverse of the embedding operators' Gram matrix.
+        embedding: The embedding operators, in the order the matrix indexes.
+
+    Returns:
+        One extraction operator per row of `gram_inverse`.
+    """
+    extraction = []
+    for row in gram_inverse:
+        terms = []
+        for c, G in zip(row, embedding):
+            if c:
+                terms.extend(multiply_2(Scalar(c), G))
+        extraction.append(LinearCombination(*terms))
+
+    return extraction
 
 
 def get_S(
@@ -183,11 +199,11 @@ def get_S(
     """
 
     S = []
-    for i, (G_i, H_i) in enumerate(zip(G, H)):
+    for G_i, dual_i in zip(G, H):
         # Shift upper letters of H to distinguish those from G
-        H_i = shift_index_2(H_i, n, letter_index(24, upper_case=True))
+        dual_i = shift_index_2(dual_i, n, letter_index(24, upper_case=True))
 
-        S_i = multiply_2(G_i, H_i)
+        S_i = multiply_2(G_i, dual_i)
         S_i = simplify_linear_combination(S_i)
 
         S.append(S_i)
@@ -617,7 +633,7 @@ def get_scalar_factor(t1: LinearCombination, t2: LinearCombination) -> Fraction 
         return None
 
 
-def get_g_pq(
+def get_gram_entry(
     j: int, n: int, G_p: LinearCombination, G_q: LinearCombination
 ) -> Fraction:
     r"""
@@ -679,7 +695,7 @@ def get_g_pq(
     return full_contraction / (2 * j + 1)
 
 
-def get_g_matrix(
+def get_gram_matrix(
     j: int, n: int, all_G: list[LinearCombination]
 ) -> list[list[Fraction]]:
     r"""Compute the exact Gram matrix of symbolic mapping tensors.
@@ -688,7 +704,7 @@ def get_g_matrix(
 
     ``g_pq = (G_p \odot^(n+j) G_q) / (2*j + 1)``
 
-    using :func:`get_g_pq`.
+    using :func:`get_gram_entry`.
 
     Args:
         j: Weight of the natural-tensor space.
@@ -704,7 +720,7 @@ def get_g_matrix(
     matrix = [[None] * num for _ in range(num)]
     for p in range(num):
         for q in range(num):
-            matrix[p][q] = get_g_pq(j, n, all_G[p], all_G[q])
+            matrix[p][q] = get_gram_entry(j, n, all_G[p], all_G[q])
 
     return matrix
 
@@ -737,4 +753,4 @@ def find_matrix_factorization(
 
 
 if __name__ == "__main__":
-    E3 = get_E(j=2, verbose=0)
+    E3 = get_natural_projector(j=2, verbose=0)
