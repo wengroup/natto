@@ -1,0 +1,550 @@
+{
+  "0": {
+    "embedding": [
+      {
+        "numerical": {
+          "abs_sum": 9.0,
+          "max": 1.0,
+          "min": 0.0,
+          "moment": 369.0,
+          "nonzero": 9,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 9.0,
+          "sum": 9.0
+        },
+        "rule": "ABCD,...->...ABCD",
+        "symbolic": [
+          "+1 δ_AB δ_CD"
+        ]
+      },
+      {
+        "numerical": {
+          "abs_sum": 18.0,
+          "max": 2.0,
+          "min": 0.0,
+          "moment": 738.0,
+          "nonzero": 15,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 24.0,
+          "sum": 18.0
+        },
+        "rule": "ABCD,...->...ABCD",
+        "symbolic": [
+          "+1 δ_AC δ_BD",
+          "+1 δ_AD δ_BC"
+        ]
+      }
+    ],
+    "extraction": [
+      {
+        "numerical": {
+          "abs_sum": 1.4000000953674316,
+          "max": 0.13333334028720856,
+          "min": -0.03333333507180214,
+          "moment": 24.600002199411392,
+          "nonzero": 21,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 0.1333333502213167,
+          "sum": 0.6000000536441803
+        },
+        "rule": "ABCD,...ABCD->...",
+        "symbolic": [
+          "+2/15 δ_AB δ_CD",
+          "-1/30 δ_AC δ_BD",
+          "-1/30 δ_AD δ_BC"
+        ]
+      },
+      {
+        "numerical": {
+          "abs_sum": 1.0000000074505806,
+          "max": 0.06666666269302368,
+          "min": -0.03333333507180214,
+          "moment": 24.599999450147152,
+          "nonzero": 21,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 0.05000000000000007,
+          "sum": 0.5999999865889549
+        },
+        "rule": "ABCD,...ABCD->...",
+        "symbolic": [
+          "-1/30 δ_AB δ_CD",
+          "+1/20 δ_AC δ_BD",
+          "+1/20 δ_AD δ_BC"
+        ]
+      }
+    ],
+    "gram": [
+      [
+        "9",
+        "6"
+      ],
+      [
+        "6",
+        "24"
+      ]
+    ],
+    "gram_inverse": [
+      [
+        "2/15",
+        "-1/30"
+      ],
+      [
+        "-1/30",
+        "1/20"
+      ]
+    ]
+  },
+  "2": {
+    "embedding": [
+      {
+        "numerical": {
+          "abs_sum": 103.99999952316284,
+          "max": 2.6666665077209473,
+          "min": -1.3333333730697632,
+          "moment": 26279.99947786331,
+          "nonzero": 141,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 99.99999809265148,
+          "sum": 71.99999856948853
+        },
+        "rule": "ABCDab,...ab->...ABCD",
+        "symbolic": [
+          "+1/2 δ_Aa δ_BD δ_Cb",
+          "+1/2 δ_Ab δ_BD δ_Ca",
+          "-2/3 δ_AC δ_BD δ_ab",
+          "+1/2 δ_Aa δ_BC δ_Db",
+          "+1/2 δ_Ab δ_BC δ_Da",
+          "-2/3 δ_AD δ_BC δ_ab",
+          "+1/2 δ_AD δ_Ba δ_Cb",
+          "+1/2 δ_AD δ_Bb δ_Ca",
+          "+1/2 δ_AC δ_Ba δ_Db",
+          "+1/2 δ_AC δ_Bb δ_Da"
+        ]
+      },
+      {
+        "numerical": {
+          "abs_sum": 51.99999976158142,
+          "max": 1.3333332538604736,
+          "min": -0.6666666865348816,
+          "moment": 13139.999738931656,
+          "nonzero": 99,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 29.99999952316287,
+          "sum": 35.99999928474426
+        },
+        "rule": "ABCDab,...ab->...ABCD",
+        "symbolic": [
+          "+1/2 δ_Aa δ_Bb δ_CD",
+          "+1/2 δ_Ab δ_Ba δ_CD",
+          "-2/3 δ_AB δ_CD δ_ab",
+          "+1/2 δ_AB δ_Ca δ_Db",
+          "+1/2 δ_AB δ_Cb δ_Da"
+        ]
+      }
+    ],
+    "extraction": [
+      {
+        "numerical": {
+          "abs_sum": 9.428571559488773,
+          "max": 0.0952381119132042,
+          "min": -0.0714285746216774,
+          "moment": 938.5713318362832,
+          "nonzero": 183,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 0.5357143133878728,
+          "sum": 2.571428306400776
+        },
+        "rule": "abABCD,...ABCD->...ab",
+        "symbolic": [
+          "+3/56 δ_Aa δ_BD δ_Cb",
+          "+3/56 δ_Ab δ_BD δ_Ca",
+          "-1/14 δ_AC δ_BD δ_ab",
+          "+3/56 δ_Aa δ_BC δ_Db",
+          "+3/56 δ_Ab δ_BC δ_Da",
+          "-1/14 δ_AD δ_BC δ_ab",
+          "+3/56 δ_AD δ_Ba δ_Cb",
+          "+3/56 δ_AD δ_Bb δ_Ca",
+          "+3/56 δ_AC δ_Ba δ_Db",
+          "+3/56 δ_AC δ_Bb δ_Da",
+          "-1/14 δ_Aa δ_Bb δ_CD",
+          "-1/14 δ_Ab δ_Ba δ_CD",
+          "+2/21 δ_AB δ_CD δ_ab",
+          "-1/14 δ_AB δ_Ca δ_Db",
+          "-1/14 δ_AB δ_Cb δ_Da"
+        ]
+      },
+      {
+        "numerical": {
+          "abs_sum": 15.142857491970062,
+          "max": 0.1785714328289032,
+          "min": -0.2380952388048172,
+          "moment": 938.571372628212,
+          "nonzero": 183,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 1.7857143708637806,
+          "sum": 2.571428418159485
+        },
+        "rule": "abABCD,...ABCD->...ab",
+        "symbolic": [
+          "-1/14 δ_Aa δ_BD δ_Cb",
+          "-1/14 δ_Ab δ_BD δ_Ca",
+          "+2/21 δ_AC δ_BD δ_ab",
+          "-1/14 δ_Aa δ_BC δ_Db",
+          "-1/14 δ_Ab δ_BC δ_Da",
+          "+2/21 δ_AD δ_BC δ_ab",
+          "-1/14 δ_AD δ_Ba δ_Cb",
+          "-1/14 δ_AD δ_Bb δ_Ca",
+          "-1/14 δ_AC δ_Ba δ_Db",
+          "-1/14 δ_AC δ_Bb δ_Da",
+          "+5/28 δ_Aa δ_Bb δ_CD",
+          "+5/28 δ_Ab δ_Ba δ_CD",
+          "-5/21 δ_AB δ_CD δ_ab",
+          "+5/28 δ_AB δ_Ca δ_Db",
+          "+5/28 δ_AB δ_Cb δ_Da"
+        ]
+      }
+    ],
+    "gram": [
+      [
+        "20",
+        "8"
+      ],
+      [
+        "8",
+        "6"
+      ]
+    ],
+    "gram_inverse": [
+      [
+        "3/28",
+        "-1/7"
+      ],
+      [
+        "-1/7",
+        "5/14"
+      ]
+    ]
+  },
+  "4": {
+    "embedding": [
+      {
+        "numerical": {
+          "abs_sum": 102.85714506357908,
+          "max": 0.22857066988945007,
+          "min": -0.11428572237491608,
+          "moment": 60745.36802787334,
+          "nonzero": 1641,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 8.999999760518797,
+          "sum": 18.514284677803516
+        },
+        "rule": "ABCDabcd,...abcd->...ABCD",
+        "symbolic": [
+          "+1/24 δ_Aa δ_Bb δ_Cc δ_Dd",
+          "+1/24 δ_Aa δ_Bb δ_Cd δ_Dc",
+          "+1/24 δ_Aa δ_Bc δ_Cb δ_Dd",
+          "+1/24 δ_Aa δ_Bc δ_Cd δ_Db",
+          "+1/24 δ_Aa δ_Bd δ_Cb δ_Dc",
+          "+1/24 δ_Aa δ_Bd δ_Cc δ_Db",
+          "+1/24 δ_Ab δ_Ba δ_Cc δ_Dd",
+          "+1/24 δ_Ab δ_Ba δ_Cd δ_Dc",
+          "+1/24 δ_Ab δ_Bc δ_Ca δ_Dd",
+          "+1/24 δ_Ab δ_Bc δ_Cd δ_Da",
+          "+1/24 δ_Ab δ_Bd δ_Ca δ_Dc",
+          "+1/24 δ_Ab δ_Bd δ_Cc δ_Da",
+          "+1/24 δ_Ac δ_Ba δ_Cb δ_Dd",
+          "+1/24 δ_Ac δ_Ba δ_Cd δ_Db",
+          "+1/24 δ_Ac δ_Bb δ_Ca δ_Dd",
+          "+1/24 δ_Ac δ_Bb δ_Cd δ_Da",
+          "+1/24 δ_Ac δ_Bd δ_Ca δ_Db",
+          "+1/24 δ_Ac δ_Bd δ_Cb δ_Da",
+          "+1/24 δ_Ad δ_Ba δ_Cb δ_Dc",
+          "+1/24 δ_Ad δ_Ba δ_Cc δ_Db",
+          "+1/24 δ_Ad δ_Bb δ_Ca δ_Dc",
+          "+1/24 δ_Ad δ_Bb δ_Cc δ_Da",
+          "+1/24 δ_Ad δ_Bc δ_Ca δ_Db",
+          "+1/24 δ_Ad δ_Bc δ_Cb δ_Da",
+          "-1/84 δ_Aa δ_Bb δ_CD δ_cd",
+          "-1/84 δ_Ab δ_Ba δ_CD δ_cd",
+          "-1/84 δ_Aa δ_BD δ_Cb δ_cd",
+          "-1/84 δ_Ab δ_BD δ_Ca δ_cd",
+          "-1/84 δ_Aa δ_BC δ_Db δ_cd",
+          "-1/84 δ_Ab δ_BC δ_Da δ_cd",
+          "-1/84 δ_AD δ_Ba δ_Cb δ_cd",
+          "-1/84 δ_AD δ_Bb δ_Ca δ_cd",
+          "-1/84 δ_AC δ_Ba δ_Db δ_cd",
+          "-1/84 δ_AC δ_Bb δ_Da δ_cd",
+          "-1/84 δ_AB δ_Ca δ_Db δ_cd",
+          "-1/84 δ_AB δ_Cb δ_Da δ_cd",
+          "-1/84 δ_Aa δ_Bc δ_CD δ_bd",
+          "-1/84 δ_Ac δ_Ba δ_CD δ_bd",
+          "-1/84 δ_Aa δ_BD δ_Cc δ_bd",
+          "-1/84 δ_Ac δ_BD δ_Ca δ_bd",
+          "-1/84 δ_Aa δ_BC δ_Dc δ_bd",
+          "-1/84 δ_Ac δ_BC δ_Da δ_bd",
+          "-1/84 δ_AD δ_Ba δ_Cc δ_bd",
+          "-1/84 δ_AD δ_Bc δ_Ca δ_bd",
+          "-1/84 δ_AC δ_Ba δ_Dc δ_bd",
+          "-1/84 δ_AC δ_Bc δ_Da δ_bd",
+          "-1/84 δ_AB δ_Ca δ_Dc δ_bd",
+          "-1/84 δ_AB δ_Cc δ_Da δ_bd",
+          "-1/84 δ_Aa δ_Bd δ_CD δ_bc",
+          "-1/84 δ_Ad δ_Ba δ_CD δ_bc",
+          "-1/84 δ_Aa δ_BD δ_Cd δ_bc",
+          "-1/84 δ_Ad δ_BD δ_Ca δ_bc",
+          "-1/84 δ_Aa δ_BC δ_Dd δ_bc",
+          "-1/84 δ_Ad δ_BC δ_Da δ_bc",
+          "-1/84 δ_AD δ_Ba δ_Cd δ_bc",
+          "-1/84 δ_AD δ_Bd δ_Ca δ_bc",
+          "-1/84 δ_AC δ_Ba δ_Dd δ_bc",
+          "-1/84 δ_AC δ_Bd δ_Da δ_bc",
+          "-1/84 δ_AB δ_Ca δ_Dd δ_bc",
+          "-1/84 δ_AB δ_Cd δ_Da δ_bc",
+          "-1/84 δ_Ab δ_Bc δ_CD δ_ad",
+          "-1/84 δ_Ac δ_Bb δ_CD δ_ad",
+          "-1/84 δ_Ab δ_BD δ_Cc δ_ad",
+          "-1/84 δ_Ac δ_BD δ_Cb δ_ad",
+          "-1/84 δ_Ab δ_BC δ_Dc δ_ad",
+          "-1/84 δ_Ac δ_BC δ_Db δ_ad",
+          "-1/84 δ_AD δ_Bb δ_Cc δ_ad",
+          "-1/84 δ_AD δ_Bc δ_Cb δ_ad",
+          "-1/84 δ_AC δ_Bb δ_Dc δ_ad",
+          "-1/84 δ_AC δ_Bc δ_Db δ_ad",
+          "-1/84 δ_AB δ_Cb δ_Dc δ_ad",
+          "-1/84 δ_AB δ_Cc δ_Db δ_ad",
+          "-1/84 δ_Ab δ_Bd δ_CD δ_ac",
+          "-1/84 δ_Ad δ_Bb δ_CD δ_ac",
+          "-1/84 δ_Ab δ_BD δ_Cd δ_ac",
+          "-1/84 δ_Ad δ_BD δ_Cb δ_ac",
+          "-1/84 δ_Ab δ_BC δ_Dd δ_ac",
+          "-1/84 δ_Ad δ_BC δ_Db δ_ac",
+          "-1/84 δ_AD δ_Bb δ_Cd δ_ac",
+          "-1/84 δ_AD δ_Bd δ_Cb δ_ac",
+          "-1/84 δ_AC δ_Bb δ_Dd δ_ac",
+          "-1/84 δ_AC δ_Bd δ_Db δ_ac",
+          "-1/84 δ_AB δ_Cb δ_Dd δ_ac",
+          "-1/84 δ_AB δ_Cd δ_Db δ_ac",
+          "-1/84 δ_Ac δ_Bd δ_CD δ_ab",
+          "-1/84 δ_Ad δ_Bc δ_CD δ_ab",
+          "-1/84 δ_Ac δ_BD δ_Cd δ_ab",
+          "-1/84 δ_Ad δ_BD δ_Cc δ_ab",
+          "-1/84 δ_Ac δ_BC δ_Dd δ_ab",
+          "-1/84 δ_Ad δ_BC δ_Dc δ_ab",
+          "-1/84 δ_AD δ_Bc δ_Cd δ_ab",
+          "-1/84 δ_AD δ_Bd δ_Cc δ_ab",
+          "-1/84 δ_AC δ_Bc δ_Dd δ_ab",
+          "-1/84 δ_AC δ_Bd δ_Dc δ_ab",
+          "-1/84 δ_AB δ_Cc δ_Dd δ_ab",
+          "-1/84 δ_AB δ_Cd δ_Dc δ_ab",
+          "+1/105 δ_AB δ_CD δ_ab δ_cd",
+          "+1/105 δ_AC δ_BD δ_ab δ_cd",
+          "+1/105 δ_AD δ_BC δ_ab δ_cd",
+          "+1/105 δ_AB δ_CD δ_ac δ_bd",
+          "+1/105 δ_AC δ_BD δ_ac δ_bd",
+          "+1/105 δ_AD δ_BC δ_ac δ_bd",
+          "+1/105 δ_AB δ_CD δ_ad δ_bc",
+          "+1/105 δ_AC δ_BD δ_ad δ_bc",
+          "+1/105 δ_AD δ_BC δ_ad δ_bc"
+        ]
+      }
+    ],
+    "extraction": [
+      {
+        "numerical": {
+          "abs_sum": 102.85714506357908,
+          "max": 0.22857066988945007,
+          "min": -0.11428572237491608,
+          "moment": 60745.36802787334,
+          "nonzero": 1641,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 8.999999760518797,
+          "sum": 18.514284677803516
+        },
+        "rule": "abcdABCD,...ABCD->...abcd",
+        "symbolic": [
+          "+1/24 δ_Aa δ_Bb δ_Cc δ_Dd",
+          "+1/24 δ_Aa δ_Bb δ_Cd δ_Dc",
+          "+1/24 δ_Aa δ_Bc δ_Cb δ_Dd",
+          "+1/24 δ_Aa δ_Bc δ_Cd δ_Db",
+          "+1/24 δ_Aa δ_Bd δ_Cb δ_Dc",
+          "+1/24 δ_Aa δ_Bd δ_Cc δ_Db",
+          "+1/24 δ_Ab δ_Ba δ_Cc δ_Dd",
+          "+1/24 δ_Ab δ_Ba δ_Cd δ_Dc",
+          "+1/24 δ_Ab δ_Bc δ_Ca δ_Dd",
+          "+1/24 δ_Ab δ_Bc δ_Cd δ_Da",
+          "+1/24 δ_Ab δ_Bd δ_Ca δ_Dc",
+          "+1/24 δ_Ab δ_Bd δ_Cc δ_Da",
+          "+1/24 δ_Ac δ_Ba δ_Cb δ_Dd",
+          "+1/24 δ_Ac δ_Ba δ_Cd δ_Db",
+          "+1/24 δ_Ac δ_Bb δ_Ca δ_Dd",
+          "+1/24 δ_Ac δ_Bb δ_Cd δ_Da",
+          "+1/24 δ_Ac δ_Bd δ_Ca δ_Db",
+          "+1/24 δ_Ac δ_Bd δ_Cb δ_Da",
+          "+1/24 δ_Ad δ_Ba δ_Cb δ_Dc",
+          "+1/24 δ_Ad δ_Ba δ_Cc δ_Db",
+          "+1/24 δ_Ad δ_Bb δ_Ca δ_Dc",
+          "+1/24 δ_Ad δ_Bb δ_Cc δ_Da",
+          "+1/24 δ_Ad δ_Bc δ_Ca δ_Db",
+          "+1/24 δ_Ad δ_Bc δ_Cb δ_Da",
+          "-1/84 δ_Aa δ_Bb δ_CD δ_cd",
+          "-1/84 δ_Ab δ_Ba δ_CD δ_cd",
+          "-1/84 δ_Aa δ_BD δ_Cb δ_cd",
+          "-1/84 δ_Ab δ_BD δ_Ca δ_cd",
+          "-1/84 δ_Aa δ_BC δ_Db δ_cd",
+          "-1/84 δ_Ab δ_BC δ_Da δ_cd",
+          "-1/84 δ_AD δ_Ba δ_Cb δ_cd",
+          "-1/84 δ_AD δ_Bb δ_Ca δ_cd",
+          "-1/84 δ_AC δ_Ba δ_Db δ_cd",
+          "-1/84 δ_AC δ_Bb δ_Da δ_cd",
+          "-1/84 δ_AB δ_Ca δ_Db δ_cd",
+          "-1/84 δ_AB δ_Cb δ_Da δ_cd",
+          "-1/84 δ_Aa δ_Bc δ_CD δ_bd",
+          "-1/84 δ_Ac δ_Ba δ_CD δ_bd",
+          "-1/84 δ_Aa δ_BD δ_Cc δ_bd",
+          "-1/84 δ_Ac δ_BD δ_Ca δ_bd",
+          "-1/84 δ_Aa δ_BC δ_Dc δ_bd",
+          "-1/84 δ_Ac δ_BC δ_Da δ_bd",
+          "-1/84 δ_AD δ_Ba δ_Cc δ_bd",
+          "-1/84 δ_AD δ_Bc δ_Ca δ_bd",
+          "-1/84 δ_AC δ_Ba δ_Dc δ_bd",
+          "-1/84 δ_AC δ_Bc δ_Da δ_bd",
+          "-1/84 δ_AB δ_Ca δ_Dc δ_bd",
+          "-1/84 δ_AB δ_Cc δ_Da δ_bd",
+          "-1/84 δ_Aa δ_Bd δ_CD δ_bc",
+          "-1/84 δ_Ad δ_Ba δ_CD δ_bc",
+          "-1/84 δ_Aa δ_BD δ_Cd δ_bc",
+          "-1/84 δ_Ad δ_BD δ_Ca δ_bc",
+          "-1/84 δ_Aa δ_BC δ_Dd δ_bc",
+          "-1/84 δ_Ad δ_BC δ_Da δ_bc",
+          "-1/84 δ_AD δ_Ba δ_Cd δ_bc",
+          "-1/84 δ_AD δ_Bd δ_Ca δ_bc",
+          "-1/84 δ_AC δ_Ba δ_Dd δ_bc",
+          "-1/84 δ_AC δ_Bd δ_Da δ_bc",
+          "-1/84 δ_AB δ_Ca δ_Dd δ_bc",
+          "-1/84 δ_AB δ_Cd δ_Da δ_bc",
+          "-1/84 δ_Ab δ_Bc δ_CD δ_ad",
+          "-1/84 δ_Ac δ_Bb δ_CD δ_ad",
+          "-1/84 δ_Ab δ_BD δ_Cc δ_ad",
+          "-1/84 δ_Ac δ_BD δ_Cb δ_ad",
+          "-1/84 δ_Ab δ_BC δ_Dc δ_ad",
+          "-1/84 δ_Ac δ_BC δ_Db δ_ad",
+          "-1/84 δ_AD δ_Bb δ_Cc δ_ad",
+          "-1/84 δ_AD δ_Bc δ_Cb δ_ad",
+          "-1/84 δ_AC δ_Bb δ_Dc δ_ad",
+          "-1/84 δ_AC δ_Bc δ_Db δ_ad",
+          "-1/84 δ_AB δ_Cb δ_Dc δ_ad",
+          "-1/84 δ_AB δ_Cc δ_Db δ_ad",
+          "-1/84 δ_Ab δ_Bd δ_CD δ_ac",
+          "-1/84 δ_Ad δ_Bb δ_CD δ_ac",
+          "-1/84 δ_Ab δ_BD δ_Cd δ_ac",
+          "-1/84 δ_Ad δ_BD δ_Cb δ_ac",
+          "-1/84 δ_Ab δ_BC δ_Dd δ_ac",
+          "-1/84 δ_Ad δ_BC δ_Db δ_ac",
+          "-1/84 δ_AD δ_Bb δ_Cd δ_ac",
+          "-1/84 δ_AD δ_Bd δ_Cb δ_ac",
+          "-1/84 δ_AC δ_Bb δ_Dd δ_ac",
+          "-1/84 δ_AC δ_Bd δ_Db δ_ac",
+          "-1/84 δ_AB δ_Cb δ_Dd δ_ac",
+          "-1/84 δ_AB δ_Cd δ_Db δ_ac",
+          "-1/84 δ_Ac δ_Bd δ_CD δ_ab",
+          "-1/84 δ_Ad δ_Bc δ_CD δ_ab",
+          "-1/84 δ_Ac δ_BD δ_Cd δ_ab",
+          "-1/84 δ_Ad δ_BD δ_Cc δ_ab",
+          "-1/84 δ_Ac δ_BC δ_Dd δ_ab",
+          "-1/84 δ_Ad δ_BC δ_Dc δ_ab",
+          "-1/84 δ_AD δ_Bc δ_Cd δ_ab",
+          "-1/84 δ_AD δ_Bd δ_Cc δ_ab",
+          "-1/84 δ_AC δ_Bc δ_Dd δ_ab",
+          "-1/84 δ_AC δ_Bd δ_Dc δ_ab",
+          "-1/84 δ_AB δ_Cc δ_Dd δ_ab",
+          "-1/84 δ_AB δ_Cd δ_Dc δ_ab",
+          "+1/105 δ_AB δ_CD δ_ab δ_cd",
+          "+1/105 δ_AC δ_BD δ_ab δ_cd",
+          "+1/105 δ_AD δ_BC δ_ab δ_cd",
+          "+1/105 δ_AB δ_CD δ_ac δ_bd",
+          "+1/105 δ_AC δ_BD δ_ac δ_bd",
+          "+1/105 δ_AD δ_BC δ_ac δ_bd",
+          "+1/105 δ_AB δ_CD δ_ad δ_bc",
+          "+1/105 δ_AC δ_BD δ_ad δ_bc",
+          "+1/105 δ_AD δ_BC δ_ad δ_bc"
+        ]
+      }
+    ],
+    "gram": [
+      [
+        "1"
+      ]
+    ],
+    "gram_inverse": [
+      [
+        "1"
+      ]
+    ]
+  }
+}

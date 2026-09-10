@@ -1,0 +1,98 @@
+{
+  "0": {
+    "gram": [
+      [
+        3.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.5773502691896258
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "AB,...->...AB",
+        "extraction_rule": "AB,...AB->...",
+        "numerical": {
+          "abs_sum": 1.7320508075688776,
+          "max": 0.5773502691896258,
+          "min": 0.0,
+          "moment": 8.660254037844387,
+          "nonzero": 3,
+          "shape": [
+            3,
+            3
+          ],
+          "square_sum": 1.0000000000000002,
+          "sum": 1.7320508075688776
+        }
+      }
+    ]
+  },
+  "1": {
+    "gram": [
+      [
+        2.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.7071067811865475
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABa,...a->...AB",
+        "extraction_rule": "ABa,...AB->...a",
+        "numerical": {
+          "abs_sum": 4.242640687119285,
+          "max": 0.7071067811865475,
+          "min": -0.7071067811865475,
+          "moment": 0.0,
+          "nonzero": 6,
+          "shape": [
+            3,
+            3,
+            3
+          ],
+          "square_sum": 2.999999999999999,
+          "sum": 0.0
+        }
+      }
+    ]
+  },
+  "2": {
+    "gram": [
+      [
+        1.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        1.0
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABab,...ab->...AB",
+        "extraction_rule": "ABab,...AB->...ab",
+        "numerical": {
+          "abs_sum": 9.999999999999998,
+          "max": 0.6666666666666667,
+          "min": -0.3333333333333333,
+          "moment": 246.0,
+          "nonzero": 21,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 5.0,
+          "sum": 6.000000000000001
+        }
+      }
+    ]
+  }
+}

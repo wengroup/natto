@@ -1,0 +1,208 @@
+{
+  "0": {
+    "gram": [
+      [
+        45.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.14907119849998599
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCD,...->...ABCD",
+        "extraction_rule": "ABCD,...ABCD->...",
+        "numerical": {
+          "abs_sum": 4.024922359499621,
+          "max": 0.447213595499958,
+          "min": 0.0,
+          "moment": 165.02181673948448,
+          "nonzero": 21,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 1.0,
+          "sum": 4.024922359499621
+        }
+      }
+    ]
+  },
+  "1": {
+    "gram": [
+      [
+        30.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.18257418583505536
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDa,...a->...ABCD",
+        "extraction_rule": "ABCDa,...ABCD->...a",
+        "numerical": {
+          "abs_sum": 9.859006035092989,
+          "max": 0.5477225575051661,
+          "min": -0.5477225575051661,
+          "moment": 7.105427357601002e-15,
+          "nonzero": 42,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 2.9999999999999996,
+          "sum": 0.0
+        }
+      }
+    ]
+  },
+  "2": {
+    "gram": [
+      [
+        15.000000000000004,
+        6.000000000000001
+      ],
+      [
+        6.000000000000001,
+        15.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.27577561178466276,
+        -0.05755772154867048
+      ],
+      [
+        -0.05755772154867049,
+        0.2757756117846628
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDab,...ab->...ABCD",
+        "extraction_rule": "ABCDab,...ABCD->...ab",
+        "numerical": {
+          "abs_sum": 25.85584404849572,
+          "max": 0.43643578047198456,
+          "min": -0.21821789023599228,
+          "moment": 4301.074616551407,
+          "nonzero": 183,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 4.9999999999999964,
+          "sum": 11.783766072743584
+        }
+      },
+      {
+        "embedding_rule": "ABCDab,...ab->...ABCD",
+        "extraction_rule": "ABCDab,...ABCD->...ab",
+        "numerical": {
+          "abs_sum": 23.783766072743585,
+          "max": 0.4364357804719846,
+          "min": -0.2182178902359923,
+          "moment": 4301.074616551408,
+          "nonzero": 183,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 4.999999999999997,
+          "sum": 11.783766072743585
+        }
+      }
+    ]
+  },
+  "3": {
+    "gram": [
+      [
+        1.3333333333333333
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.8660254037844387
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDabc,...abc->...ABCD",
+        "extraction_rule": "ABCDabc,...ABCD->...abc",
+        "numerical": {
+          "abs_sum": 49.883063257983665,
+          "max": 0.23094010767585035,
+          "min": -0.23094010767585035,
+          "moment": -2.2737367544323206e-13,
+          "nonzero": 510,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 7.000000000000001,
+          "sum": -1.1102230246251565e-16
+        }
+      }
+    ]
+  },
+  "4": {
+    "gram": [
+      [
+        0.9999999999999994
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        1.0000000000000004
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDabcd,...abcd->...ABCD",
+        "extraction_rule": "ABCDabcd,...ABCD->...abcd",
+        "numerical": {
+          "abs_sum": 102.85714285714288,
+          "max": 0.22857142857142956,
+          "min": -0.11428571428571435,
+          "moment": 60745.37142857141,
+          "nonzero": 1641,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 9.000000000000004,
+          "sum": 18.514285714285712
+        }
+      }
+    ]
+  }
+}

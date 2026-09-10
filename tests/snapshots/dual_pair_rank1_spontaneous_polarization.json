@@ -1,0 +1,56 @@
+{
+  "1": {
+    "embedding": [
+      {
+        "numerical": {
+          "abs_sum": 3.0,
+          "max": 1.0,
+          "min": 0.0,
+          "moment": 15.0,
+          "nonzero": 3,
+          "shape": [
+            3,
+            3
+          ],
+          "square_sum": 3.0,
+          "sum": 3.0
+        },
+        "rule": "Aa,...a->...A",
+        "symbolic": [
+          "+1 δ_Aa"
+        ]
+      }
+    ],
+    "extraction": [
+      {
+        "numerical": {
+          "abs_sum": 3.0,
+          "max": 1.0,
+          "min": 0.0,
+          "moment": 15.0,
+          "nonzero": 3,
+          "shape": [
+            3,
+            3
+          ],
+          "square_sum": 3.0,
+          "sum": 3.0
+        },
+        "rule": "aA,...A->...a",
+        "symbolic": [
+          "+1 δ_Aa"
+        ]
+      }
+    ],
+    "gram": [
+      [
+        "1"
+      ]
+    ],
+    "gram_inverse": [
+      [
+        "1"
+      ]
+    ]
+  }
+}

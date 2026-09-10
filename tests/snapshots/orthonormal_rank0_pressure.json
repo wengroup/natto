@@ -1,0 +1,30 @@
+{
+  "0": {
+    "gram": [
+      [
+        1.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        1.0
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": ",...->...",
+        "extraction_rule": ",...->...",
+        "numerical": {
+          "abs_sum": 1.0,
+          "max": 1.0,
+          "min": 1.0,
+          "moment": 1.0,
+          "nonzero": 1,
+          "shape": [],
+          "square_sum": 1.0,
+          "sum": 1.0
+        }
+      }
+    ]
+  }
+}

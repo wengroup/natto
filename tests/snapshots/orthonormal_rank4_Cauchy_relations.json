@@ -1,0 +1,107 @@
+{
+  "0": {
+    "gram": [
+      [
+        45.0
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.14907119849998599
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCD,...->...ABCD",
+        "extraction_rule": "ABCD,...ABCD->...",
+        "numerical": {
+          "abs_sum": 4.024922359499621,
+          "max": 0.447213595499958,
+          "min": 0.0,
+          "moment": 165.02181673948448,
+          "nonzero": 21,
+          "shape": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 1.0,
+          "sum": 4.024922359499621
+        }
+      }
+    ]
+  },
+  "2": {
+    "gram": [
+      [
+        42.000000000000014
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        0.15430334996209188
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDab,...ab->...ABCD",
+        "extraction_rule": "ABCDab,...ABCD->...ab",
+        "numerical": {
+          "abs_sum": 24.071322594086332,
+          "max": 0.6172133998483675,
+          "min": -0.30860669992418377,
+          "moment": 6082.638055505663,
+          "nonzero": 183,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 4.999999999999998,
+          "sum": 16.66476179590592
+        }
+      }
+    ]
+  },
+  "4": {
+    "gram": [
+      [
+        0.9999999999999994
+      ]
+    ],
+    "gram_inverse_sqrt": [
+      [
+        1.0000000000000004
+      ]
+    ],
+    "orthonormal": [
+      {
+        "embedding_rule": "ABCDabcd,...abcd->...ABCD",
+        "extraction_rule": "ABCDabcd,...ABCD->...abcd",
+        "numerical": {
+          "abs_sum": 102.85714285714288,
+          "max": 0.22857142857142956,
+          "min": -0.11428571428571435,
+          "moment": 60745.37142857141,
+          "nonzero": 1641,
+          "shape": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "square_sum": 9.000000000000004,
+          "sum": 18.514285714285712
+        }
+      }
+    ]
+  }
+}
