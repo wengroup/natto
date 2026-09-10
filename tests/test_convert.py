@@ -4,6 +4,11 @@ import torch
 from natto.convert import Converter
 from natto.sym import symmetrize
 
+#: Rank four is where the construction costs seconds rather than a fraction of
+#: one, so all but the elastic class are marked `slow`; see
+#: `test_mappings.DEFAULT_RANK_FOUR_CLASS`.
+slow = pytest.mark.slow
+
 
 @pytest.mark.parametrize(
     "rank,symmetry",
@@ -13,11 +18,11 @@ from natto.sym import symmetrize
         (3, None),
         (3, "ijk=ikj"),
         (3, "ijk=ikj=jik"),
-        (4, None),
-        (4, "ijkl=jikl"),
-        (4, "ijkl=jilk"),
+        pytest.param(4, None, marks=slow),
+        pytest.param(4, "ijkl=jikl", marks=slow),
+        pytest.param(4, "ijkl=jilk", marks=slow),
         (4, "ijkl=jikl=klij"),
-        (4, "ijkl=jikl=kjil=ljki"),
+        pytest.param(4, "ijkl=jikl=kjil=ljki", marks=slow),
     ],
 )
 def test_Converter(rank, symmetry):
