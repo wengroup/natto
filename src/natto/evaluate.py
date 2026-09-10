@@ -1,5 +1,9 @@
-"""
-Evaluating numerical values of G, H, and S tensors and their tensor products.
+r"""Numerical evaluation of the symbolic operators.
+
+A symbolic operator is a linear combination of products of Kronecker deltas and
+Levi-Civita symbols. This module contracts one into the array that `torch.einsum`
+applies, in the index order the operator is used in: `embedding`, `extraction`
+or `decomposition`.
 """
 
 from functools import lru_cache
@@ -59,21 +63,21 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
     Upper-case letters are used to represent tensors in the n space (namely for
     tensors T and such), while lower-case letters are used to represent tensors in the
     j space (namely for tensors X). So:
-    1. X = H T: H would consist of both lower case and upper-case letters, and its
-       upper-case letters are to be contracted with T. We assume the contracting rule
-       is something like X_ab = H_abABC T_ABC.
-    2. T' = G X: G would consist of both lower case and upper-case letters, and its
-       lower-case letters are to be contracted with X. We assume the contracting rule is
-       something like T'_ABC = G_ABCab X_ab.
-    3. T' = G H T = S T: S would consist of only upper-case letters. We assume the
-       contracting rule is something like T'_ABC = S_ABCDEF T_DEF, where the first
-       half of the indices are associated with the embedded tensor T', while the
-       latter half of the indices are associated with the original tensor T.
+    1. Extraction, X = G~ T: G~ would consist of both lower case and upper-case
+       letters, and its upper-case letters are to be contracted with T. We assume the
+       contracting rule is something like X_ab = G~_abABC T_ABC.
+    2. Embedding, T' = G X: G would consist of both lower case and upper-case letters,
+       and its lower-case letters are to be contracted with X. We assume the
+       contracting rule is something like T'_ABC = G_ABCab X_ab.
+    3. Decomposition, T' = G G~ T = S T: S would consist of only upper-case letters.
+       We assume the contracting rule is something like T'_ABC = S_ABCDEF T_DEF, where
+       the first half of the indices are associated with the embedded tensor T', while
+       the latter half of the indices are associated with the original tensor T.
 
     Args:
         tp: Tensor product of Kronecker delta and Levi-Civita tensors.
-        mode: which mode to use, either `G`, `H`, or `S`. This determines how the
-            output indices are ordered.
+        mode: which mode to use, either `embedding`, `extraction` or
+            `decomposition`. This determines how the output indices are ordered.
         dtype: Floating-point dtype of the evaluated tensor.
 
     Returns:
@@ -98,16 +102,17 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
     # Since the tensors only consists of delta and epsilon, the left rule should be OK,
     # because of the `major` symmetric in them, e.g. d_ij d_kl = d_kl d_ij.
     # But, the right rule should be ordered according to the mode.
-    # The order of individual index in lower indices (or upper indices) in the right
-    # does not matter when consider Z = HT and such cases, since this function is only
-    # since H is symmetric.
+    # The order of an individual index within the lower group (or within the upper
+    # group) on the right does not matter for the operators built here, since each is
+    # symmetric under permutations within either group; only which group an index
+    # belongs to does, and that is what the mode fixes.
     #
     # TODO
     # The order of the indices in the right rule can matter when we do
-    # Z = H:XY (see H_tp.py), because H carries three set of indices then. That's why
-    # we sort the indices. This is definitely abuse of this function. It is designed
-    # only for cases like Z = HT, so we need to create a new function just like this
-    # for Z = H:XY.
+    # Z = K:XY (see coupling.py), because K carries three set of indices then. That's
+    # why we sort the indices. This is definitely abuse of this function. It is
+    # designed only for cases like Z = ST, so we need to create a new function just
+    # like this for Z = K:XY.
     right = "".join(delta_rules + epsilon_rules)
     lower = sorted([c for c in right if c.islower()])
     upper = sorted([c for c in right if c.isupper()])
@@ -149,53 +154,52 @@ def evaluate_tensors(
     return output
 
 
-def extract(H: LinearCombination, T: Tensor) -> Tensor:
+def extract(G_tilde: LinearCombination, T: Tensor) -> Tensor:
     r"""
-    Evaluate X(j) = H(j|n) \odot^n T(n).
+    Evaluate X(j) = G~(j|n) \odot^n T(n).
 
-    In G, lower case indices are for r1, r2, ..., rj, and upper case indices are for
+    In G~, lower case indices are for r1, r2, ..., rj, and upper case indices are for
     s1, s2, ..., sn. Here, the upper indices are to be contracted away.
 
     Args:
-        H: the contraction rule.
-        T: the ordinary tensor T(n) to contract with H.
+        G_tilde: the dual mapping tensor G~(j|n), symbolically.
+        T: the ordinary tensor T(n) to contract with G~.
 
     Returns:
         X(j) in the space j.
     """
-    # Get numerical values of H
-
-    H = simplify_linear_combination(H)
-    H_num = evaluate_tensors(H, mode="extraction")
+    # Get numerical values of G~
+    G_tilde = simplify_linear_combination(G_tilde)
+    G_tilde_num = evaluate_tensors(G_tilde, mode="extraction")
 
     n = T.dim()
-    j = H_num.dim() - n
+    j = G_tilde_num.dim() - n
 
     lower = letter_index(j)
     upper = letter_index(n, upper_case=True)
-    H_indices = lower + upper
+    G_tilde_indices = lower + upper
     T_indices = upper
     X_indices = lower
-    rule = f"{H_indices},{T_indices}->{X_indices}"
+    rule = f"{G_tilde_indices},{T_indices}->{X_indices}"
 
-    out = torch.einsum(rule, H_num, T)
+    out = torch.einsum(rule, G_tilde_num, T)
 
     return out
 
 
 def embed(G: LinearCombination, X: Tensor) -> Tensor:
     r"""
-    Evaluate S(n) = G(n|j) \odot^j X(j).
+    Evaluate T'(n) = G(n|j) \odot^j X(j).
 
     In G, lower case indices are for r1, r2, ..., rj, and upper case indices are for
     s1, s2, ..., sn. Here, the lower indices are to be contracted away.
 
     Args:
-        G: the contraction rule.
+        G: the mapping tensor G(n|j), symbolically.
         X: the natural tensor X(j) to contract with G.
 
     Return:
-        S(n) in the space n.
+        T'(n) in the space n.
     """
     # Get numerical values of G
     G = simplify_linear_combination(G)
@@ -208,8 +212,8 @@ def embed(G: LinearCombination, X: Tensor) -> Tensor:
     upper = letter_index(n, upper_case=True)
     G_indices = upper + lower
     X_indices = lower
-    S_indices = upper
-    rule = f"{G_indices},{X_indices}->{S_indices}"
+    T_prime_indices = upper
+    rule = f"{G_indices},{X_indices}->{T_prime_indices}"
 
     out = torch.einsum(rule, G_num, X)
 

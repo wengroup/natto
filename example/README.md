@@ -42,23 +42,23 @@ The data is organized in the following way:
 
 # tensor_product_projector.yaml
 
-This projector `H` performs the Clebsch-Gordan-like coupling of two natural tensors of
-ranks l1 and l2 into a new natural tensor of rank l3.
-The file contains the symbolic and numerical values of `H` along with the einsum rule
+The coupling operator `K` performs the Clebsch-Gordan-like coupling of two natural
+tensors of weights l1 and l2 into a new natural tensor of weight l3.
+The file contains the symbolic and numerical values of `K` along with the einsum rule
 to apply it.
 
 The data is organized in the following way:
 
 {l1-l2-l3-normalization:
-    {"H_symbolic": symbolic expression for the projector H,
-    "H_numerical": numerical values of the projector H,
-    "rule": einsum rule to apply the projector H to get the natural tensor from the two input natural tensors
+    {"symbolic": symbolic expression for the coupling operator K,
+    "numerical": numerical values of K,
+    "rule": einsum rule to apply K to the two input natural tensors
     }
 }
 
-- In "l1-l2-l3-normalization", l1 and l2 are the ranks of the two input natural tensors,
-  l3 is the rank of the output natural tensor, and normalization can be `none` or
-  `unity`, indicating whether the projector H is normalized or not.
+- In "l1-l2-l3-normalization", l1 and l2 are the weights of the two input natural
+  tensors, l3 is the weight of the output natural tensor, and normalization can be
+  `none` or `unity`, indicating whether K is normalized or not.
 
 
 # decomposition_and_reconstruction_projector.yaml
@@ -68,7 +68,7 @@ into its natural tensor components and reconstruct it back. Specifically:
 
 - `extraction` extracts a natural tensor component from the physical tensor.
 - `embedding` embeds a natural tensor component back into the physical tensor space.
-- `projector` is their composition, taking the physical tensor straight to its
+- `decomposition` is their composition, taking the physical tensor straight to its
   weight-`l`, channel-`p` part without forming the natural tensor.
 
 The file contains the symbolic and numerical values of the three for each

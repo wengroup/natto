@@ -1,35 +1,43 @@
-r"""
-Tensor operator to get Z = X \otimes Y.
+r"""Coupling of two irreducible Cartesian tensors into a third.
 
-This is based on our newly derived formulas (\label{eq:tp:even:H} and
-\label{eq:tp:odd:H}) to get Z_l3 as: Z_l3 = H : X_l1 Y_l2, where : denotes contraction
-with X and Y.
-Unlike the equations in [LP89], which needs a loop to compute Z, the newly derived is
-much more efficient as it just need a single tensor product.
+The coupling operator $\mathbf{K}_{(\ell_3 \mid \ell_1, \ell_2)}$ of Eqs. (47)
+and (48) takes natural tensors $\mathbf{X}^{\ell_1}$ and $\mathbf{Y}^{\ell_2}$
+to the weight-$\ell_3$ tensor of their product,
+
+$$\mathbf{Z}^{\ell_3} = \mathbf{K}_{(\ell_3 \mid \ell_1, \ell_2)}
+\odot^{\ell_1} \mathbf{X}^{\ell_1} \odot^{\ell_2} \mathbf{Y}^{\ell_2},$$
+
+the Cartesian counterpart of a Clebsch-Gordan coefficient. Two closed forms
+build it, one for each parity of $\ell_1 + \ell_2 - \ell_3$; the odd one carries
+a Levi-Civita symbol. `get_coupling_operator` dispatches on that parity, so a
+caller supplies only the three weights.
+
+The scale is not fixed by the construction. One factor per weight triple is
+free, and the normalization constants $C$ of Eqs. (49) and (50) fix it, one per
+parity; `tests/test_coupling.py` asserts the two conditions they come from.
+
+## Why this is not a call into `GHS`
 
 This is the only route to the coupling, and it is a closed form rather than a
 call into the general symmetry machinery of `GHS`. That is worth explaining,
-since X \otimes Y is symmetric within its first l1 indices and within its last
-l2, which is an intrinsic symmetry in the ordinary sense, and the symmetry
-route does apply to it.
+since $\mathbf{X} \otimes \mathbf{Y}$ is symmetric within its first $\ell_1$
+indices and within its last $\ell_2$, which is an intrinsic symmetry in the
+ordinary sense, and the symmetry route does apply to it.
 
-Applying it is not enough on its own. What reduces the weight-l3 mapping space
-to a single dimension is a second property: X and Y are traceless, so a
-contraction taken inside either vanishes and only contractions between the two
-survive. Tracelessness is not an index permutation, so no symmetry string
-expresses it and the symmetry-adapted construction cannot use it. The
-derivation narrows the candidates with it separately, and the result is the
-single operator built here.
+Applying it is not enough on its own. What reduces the weight-$\ell_3$ mapping
+space to a single dimension is a second property: $\mathbf{X}$ and $\mathbf{Y}$
+are traceless, so a contraction taken inside either vanishes and only
+contractions between the two survive. Tracelessness is not an index permutation,
+so no symmetry string expresses it and the symmetry-adapted construction cannot
+use it. The derivation narrows the candidates with it separately, and the result
+is the single operator built here.
 
-A second route did exist, reaching Z by reducing the rank-(l1 + l2) product and
-grouping the resulting mappings numerically, which is how it saw tracelessness:
-by working on an actual traceless product rather than through the symmetry. It
-gave the same operator up to a scalar and was removed. The closed form is exact
-and far cheaper, the general route having to pass through the reduction of a
-rank-six tensor once l1 = l2 = 3.
-
-[LP89] "Angular reduction in multiparticle matrix elements" by D. R. Lehman and W. C. Parke.
-http://dx.doi.org/10.1063/1.528515
+A second route did exist, reaching $\mathbf{Z}$ by reducing the rank-$(\ell_1 +
+\ell_2)$ product and grouping the resulting mappings numerically, which is how
+it saw tracelessness: by working on an actual traceless product rather than
+through the symmetry. It gave the same operator up to a scalar and was removed.
+The closed form is exact and far cheaper, the general route having to pass
+through the reduction of a rank-six tensor once $\ell_1 = \ell_2 = 3$.
 """
 
 from fractions import Fraction
@@ -52,40 +60,76 @@ from natto.utils import (
 )
 
 
-def get_H_numerical_even(
+def get_coupling_operator(
     l1: int, l2: int, l3: int, normalize: str = "unity"
 ) -> tuple[Tensor, str]:
-    """
-    Args:
-        l1: The rank of the first tensor X.
-        l2: The rank of the second tensor Y.
-        l3: The rank of the output tensor Z.
-        normalize: The normalization method.
-            If `unity`, the output is normalized such that the l3 fold contraction of
-            the output tensor with a unit vector yields 1.
-            If `none`, no normalization is applied.
-    """
-    H, X_idx, Y_idx, Z_idx = get_H_even(l1, l2, l3)
+    """Build the coupling operator `K` of one weight triple, evaluated.
 
-    H = simplify_linear_combination(H)
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+        normalize: `unity` applies the normalization constant `C` of the paper,
+            fixing the scale by the condition for the parity of
+            `L = l1 + l2 + l3`; `none` leaves the operator unscaled.
+
+    Returns:
+        The evaluated operator, and the einsum rule that applies it, so that
+        `Z = torch.einsum(rule, K, X, Y)`.
+    """
+    if (l1 + l2 - l3) % 2 == 0:
+        return _get_coupling_operator_even(l1, l2, l3, normalize)
+
+    return _get_coupling_operator_odd(l1, l2, l3, normalize)
+
+
+def get_coupling_symbolic(
+    l1: int, l2: int, l3: int
+) -> tuple[LinearCombination, str, str, str]:
+    """Build the coupling operator `K` of one weight triple, symbolically.
+
+    The terms are exact, with rational coefficients, and unnormalized; the
+    normalization constants are `coeff_C_even` and `coeff_C_odd`.
+
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+
+    Returns:
+        The symbolic operator, and the letters carrying the X, Y and Z indices.
+    """
+    if (l1 + l2 - l3) % 2 == 0:
+        return _get_coupling_symbolic_even(l1, l2, l3)
+
+    return _get_coupling_symbolic_odd(l1, l2, l3)
+
+
+def _get_coupling_operator_even(
+    l1: int, l2: int, l3: int, normalize: str = "unity"
+) -> tuple[Tensor, str]:
+    """Evaluate `K` for even `l1 + l2 - l3`; see `get_coupling_operator`."""
+    K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_even(l1, l2, l3)
+
+    K = simplify_linear_combination(K)
 
     # We have three types indices, lower case for Z, upper case for X, and upper case
     # for Y. But the function evaluate_tensors() can only deal with two types of
     # indices: lower and upper case (cannot distinguish between X and Y). Then:
-    # Q: Why we still can use it to evaluate H?
+    # Q: Why we still can use it to evaluate K?
     # A: We take advantage of the fact that, by construction, all the indices in
     # X_idx are smaller than the indices in Y_idx, and that in `evaluate_tensors()`,
     # (actually `tp_delta_epsilon()`), the upper indices are sorted. As a result,
-    # we have all the indices of X_idx # comes before Y_idx in H_numerical.
-    # In other words, the indices of H_numerical is {Z_idx}{X_idx}{Y_idx}.
-    # Then, we can use this to do H:XY.
+    # we have all the indices of X_idx # comes before Y_idx in K_numerical.
+    # In other words, the indices of K_numerical is {Z_idx}{X_idx}{Y_idx}.
+    # Then, we can use this to do K:XY.
     #
     # TODO, create a new function like evaluate_tensors to deal with this case.
-    H_numerical = evaluate_tensors(H, mode="extraction")
+    K_numerical = evaluate_tensors(K, mode="extraction")
 
     if normalize == "unity":
-        c = coeff_C(l1, l2, l3)
-        H_numerical *= c
+        c = coeff_C_even(l1, l2, l3)
+        K_numerical *= c
     elif normalize == "none":
         pass
     else:
@@ -97,33 +141,24 @@ def get_H_numerical_even(
     # Rule that can be used in einsum to obtain Z = einsum(rule, G, X, Y)
     rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
 
-    return H_numerical, rule
+    return K_numerical, rule
 
 
-def get_H_numerical_odd(
+def _get_coupling_operator_odd(
     l1: int,
     l2: int,
     l3: int,
     normalize: str = "unity",
 ) -> tuple[Tensor, str]:
-    """
+    """Evaluate `K` for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
+    K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_odd(l1, l2, l3)
+    K = simplify_linear_combination(K)
 
-    Args:
-        l1:
-        l2:
-        l3:
-        normalize:
-
-    Returns:
-    """
-    H, X_idx, Y_idx, Z_idx = get_H_odd(l1, l2, l3)
-    H = simplify_linear_combination(H)
-
-    H_numerical = evaluate_tensors(H, mode="extraction")
+    K_numerical = evaluate_tensors(K, mode="extraction")
 
     if normalize == "unity":
-        c = coeff_D(l1, l2, l3)
-        H_numerical *= c
+        c = coeff_C_odd(l1, l2, l3)
+        K_numerical *= c
     elif normalize == "none":
         pass
     else:
@@ -135,24 +170,13 @@ def get_H_numerical_odd(
     # Rule that can be used in einsum to obtain Z = einsum(rule, G, X, Y)
     rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
 
-    return H_numerical, rule
+    return K_numerical, rule
 
 
-def get_H_even(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, str]:
-    """
-    Calculate the H operator tensor to obtain Z_l3 = H:XY, where l1 + l2 - l3 is even.
-
-    Args:
-        l1: The rank of the first tensor X.
-        l2: The rank of the second tensor Y.
-        l3: The rank of the output tensor Z.
-
-    Returns:
-        H: Symbolic representation of the H tensor.
-        X_idx: letters used as X indices in H.
-        Y_idx: letters used as Y indices in H.
-        Z_idx: letters used as Z indices in H.
-    """
+def _get_coupling_symbolic_even(
+    l1: int, l2: int, l3: int
+) -> tuple[LinearCombination, str, str, str]:
+    """Build `K` symbolically for even `l1 + l2 - l3`; see `get_coupling_symbolic`."""
     assert (l1 + l2 - l3) % 2 == 0, "l1 + l2 - l3 must be even"
 
     k = (l1 + l2 - l3) // 2
@@ -163,7 +187,7 @@ def get_H_even(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, 
             (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2).item()
         )
 
-        all_rules = get_H_rules_even(l1, l2, l3, t)
+        all_rules = _get_coupling_rules_even(l1, l2, l3, t)
 
         # create tensor products of deltas for each rule
         tensors = [
@@ -176,35 +200,20 @@ def get_H_even(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, 
         # extend them to sum up later
         out.extend(tensors)
 
-    H = LinearCombination(*out)
+    K = LinearCombination(*out)
 
-    # Note, this should exactly the same as those in `get_H_rules_even()`
+    # Note, this should exactly the same as those in `_get_coupling_rules_even()`
     X_idx = letter_index(l1, upper_case=True)
     Y_idx = letter_index(l2, start=l1, upper_case=True)
     Z_idx = letter_index(l3)
 
-    return H, X_idx, Y_idx, Z_idx
+    return K, X_idx, Y_idx, Z_idx
 
 
-def get_H_odd(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, str]:
-    """
-    Calculate the H operator tensor to obtain Z_l3 = H:XY, where l1 + l2 - l3 is odd.
-
-    Args:
-        l1: The rank of the first tensor X.
-        l2: The rank of the second tensor Y.
-        l3: The rank of the output tensor Z.
-        normalize: The normalization method.
-            If `unity`, the output is normalized such that the l3 fold contraction of
-            the output tensor with a unit vector yields 1.
-            If `none`, no normalization is applied.
-
-    Returns:
-        H: Symbolic representation of the H tensor.
-        X_idx: letters used as X indices in H.
-        Y_idx: letters used as Y indices in H.
-        Z_idx: letters used as Z indices in H.
-    """
+def _get_coupling_symbolic_odd(
+    l1: int, l2: int, l3: int
+) -> tuple[LinearCombination, str, str, str]:
+    """Build `K` symbolically for odd `l1 + l2 - l3`; see `get_coupling_symbolic`."""
     assert (l1 + l2 - l3) % 2 == 1, "l1 + l2 - l3 must be odd"
 
     k = (l1 + l2 - l3 - 1) // 2
@@ -216,7 +225,7 @@ def get_H_odd(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, s
             (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2).item()
         )
 
-        all_rules = get_H_rules_odd(l1, l2, l3, t)
+        all_rules = _get_coupling_rules_odd(l1, l2, l3, t)
 
         # create tensor products of deltas for each rule
         tensors = [
@@ -231,17 +240,19 @@ def get_H_odd(l1: int, l2: int, l3: int) -> tuple[LinearCombination, str, str, s
         # extend them to sum up later
         out.extend(tensors)
 
-    H = LinearCombination(*out)
+    K = LinearCombination(*out)
 
-    # Note, this should exactly the same as those in `get_H_rules_odd()`
+    # Note, this should exactly the same as those in `_get_coupling_rules_odd()`
     X_idx = letter_index(l1, upper_case=True)
     Y_idx = letter_index(l2, start=l1, upper_case=True)
     Z_idx = letter_index(l3)
 
-    return H, X_idx, Y_idx, Z_idx
+    return K, X_idx, Y_idx, Z_idx
 
 
-def get_H_rules_even(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[str]]]:
+def _get_coupling_rules_even(
+    l1: int, l2: int, l3: int, t: int
+) -> list[dict[str, list[str]]]:
     """
     Get the rule for  { d_ra^{l1-k-t} d_sa^{l2-k-t} d_{aa}^t } d_rs^{k+t}.
 
@@ -291,7 +302,7 @@ def get_H_rules_even(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[s
         # from natural tensors, and thus all r or k indices are symmetric.
         #
         # Get p_a such that p_a[perm] -> a_idx. This is used because later when we do
-        # tensor product to get Z = H:XY, the rule in the einsum will be sorted in the
+        # tensor product to get Z = K:XY, the rule in the einsum will be sorted in the
         # right-hand-side. Then, p_a corresponds to the indices on the left-hand-side,
         # and a_idx (it is sorted here) corresponds to the indices on the
         # right-hand-side. Then we are essentially symmetrizing the tensors.
@@ -318,7 +329,9 @@ def get_H_rules_even(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[s
     return all_rules
 
 
-def get_H_rules_odd(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[str]]]:
+def _get_coupling_rules_odd(
+    l1: int, l2: int, l3: int, t: int
+) -> list[dict[str, list[str]]]:
     """
     Get the rule for  { eps_rsa d_ra^{l1-k-t} d_sa^{l2-k-t} d_{aa}^t } d_rs^{k+t}.
 
@@ -330,7 +343,7 @@ def get_H_rules_odd(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[st
         t:
 
     Returns:
-        Rules for constructing the H operator for odd l1 + l2 - l3, e.g.
+        Rules for constructing the K operator for odd l1 + l2 - l3, e.g.
         {eps_ipA  d_jB d_kC  d_qD d_rE  D_FG} d_ls
 
     """
@@ -370,7 +383,7 @@ def get_H_rules_odd(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[st
         # curly braces {}. No need to permute the r and s indices
         #
         # Get p_a such that p_a[perm] -> a_idx. This is used because later when we do
-        # tensor product to get Z = H:XY, the rule in the einsum will be sorted in the
+        # tensor product to get Z = K:XY, the rule in the einsum will be sorted in the
         # right-hand-side. Then, p_a corresponds to the indices on the left-hand-side,
         # and a_idx (it is sorted here) corresponds to the indices on the
         # right-hand-side. Then we are essentially symmetrizing the tensors.
@@ -406,7 +419,7 @@ def get_H_rules_odd(l1: int, l2: int, l3: int, t: int) -> list[dict[str, list[st
 
 
 def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    """
+    r"""
     Get the einsum rule when l1 + l2 - l3 is even.
 
     x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^m}
@@ -460,7 +473,7 @@ def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
 
 
 def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    """
+    r"""
     Get the einsum rule when l1 + l2 - l3 is odd.
 
     epsilon : x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^t}
@@ -517,13 +530,20 @@ def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
     return rule, symmetry, delta_indices
 
 
-def coeff_C(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
-    """Coefficient C for even L.
+def coeff_C_even(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
+    """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
 
-    The coefficient is obtained such that the l3-fold contraction of the output tensor
-    with a unit vector yields 1.
+    The constant is fixed by requiring that the l3-fold contraction of the output
+    tensor with a unit vector yields 1.
 
-    Ref: Eq. 54 of [LP89]
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+        device: Device the constant is computed on.
+
+    Returns:
+        The normalization constant.
     """
     L = l1 + l2 + l3
     L1 = L - 2 * l1 - 1
@@ -544,20 +564,29 @@ def coeff_C(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
     )
 
 
-def coeff_D(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
-    """Coefficient D for odd L.
+def coeff_C_odd(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
+    r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
 
-    The normalization condition differs from that of coeff_C. For odd L the coupling
-    tensor carries a Levi-Civita symbol, so contracting the output l3 times with a
-    single unit vector vanishes identically by antisymmetry and cannot fix the scale.
-    Instead, D is obtained such that when X_l1 is built from a unit vector r and Y_l2
-    from a unit vector b, the output Z_l3 satisfies
+    The condition differs from the one behind `coeff_C_even`. For odd `L` the
+    coupling operator carries a Levi-Civita symbol, so contracting the output
+    l3 times with a single unit vector vanishes identically by antisymmetry and
+    cannot fix the scale. The constant is fixed instead by the rate of that
+    vanishing: with $\mathbf{X}^{\ell_1}$ built from a unit vector $\mathbf{r}$
+    and $\mathbf{Y}^{\ell_2}$ from a unit vector $\mathbf{b}$,
 
-        lim_{b -> r} |Z_l3 (.)^{l3-1} r^{x(l3-1)}| / |r x b| = 1,
+    $$\lim_{\mathbf{b} \to \mathbf{r}}
+    \frac{\lVert \mathbf{Z}^{\ell_3} \odot^{\ell_3 - 1}
+    \mathbf{r}^{\otimes(\ell_3 - 1)} \rVert}
+    {\lVert \mathbf{r} \times \mathbf{b} \rVert} = 1.$$
 
-    where (.) denotes contraction and |.| the norm of the resulting vector.
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+        device: Device the constant is computed on.
 
-    Ref: Eq. 55 of [LP89]
+    Returns:
+        The normalization constant.
     """
     L = l1 + l2 + l3
     L1 = L - 2 * l1 - 1
@@ -577,16 +606,3 @@ def coeff_D(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
         / double_factorial(L3 + 1, device=device)
         / factorial((L + 1) // 2, device=device)
     )
-
-
-if __name__ == "__main__":
-    # Get symbolic
-    l1 = 2
-    l2 = 1
-    l3 = 2
-    if (l1 + l2 - l3) % 2 == 0:
-        H, X_idx, Y_idx, Z_idx = get_H_even(l1, l2, l3)
-    else:
-        H, X_idx, Y_idx, Z_idx = get_H_odd(l1, l2, l3)
-    H = simplify_linear_combination(H)
-    print(f"H after simplification (l1={l1}, l2={l2}, l3={l3}):", H)
