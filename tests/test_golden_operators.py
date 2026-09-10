@@ -18,14 +18,34 @@ carrying nothing they do not, and `test_GHS.test_get_G_H_S` already asserts
 
 The classes come from `test_GHS.PHYSICAL_TENSOR_CLASSES` rather than being
 restated here, so the table stays one statement about the physics.
+
+Rank six is snapshotted too, since it carries the paper's new result, but only
+at weights zero to three; the rest cost minutes each.
+
+Nothing above rank four is committed. Those snapshots are large -- a megabyte
+for the generic rank-six class -- and slow to produce, so they live in the
+gitignored `local` directory and their test skips when they are absent.
+Generate them once at the start of a porting session and they guard the rest of
+it; a fresh clone gets the rank-four coverage and a skip.
 """
 
 import functools
+from pathlib import Path
 
 import pytest
 
-from natto.GHS import get_orthonormal_Q
-from tests.golden import assert_snapshot, fingerprint
+from natto.evaluate import evaluate_tensors
+from natto.GHS import get_G_H_of_j, get_G_H_S_of_j, get_orthonormal_Q
+from natto.matrix import fraction_matrix
+from natto.ops import simplify_linear_combination
+from natto.utils import letter_index
+from tests.golden import (
+    LOCAL_SNAPSHOT_DIR,
+    assert_snapshot,
+    fingerprint,
+    regolding,
+    snapshot_path,
+)
 from tests.test_GHS import get_G_H_S_cached, get_tensor_class_params
 
 #: `LinearCombination.__str__` joins the terms of an operator with two spaces.
@@ -37,6 +57,27 @@ TERM_SEPARATOR = "  "
 #: content exactly; this tolerance only has to be tight enough to notice a
 #: different basis, which is order one.
 FINGERPRINT_RTOL = 1e-5
+
+#: Rank six is where the paper's new result lives, so it is snapshotted even
+#: though no rank-six row is in `PHYSICAL_TENSOR_CLASSES`.
+RANK_SIX = 6
+
+#: Only the affordable sectors. Rank-six weight 4 takes about three minutes and
+#: weight 5 about thirty-four, at nearly four gigabytes, so both are left out;
+#: the multiplicities there are covered by the audit rather than by a test.
+RANK_SIX_WEIGHTS = (0, 1, 2, 3)
+
+#: Path named in the skip message, so it can be pasted into a shell.
+TEST_FILE = (
+    Path(__file__).relative_to(Path.cwd())
+    if Path(__file__).is_relative_to(Path.cwd())
+    else Path(__file__)
+)
+
+#: The third-order elastic tensor, class ((ij)(kl)(mn)), written with the
+#: paper's minimal generating set: exchange within the first pair, exchange of
+#: the first pair with the second, and of the second with the third.
+THIRD_ORDER_ELASTIC = "ijklmn=jiklmn=klijmn=ijmnkl"
 
 
 @functools.lru_cache(maxsize=None)
@@ -103,6 +144,76 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     return content
 
 
+def rank_six_content(symmetry: str | None) -> dict:
+    """Collect the affordable rank-six sectors of one class into snapshot form.
+
+    `get_G_H_S` cannot be used here. It walks every weight, which would pull in
+    the two that cost minutes, and it evaluates `S`, which at rank six is a
+    rank-12 array of half a million entries per channel. This goes weight by
+    weight instead and builds only what is snapshotted.
+
+    Args:
+        symmetry: Intrinsic symmetry of the class, or None for a generic tensor.
+
+    Returns:
+        The operators keyed by weight. A weight the symmetry extinguishes is
+        recorded as a multiplicity of zero rather than omitted, since its
+        absence is a result in its own right.
+    """
+    lower_by_weight = {weight: letter_index(weight) for weight in RANK_SIX_WEIGHTS}
+    upper = letter_index(RANK_SIX, upper_case=True)
+
+    content = {}
+    for weight in RANK_SIX_WEIGHTS:
+        if symmetry is None:
+            embedding, extraction, gram, gram_inverse = get_G_H_of_j(weight, RANK_SIX)
+        else:
+            embedding, extraction, _, gram, gram_inverse = get_G_H_S_of_j(
+                weight, RANK_SIX, symmetry
+            )
+
+        if not embedding:
+            content[weight] = {"multiplicity": 0}
+            continue
+
+        lower = lower_by_weight[weight]
+        content[weight] = {
+            "multiplicity": len(embedding),
+            "gram": fraction_matrix(gram),
+            "gram_inverse": fraction_matrix(gram_inverse),
+            "embedding": [
+                _rank_six_operator(
+                    operator, "G", f"{upper}{lower},...{lower}->...{upper}"
+                )
+                for operator in embedding
+            ],
+            "extraction": [
+                _rank_six_operator(
+                    operator, "H", f"{lower}{upper},...{upper}->...{lower}"
+                )
+                for operator in extraction
+            ],
+        }
+
+    return content
+
+
+def _rank_six_operator(operator, mode: str, rule: str) -> dict:
+    """Snapshot form of one rank-six operator, evaluated on the spot.
+
+    The rank-four path takes its operators from `get_G_H_S`, which has already
+    simplified and evaluated them. Here they arrive raw, so both steps happen
+    here.
+    """
+    simplified = simplify_linear_combination(operator)
+
+    return {
+        "symbolic": str(simplified).split(TERM_SEPARATOR),
+        "rule": rule,
+        "numerical": fingerprint(evaluate_tensors(simplified, mode=mode)),
+    }
+
+
 def _operator(entry: dict) -> dict:
     """Snapshot form of one operator: symbolic exactly, evaluated by fingerprint.
 
@@ -144,4 +255,32 @@ def test_orthonormal_operator_content(tensor_class):
         f"orthonormal_{tensor_class.test_id}",
         orthonormal_content(tensor_class.rank, tensor_class.symmetry),
         rtol=FINGERPRINT_RTOL,
+    )
+
+
+@pytest.mark.parametrize(
+    "name,symmetry", [("generic", None), ("third_order_elastic", THIRD_ORDER_ELASTIC)]
+)
+def test_rank_six_operator_content(name: str, symmetry: str | None):
+    """Pin the affordable rank-six sectors of the paper's two rank-six rows.
+
+    Weights 0 to 3 only; see `RANK_SIX_WEIGHTS` for why the rest are left out.
+
+    Args:
+        name: Short label used as the snapshot name.
+        symmetry: Intrinsic symmetry of the class, or None for a generic tensor.
+    """
+    snapshot = f"rank6_{name}"
+    if not regolding() and not snapshot_path(snapshot, LOCAL_SNAPSHOT_DIR).exists():
+        pytest.skip(
+            f"No local snapshot for {snapshot}. Rank-six snapshots are not "
+            f"committed; create them with "
+            f"NATTO_REGOLD=1 pytest {TEST_FILE}::test_rank_six_operator_content"
+        )
+
+    assert_snapshot(
+        snapshot,
+        rank_six_content(symmetry),
+        rtol=FINGERPRINT_RTOL,
+        directory=LOCAL_SNAPSHOT_DIR,
     )
