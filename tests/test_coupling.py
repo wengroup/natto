@@ -1,13 +1,13 @@
 """Tests for the Cartesian coupling operator.
 
-`H_tp` builds the operator that couples two irreducible Cartesian tensors into a
-third, the Cartesian counterpart of the Clebsch-Gordan coefficients. Its shape
+`natto.coupling` builds the operator that couples two irreducible Cartesian
+tensors into a third, the Cartesian counterpart of the Clebsch-Gordan coefficients. Its shape
 follows from the natural projector, but its overall scale does not: the
 construction leaves one factor free per weight triple, and the paper fixes it
 with two conditions, one for each parity of `L = l1 + l2 + l3`.
 
 Those conditions are what these tests assert. They are the only thing that pins
-`coeff_C` and `coeff_D`, so without them the coupling operator is checked only
+`coeff_C_even` and `coeff_C_odd`, so without them the coupling operator is checked only
 up to a scalar.
 
 The conditions are stated on the Cartesian harmonics, which the package does not
@@ -22,7 +22,7 @@ import math
 import pytest
 import torch
 
-from natto.H_tp import get_H_numerical_even, get_H_numerical_odd
+from natto.coupling import get_coupling_operator
 from natto.symmetrize import remove_trace
 
 #: Weights the conditions are checked at. The operator is closed form, so this
@@ -146,10 +146,10 @@ def test_cartesian_harmonic_generates_legendre(weight: int):
 def test_even_parity_normalization(l1: int, l2: int, l3: int):
     """Two harmonics of one direction couple to the harmonic of that direction.
 
-    This is the condition that fixes `coeff_C`.
+    This is the condition that fixes `coeff_C_even`.
     """
     a = random_unit_vector(0)
-    operator, rule = get_H_numerical_even(l1, l2, l3, normalize="unity")
+    operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
 
     coupled = torch.einsum(
         rule,
@@ -170,14 +170,14 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
     For odd `L` the operator carries a Levi-Civita symbol, so contracting the
     output with a single direction vanishes identically and cannot fix the
     scale. The paper's second condition takes the rate of that vanishing
-    instead. This is what fixes `coeff_D`.
+    instead. This is what fixes `coeff_C_odd`.
     """
     a = random_unit_vector(0)
     perpendicular = torch.linalg.cross(a, random_unit_vector(1))
     b = a + LIMIT_SEPARATION * perpendicular / perpendicular.norm()
     b = b / b.norm()
 
-    operator, rule = get_H_numerical_odd(l1, l2, l3, normalize="unity")
+    operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
     coupled = torch.einsum(
         rule,
         operator.to(torch.float64),

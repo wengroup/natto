@@ -48,7 +48,7 @@ defines it.
 | $\widehat{\mathbf{G}}^p_{(\ell\mid n)}$, Eq. (26) | Orthonormal mapping tensor, self-dual | `basis="orthonormal"`, not a separate function |
 | $\mathbf{Q}^p_{(\ell\mid n)}$, Eq. (36) | Symmetry-adapted mapping tensor | `symmetry=...`, not a separate function |
 | $\mathbf{S}^{\ell,p}_n$, Eq. (25) | Embedding of $\mathbf{X}^p_\ell$ in $\mathcal{T}^n$ | `decomposition`; see the note below |
-| $\mathbf{K}_{(\ell_3\mid\ell_1,\ell_2)}$, Eqs. (47), (48) | Coupling operator | `get_coupling_operator` (pending) |
+| $\mathbf{K}_{(\ell_3\mid\ell_1,\ell_2)}$, Eqs. (47), (48) | Coupling operator | `get_coupling_operator` |
 | $\mathbf{H}_{(n\mid n)}$, Eq. (40) | Harmonic operator | not implemented |
 | $\mathbf{V}_n$, Eq. (41) | Cartesian harmonic of weight $n$ | not implemented |
 
