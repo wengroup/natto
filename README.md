@@ -40,14 +40,20 @@ T = np.array([
     [7.0, 8.0, 12.0]
 ])
 
+# the operators of every rank-2 tensor, keyed by weight
 operators = get_reduction(rank=2)
+
 for weight, data in operators.items():
-    extraction = data["extraction"][0]
-    X = np.einsum(extraction["rule"], extraction["numerical"], T)
-    print(f"weight {weight}:")
-    print(f"  operator: {extraction['symbolic']}")
-    print(f"  X{weight}:")
-    print(textwrap.indent(str(X), "    "))
+    # a weight can occur more than once; each occurrence is a channel, and at
+    # rank 2 every weight has exactly one
+    for extraction in data["extraction"]:
+        # contract T with the operator to get the ICT of this weight
+        X = np.einsum(extraction["rule"], extraction["numerical"], T)
+
+        print(f"weight {weight}:")
+        print(f"  operator: {extraction['symbolic']}")
+        print(f"  X{weight}:")
+        print(textwrap.indent(str(X), "    "))
 ```
 
 ```
@@ -77,16 +83,19 @@ Declaring a symmetry removes the weights the class cannot carry. A symmetric
 rank-2 tensor has no antisymmetric part, so weight 1 is gone, leaving two ICTs:
 
 ```python
+# a symmetric tensor of the same class
 T = (T + T.T) / 2
 
 operators = get_reduction(rank=2, symmetry="ij=ji")
+
 for weight, data in operators.items():
-    extraction = data["extraction"][0]
-    X = np.einsum(extraction["rule"], extraction["numerical"], T)
-    print(f"weight {weight}:")
-    print(f"  operator: {extraction['symbolic']}")
-    print(f"  X{weight}:")
-    print(textwrap.indent(str(X), "    "))
+    for extraction in data["extraction"]:
+        X = np.einsum(extraction["rule"], extraction["numerical"], T)
+
+        print(f"weight {weight}:")
+        print(f"  operator: {extraction['symbolic']}")
+        print(f"  X{weight}:")
+        print(textwrap.indent(str(X), "    "))
 ```
 
 ```
