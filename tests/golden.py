@@ -43,6 +43,12 @@ import torch
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 
+#: Snapshots too large to be worth committing. This directory is gitignored, so
+#: a snapshot placed here guards the working copy of whoever generated it and
+#: nothing else. A test using it is responsible for skipping when it is absent,
+#: since the harness itself treats a missing snapshot as an error.
+LOCAL_SNAPSHOT_DIR = SNAPSHOT_DIR / "local"
+
 #: Setting this environment variable rewrites snapshots instead of checking them.
 REGOLD_ENV = "NATTO_REGOLD"
 
