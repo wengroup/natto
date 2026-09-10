@@ -21,12 +21,12 @@ the order-preserving one. Householder QR is the more accurate algorithm, but tha
 not what decides it here: the coefficient matrices are small and well conditioned
 (built from exact fractions upstream), so both schemes are at machine precision on
 them, whereas which subset is selected has lasting consequences. The selection fixes
-which H tensors are the canonical ones, and so the coeff = M^-1 N that is stored
+which duals are the canonical ones, and so the coeff = M^-1 N that is stored
 alongside them and the basis any downstream natural-tensor components are expressed
 in. Keeping the earliest tensors makes that a pure function of the input: the same
 answer on every machine, forever. Pivoted QR instead orders the columns by residual
 norm, and how LAPACK breaks ties between columns of equal norm can differ between
-LAPACK builds and versions, so the canonical H could silently change under an
+LAPACK builds and versions, so the canonical dual could silently change under an
 unrelated BLAS upgrade.
 """
 

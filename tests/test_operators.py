@@ -1,7 +1,9 @@
 import pytest
 import torch
 
-from natto.EGH import (
+from natto.evaluate import evaluate_tensors
+from natto.mappings import get_dual_pair_of_weight
+from natto.operators import (
     get_E_rules,
     get_G_even,
     get_G_odd,
@@ -9,8 +11,6 @@ from natto.EGH import (
     get_natural_projector,
     relabel_indices_2,
 )
-from natto.evaluate import evaluate_tensors
-from natto.mappings import get_G_H_of_j
 from natto.utils import letter_index
 
 
@@ -409,7 +409,7 @@ def test_G_odd():
 
 def test_relabel_indices_is_simultaneous():
     """A transposition of two letters must not chain into a collapse."""
-    mapping, _, _, _ = get_G_H_of_j(2, 4)
+    mapping, _, _, _ = get_dual_pair_of_weight(2, 4)
     swapped = relabel_indices_2(mapping[0], {"A": "B", "B": "A"})
 
     terms = {
@@ -422,7 +422,7 @@ def test_relabel_indices_is_simultaneous():
 
 def test_relabel_indices_leaves_other_letters_alone():
     """Letters absent from the mapping are untouched, including lower case."""
-    mapping, _, _, _ = get_G_H_of_j(1, 3)
+    mapping, _, _, _ = get_dual_pair_of_weight(1, 3)
     relabeled = relabel_indices_2(mapping[0], {"A": "C", "C": "A"})
 
     assert "δ_a" in str(relabeled)
@@ -430,7 +430,7 @@ def test_relabel_indices_leaves_other_letters_alone():
 
 def test_relabel_indices_round_trips():
     """Applying a permutation and its inverse returns the original."""
-    mapping, _, _, _ = get_G_H_of_j(2, 4)
+    mapping, _, _, _ = get_dual_pair_of_weight(2, 4)
     forward = {"A": "B", "B": "C", "C": "A"}
     backward = {new: old for old, new in forward.items()}
 

@@ -1,6 +1,6 @@
 from pytest import fixture
 
-from natto.ops import (
+from natto.algebra import (
     contract_epsilon_delta,
     contract_two_epsilon,
     contract_with_delta,

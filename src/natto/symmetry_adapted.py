@@ -16,9 +16,9 @@ is a statement rather than a threshold.
 
 from fractions import Fraction
 
-from natto.EGH import get_gram_entry, relabel_indices_2
+from natto.algebra import simplify_linear_combination
 from natto.matrix import matrix_multiply, matrix_null_space
-from natto.ops import simplify_linear_combination
+from natto.operators import get_gram_entry, relabel_indices_2
 from natto.sym import parse_symmetry_generators
 from natto.symbolic import LinearCombination
 from natto.utils import letter_index

@@ -19,7 +19,7 @@ The example below converts a rank-2 Cartesian tensor into its natural tensor com
 
 ```python
 import torch
-from natto.mappings import get_G_H_S
+from natto.mappings import get_reduction
 
 # Create a rank-2 tensor
 T = torch.arange(9, dtype=torch.float).reshape(3, 3)
@@ -27,7 +27,7 @@ T = torch.arange(9, dtype=torch.float).reshape(3, 3)
 # Get the operators for the reduction
 rank = 2
 symmetry=None # `None` means no additional symmetry; `ij=ji` means symmetric tensors...
-output = get_G_H_S(rank, symmetry)
+output = get_reduction(rank, symmetry)
 
 all_T_prime = []
 for j, out_j in output.items():

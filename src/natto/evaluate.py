@@ -11,7 +11,7 @@ from functools import lru_cache
 import torch
 from torch import Tensor
 
-from natto.ops import simplify_linear_combination
+from natto.algebra import simplify_linear_combination
 from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
 from natto.utils import dij, eijk, letter_index
 
