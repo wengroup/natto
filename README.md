@@ -7,9 +7,9 @@ also known as **natural tensors**), from Cartesian tensors.
 It also provides operators to embed ICTs back into Cartesian tensor space.
 
 Some other features:
-1. operators to deal with physical tensors with intrinsic symmetry
-2. operators to couple two ICTs into a third
-3. operators to build Cartesian harmonics
+1. dealing with physical tensors with intrinsic symmetry
+2. coupling two ICTs into a third
+3. building Cartesian harmonics
 
 ## Installation
 
