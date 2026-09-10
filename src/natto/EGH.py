@@ -493,6 +493,56 @@ def shift_index(
         raise ValueError(f"Unknown tensor type: {type(tensor)}")
 
 
+def relabel_indices(
+    tensor: CartesianTensor | TensorProduct, mapping: dict[str, str]
+) -> CartesianTensor | TensorProduct:
+    """Rename the indices of a tensor according to `mapping`.
+
+    The substitution is simultaneous, so a mapping may permute letters among
+    themselves. Applying it one letter at a time would chain the replacements,
+    turning a transposition into a collapse.
+
+    Args:
+        tensor: The tensor whose indices to rename.
+        mapping: Old index letter to new. Letters absent from it are left alone.
+
+    Returns:
+        The tensor with its indices renamed.
+    """
+    # A zero tensor carries no meaningful indices, and a zero TensorProduct holds
+    # a component whose constructor does not take the arguments used below.
+    if tensor.factor == 0:
+        return tensor
+
+    def _relabel(t: CartesianTensor):
+        indices = "".join(mapping.get(index, index) for index in t.indices)
+
+        return t.__class__(indices, factor=t.factor, symbol=t.symbol)
+
+    if isinstance(tensor, CartesianTensor):
+        return _relabel(tensor)
+
+    if isinstance(tensor, TensorProduct):
+        return tensor.__class__(*[_relabel(t) for t in tensor], factor=tensor.factor)
+
+    raise ValueError(f"Unknown tensor type: {type(tensor)}")
+
+
+def relabel_indices_2(
+    tensor: LinearCombination, mapping: dict[str, str]
+) -> LinearCombination:
+    """Rename the indices of every term of a linear combination.
+
+    Args:
+        tensor: The linear combination whose indices to rename.
+        mapping: Old index letter to new, applied simultaneously.
+
+    Returns:
+        The linear combination with its indices renamed.
+    """
+    return LinearCombination(*[relabel_indices(t, mapping) for t in tensor])
+
+
 def shift_index_2(
     tensor: LinearCombination, shift: int, letters: str = None
 ) -> LinearCombination:
