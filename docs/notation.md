@@ -1,12 +1,18 @@
 # Notation
 
-This file is the correspondence between the paper and the package. It is
-binding: no identifier enters natto that is not in the tables below, and a name
-here means the same thing everywhere it appears. Entries marked *pending* are
-agreed but not yet applied.
+This file holds the naming decisions that the code cannot hold itself: the rule
+that governs which register a name is written in, the names that have been
+retired and must not come back, and the one place where the paper's symbol and
+natto's object are not the same thing.
 
-The paper is *Reduction of Cartesian tensors with intrinsic symmetry into
-irreducible Cartesian tensors*; equation and section numbers refer to it.
+Everything else lives next to the implementation. Each operator's docstring
+names the equation that defines it, so a table of those here would be a second
+copy to keep in step -- and this file has already been caught drifting, having
+cited a working title the paper no longer carries.
+
+The paper is *Reusable Operators for Irreducible Cartesian Tensor Decomposition
+and Coupling* (arXiv:2609.05971); equation and section numbers throughout the
+package refer to it.
 
 ## The rule: words outside, symbols inside
 
@@ -37,28 +43,7 @@ caused before was that the package used the tilde for the hat.
 The paper's symbol also belongs in the docstring, next to the equation that
 defines it.
 
-## Operators
-
-| Paper | Meaning | natto |
-|---|---|---|
-| $\mathbf{E}_{(\ell\mid\ell)}$, Eq. (12) | Natural projector, $\mathcal{T}^\ell \to \mathcal{X}^\ell$ | `get_natural_projector` |
-| $\mathbf{F}^p_{n \to \ell}$, Eqs. (14), (16) | Rank-lowering tensor, $\mathcal{T}^n \to \mathcal{T}^\ell$ | not exposed; built inside the embedding operators |
-| $\mathbf{G}^p_{(\ell\mid n)}$, Eq. (19) | Mapping tensor, embeds $\mathcal{X}^\ell \to \mathcal{T}^n$ | `embedding` |
-| $\widetilde{\mathbf{G}}^p_{(\ell\mid n)}$, Eq. (22) | Dual mapping tensor, extracts $\mathcal{T}^n \to \mathcal{X}^\ell$ | `extraction` |
-| $\widehat{\mathbf{G}}^p_{(\ell\mid n)}$, Eq. (26) | Orthonormal mapping tensor, self-dual | `basis="orthonormal"`, not a separate function |
-| $\mathbf{Q}^p_{(\ell\mid n)}$, Eq. (36) | Symmetry-adapted mapping tensor | `symmetry=...`, not a separate function |
-| $\mathbf{S}^{\ell,p}_n$, Eq. (25) | Embedding of $\mathbf{X}^p_\ell$ in $\mathcal{T}^n$ | `decomposition`; see the note below |
-| $\mathbf{K}_{(\ell_3\mid\ell_1,\ell_2)}$, Eqs. (47), (48) | Coupling operator | `get_coupling_operator` |
-| $\mathbf{H}_{(n\mid n)}$, Eq. (40) | Harmonic operator | not implemented |
-| $\mathbf{V}_n$, Eq. (41) | Cartesian harmonic of weight $n$ | not implemented |
-
-$\mathbf{Q}$ and $\widehat{\mathbf{G}}$ are arguments rather than functions on purpose. Section IV of the
-paper makes the argument itself: the Gram matrix, the duals, extraction,
-embedding and orthonormalization all carry over "with the $\mathbf{Q}^p$ in
-place of the $\mathbf{G}^p$". A symmetry-adapted mapping is a mapping under a constraint, and an
-orthonormal one is the same construction in a different basis. Which of them
-came back is a fact about the result, not something a caller must know before
-calling.
+## The one trap
 
 $\mathbf{S}$ needs care: the paper's $\mathbf{S}^{\ell,p}_n$ is a rank-$n$
 *tensor*, the weight-$\ell$ part of one particular $\mathbf{T}$, while natto's
@@ -66,68 +51,25 @@ is the rank-$2n$ *operator* that produces it,
 $\mathbf{S} = \mathbf{G} \odot^\ell \widetilde{\mathbf{G}}$. Same letter, one
 the map and one its output.
 
-## Quantities
-
-| Paper | Meaning | natto |
-|---|---|---|
-| $\ell$ | Weight | `weight` |
-| $p$ | Multiplicity index, the paper's "channel" | `p`; the older term "seniority" is retired |
-| $n$ | Rank of the Cartesian tensor | `rank` |
-| $\mathbf{g}$, $g_{pq}$, Eq. (21) | Gram matrix of the mappings | `gram` |
-| $\mathbf{g}^{-1}$ | Its inverse | `gram_inverse` |
-| $\mathbf{g}^{-1/2}$ | Its symmetric inverse square root | `gram_inverse_sqrt` |
-| $C$, Eq. (49), even $L$ | Coupling normalization | `coeff_C_even` |
-| $C$, Eq. (50), odd $L$ | Coupling normalization | `coeff_C_odd` |
-| $\mathbf{M}^a$, Eq. (37) | Mixing matrix of generator `a` | `action` matrix |
-| $\Pi_a$, $\eta_a$, Eq. (35) | Index permutation and its sign | `permutation`, `sign` |
-| $\mathcal{S}$, Sec. IV | Intrinsic symmetry class | `symmetry`, given as `"ijkl=jikl=klij"` |
-| $N^{\mathrm{c}}_\ell$ | Number of candidate mappings | not named |
-| $N_\ell$ | Multiplicity, the number of channels | `multiplicity` |
-| $N^{\mathcal{S}}_\ell$ | Multiplicity within a symmetry class | `multiplicity` |
-
-The paper writes both coupling constants as $C$, its value differing by the
-parity of $L$; $D$ appears only in a LaTeX label. `coeff_C_even` and
-`coeff_C_odd` follow the text rather than the label.
-
-## Index letters
-
-Within the symbolic layer, indices are letters, lower case for the natural
-tensor space and upper case for the Cartesian tensor space.
-
-- `t`, `s`: general tensor, no assumed symmetry
-- `u`, `v`: symmetric tensor
-- `x`, `y`, `z`: natural tensor, symmetric and traceless
-- `a`, `b`, `c`: rank-1 tensors, vectors
-
-## Operations
-
-| Paper | Meaning |
-|---|---|
-| $\otimes$ | Tensor product |
-| $\otimes^n$ | $n$-fold tensor product |
-| $\odot^n$ | $n$-fold contraction |
-| $\cong$ | Equality under stated conditions |
-| $\langle\,\cdot\,\rangle$ | Average over index permutations |
-
 ## Retired names
 
 Names that meant something else, or several things, and must not come back.
 
 | Retired | Was | Now |
 |---|---|---|
-| `H` | the dual mapping tensor, in `GHS` | `get_extraction_operators` |
-| `get_G_H_S` | the whole reduction | `get_reduction` |
-| `_of_j` | the suffix for one weight | `_of_weight`; `j` is `weight`, `n` is `rank` |
-| `H` | the coupling operator, in `H_tp` | `get_coupling_operator` |
+| `H` | the dual mapping tensor | `extraction`, `get_extraction_operators` |
+| `H` | the coupling operator | `get_coupling_operator` |
 | `H` | an index-ordering flag, `mode="H"` | `mode="extraction"` |
-| `H_tp` | module name | `coupling` |
-| `GHS` | module name | `mappings`, plus `orthonormal` and `symmetry_adapted` |
-| `EGH` | module name | `operators` |
-| `ops` | module name | `algebra`, to keep it distinct from `operators` |
 | `G_tilde`, `Q_tilde` | the *orthonormal* mappings, i.e. the paper's hat | `basis="orthonormal"`. `G_tilde` is free again, and correct, for a dual |
 | `coeff_D` | the odd-parity coupling constant | `coeff_C_odd` |
 | `seniority` | the multiplicity index | `p`, "channel" |
 | `projector` | the key for `S` | `decomposition` |
+| `get_G_H_S` | the whole reduction | `get_reduction` |
+| `_of_j` | the suffix for one weight | `_of_weight`; `j` is `weight` and `n` is `rank` throughout |
+| `H_tp` | module | `coupling` |
+| `GHS` | module | `mappings`, plus `orthonormal` and `symmetry_adapted` |
+| `EGH` | module | `operators` |
+| `ops` | module | `algebra`, to keep it distinct from `operators` |
 
 ## The three operators
 
