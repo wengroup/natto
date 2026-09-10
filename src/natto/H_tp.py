@@ -1,4 +1,4 @@
-"""
+r"""
 Tensor operator to get Z = X \otimes Y.
 
 This is based on our newly derived formulas (\label{eq:tp:even:H} and
@@ -6,6 +6,27 @@ This is based on our newly derived formulas (\label{eq:tp:even:H} and
 with X and Y.
 Unlike the equations in [LP89], which needs a loop to compute Z, the newly derived is
 much more efficient as it just need a single tensor product.
+
+This is the only route to the coupling, and it is a closed form rather than a
+call into the general symmetry machinery of `GHS`. That is worth explaining,
+since X \otimes Y is symmetric within its first l1 indices and within its last
+l2, which is an intrinsic symmetry in the ordinary sense, and the symmetry
+route does apply to it.
+
+Applying it is not enough on its own. What reduces the weight-l3 mapping space
+to a single dimension is a second property: X and Y are traceless, so a
+contraction taken inside either vanishes and only contractions between the two
+survive. Tracelessness is not an index permutation, so no symmetry string
+expresses it and the symmetry-adapted construction cannot use it. The
+derivation narrows the candidates with it separately, and the result is the
+single operator built here.
+
+A second route did exist, reaching Z by reducing the rank-(l1 + l2) product and
+grouping the resulting mappings numerically, which is how it saw tracelessness:
+by working on an actual traceless product rather than through the symmetry. It
+gave the same operator up to a scalar and was removed. The closed form is exact
+and far cheaper, the general route having to pass through the reduction of a
+rank-six tensor once l1 = l2 = 3.
 
 [LP89] "Angular reduction in multiparticle matrix elements" by D. R. Lehman and W. C. Parke.
 http://dx.doi.org/10.1063/1.528515
