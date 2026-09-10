@@ -19,8 +19,9 @@ into agreeing with a wrong operator.
 
 import math
 
+import numpy as np
 import pytest
-import torch
+import scipy.special
 
 from natto.coupling import get_coupling_operator
 from natto.symmetrize import remove_trace
@@ -52,16 +53,16 @@ def double_factorial(n: int) -> float:
     return result
 
 
-def outer_power(vector: torch.Tensor, power: int) -> torch.Tensor:
+def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
     """The polyadic `vector^(otimes power)`."""
-    result = torch.ones((), dtype=vector.dtype)
+    result = np.ones((), dtype=vector.dtype)
     for _ in range(power):
-        result = torch.tensordot(result, vector, dims=0)
+        result = np.tensordot(result, vector, axes=0)
 
     return result
 
 
-def cartesian_harmonic(direction: torch.Tensor, weight: int) -> torch.Tensor:
+def cartesian_harmonic(direction: np.ndarray, weight: int) -> np.ndarray:
     """The Cartesian harmonic of `weight` built from a unit vector.
 
     The natural projector applied to the polyadic returns its traceless part,
@@ -77,29 +78,28 @@ def cartesian_harmonic(direction: torch.Tensor, weight: int) -> torch.Tensor:
         The rank-`weight` harmonic.
     """
     if weight == 0:
-        return torch.ones((), dtype=direction.dtype)
+        return np.ones((), dtype=direction.dtype)
 
     scale = double_factorial(2 * weight - 1) / math.factorial(weight)
 
     return scale * remove_trace(outer_power(direction, weight))
 
 
-def contract_all(operator: torch.Tensor, vector: torch.Tensor) -> torch.Tensor:
+def contract_all(operator: np.ndarray, vector: np.ndarray) -> np.ndarray:
     """Contract every index of `operator` with `vector`."""
     if operator.ndim == 0:
         return operator
 
-    return torch.tensordot(
-        operator, outer_power(vector, operator.ndim), dims=operator.ndim
+    return np.tensordot(
+        operator, outer_power(vector, operator.ndim), axes=operator.ndim
     )
 
 
-def random_unit_vector(seed: int) -> torch.Tensor:
+def random_unit_vector(seed: int) -> np.ndarray:
     """A reproducible unit vector."""
-    generator = torch.Generator().manual_seed(seed)
-    vector = torch.randn(3, generator=generator, dtype=torch.float64)
+    vector = np.random.default_rng(seed).standard_normal(3)
 
-    return vector / vector.norm()
+    return vector / np.linalg.norm(vector)
 
 
 def weight_triples(parity: int) -> list[tuple[int, int, int]]:
@@ -137,9 +137,9 @@ def test_cartesian_harmonic_generates_legendre(weight: int):
     b = random_unit_vector(1)
 
     value = contract_all(cartesian_harmonic(a, weight), b)
-    expected = torch.special.legendre_polynomial_p(a @ b, weight)
+    expected = scipy.special.eval_legendre(weight, a @ b)
 
-    torch.testing.assert_close(value, expected)
+    np.testing.assert_allclose(value, expected, atol=1e-12)
 
 
 @pytest.mark.parametrize("l1,l2,l3", weight_triples(parity=0))
@@ -151,14 +151,14 @@ def test_even_parity_normalization(l1: int, l2: int, l3: int):
     a = random_unit_vector(0)
     operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
 
-    coupled = torch.einsum(
+    coupled = np.einsum(
         rule,
-        operator.to(torch.float64),
+        operator.astype(np.float64),
         cartesian_harmonic(a, l1),
         cartesian_harmonic(a, l2),
     )
 
-    torch.testing.assert_close(
+    np.testing.assert_allclose(
         coupled, cartesian_harmonic(a, l3), rtol=OPERATOR_RTOL, atol=1e-7
     )
 
@@ -173,14 +173,14 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
     instead. This is what fixes `coeff_C_odd`.
     """
     a = random_unit_vector(0)
-    perpendicular = torch.linalg.cross(a, random_unit_vector(1))
-    b = a + LIMIT_SEPARATION * perpendicular / perpendicular.norm()
-    b = b / b.norm()
+    perpendicular = np.cross(a, random_unit_vector(1))
+    b = a + LIMIT_SEPARATION * perpendicular / np.linalg.norm(perpendicular)
+    b = b / np.linalg.norm(b)
 
     operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
-    coupled = torch.einsum(
+    coupled = np.einsum(
         rule,
-        operator.to(torch.float64),
+        operator.astype(np.float64),
         cartesian_harmonic(a, l1),
         cartesian_harmonic(b, l2),
     )
@@ -190,10 +190,10 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
     if l3 == 1:
         residual = coupled
     else:
-        residual = torch.tensordot(coupled, outer_power(a, l3 - 1), dims=l3 - 1)
+        residual = np.tensordot(coupled, outer_power(a, l3 - 1), axes=l3 - 1)
 
-    rate = residual.norm() / torch.linalg.cross(a, b).norm()
+    rate = np.linalg.norm(residual) / np.linalg.norm(np.cross(a, b))
 
-    torch.testing.assert_close(
-        rate, torch.ones((), dtype=rate.dtype), rtol=LIMIT_RTOL, atol=0
+    np.testing.assert_allclose(
+        rate, np.ones((), dtype=rate.dtype), rtol=LIMIT_RTOL, atol=0
     )

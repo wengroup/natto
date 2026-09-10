@@ -1,5 +1,5 @@
+import numpy as np
 import pytest
-import torch
 
 from natto.evaluate import evaluate_tensors
 from natto.mappings import get_dual_pair_of_weight
@@ -226,9 +226,9 @@ def test_E_trace(m):
     projector = evaluate_tensors(get_natural_projector(m), mode="extraction")
     indices = letter_index(m)
     contraction_rule = indices * 2
-    trace = torch.einsum(contraction_rule, projector)
+    trace = np.einsum(contraction_rule, projector)
 
-    torch.testing.assert_close(trace, torch.tensor(float(2 * m + 1)))
+    np.testing.assert_allclose(trace, np.array(float(2 * m + 1)), atol=1e-12)
 
 
 def test_G_even():

@@ -12,8 +12,8 @@ here for every implementation:
 import functools
 from typing import Callable, NamedTuple, Optional
 
+import numpy as np
 import pytest
-import torch
 
 from natto.qr import (
     find_independent_tensors,
@@ -82,9 +82,9 @@ def get_scheme_params(
     return params
 
 
-def get_e(dim: int) -> list[torch.Tensor]:
+def get_e(dim: int) -> list[np.ndarray]:
     """Unit basis vectors of dimension `dim`."""
-    return list(torch.eye(dim))
+    return list(np.eye(dim))
 
 
 def assert_valid_selection(tensors, selected, indices, expected_rank: int):
@@ -102,11 +102,11 @@ def assert_valid_selection(tensors, selected, indices, expected_rank: int):
     if expected_rank == 0:
         return
 
-    matrix_all = torch.vstack([t.flatten() for t in tensors]).to(torch.float64)
-    matrix_selected = torch.vstack([t.flatten() for t in selected]).to(torch.float64)
+    matrix_all = np.vstack([t.flatten() for t in tensors]).astype(np.float64)
+    matrix_selected = np.vstack([t.flatten() for t in selected]).astype(np.float64)
 
-    assert torch.linalg.matrix_rank(matrix_selected) == expected_rank
-    assert torch.linalg.matrix_rank(matrix_all) == expected_rank
+    assert np.linalg.matrix_rank(matrix_selected) == expected_rank
+    assert np.linalg.matrix_rank(matrix_all) == expected_rank
 
 
 @pytest.mark.parametrize("scheme", get_scheme_params())
@@ -144,9 +144,9 @@ def test_valid_regime_selects_the_leading_tensors(scheme):
 @pytest.mark.parametrize("scheme", get_scheme_params())
 def test_shape_is_irrelevant(scheme):
     """Tensors are flattened, so only the components matter, not the shape."""
-    torch.manual_seed(35)
-    a = torch.randn(3, 3, dtype=torch.float64)
-    b = torch.randn(3, 3, dtype=torch.float64)
+    rng = np.random.default_rng(35)
+    a = rng.standard_normal((3, 3))
+    b = rng.standard_normal((3, 3))
     tensors = [a, b, 2 * a - b]
 
     selected, indices = scheme(tensors)
@@ -174,7 +174,7 @@ def test_all_independent(scheme):
 def test_zero_tensor_first(scheme):
     """A leading zero tensor must not hide the independent tensors after it."""
     e = get_e(4)
-    tensors = [torch.zeros(4), e[0], e[1], e[2]]
+    tensors = [np.zeros(4), e[0], e[1], e[2]]
 
     selected, indices = scheme(tensors)
 
@@ -196,9 +196,7 @@ def test_zero_tensor_first_gram_schmidt_prefers_earlier():
     """Gram-Schmidt keeps the earliest tensors of an equally valid subset."""
     e = get_e(4)
 
-    _, indices = find_independent_tensors_gram_schmidt(
-        [torch.zeros(4), e[0], e[1], e[2]]
-    )
+    _, indices = find_independent_tensors_gram_schmidt([np.zeros(4), e[0], e[1], e[2]])
     assert indices == [1, 2, 3]
 
     _, indices = find_independent_tensors_gram_schmidt([e[0], 2 * e[0], e[1], e[2]])
@@ -213,7 +211,7 @@ def test_zero_tensor_first_unpivoted_is_wrong():
     being a residual distance -- all four are reported as zero, giving rank 0.
     """
     e = get_e(4)
-    tensors = [torch.zeros(4), e[0], e[1], e[2]]
+    tensors = [np.zeros(4), e[0], e[1], e[2]]
 
     _, indices = find_independent_tensors_qr_unpivoted(tensors)
     assert indices == []
@@ -285,7 +283,7 @@ PHOTOELASTIC_J1_U = [
 
 @pytest.mark.parametrize("scheme", get_scheme_params(rank_revealing=True))
 def test_photoelastic_j1_coefficients(scheme):
-    tensors = [torch.tensor(row) for row in PHOTOELASTIC_J1_U]
+    tensors = [np.array(row) for row in PHOTOELASTIC_J1_U]
 
     selected, indices = scheme(tensors)
 
@@ -294,7 +292,7 @@ def test_photoelastic_j1_coefficients(scheme):
 
 def test_photoelastic_j1_coefficients_unpivoted_is_wrong():
     """The original failure: rank 3, but the unpivoted scheme reports 2."""
-    tensors = [torch.tensor(row) for row in PHOTOELASTIC_J1_U]
+    tensors = [np.array(row) for row in PHOTOELASTIC_J1_U]
 
     _, indices = find_independent_tensors_qr_unpivoted(tensors)
     assert indices == [1, 2]

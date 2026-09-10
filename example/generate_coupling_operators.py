@@ -18,8 +18,7 @@ stays plain ASCII.
 
 from pathlib import Path
 
-import torch
-from torch import Tensor
+import numpy as np
 
 from natto.algebra import simplify_linear_combination
 from natto.coupling import get_coupling_operator, get_coupling_symbolic
@@ -27,8 +26,8 @@ from natto.utils import yaml_dump
 
 
 def generate_coupling_operators(
-    max_l1: int, max_l2: int, max_l3: int, dtype=torch.float64
-) -> dict[str, dict[str, Tensor]]:
+    max_l1: int, max_l2: int, max_l3: int, dtype=np.float64
+) -> dict[str, dict[str, np.ndarray]]:
     """
     Generate coupling operators and the corresponding einsum rules.
 
@@ -36,15 +35,12 @@ def generate_coupling_operators(
         max_l1: Maximum weight of X.
         max_l2: Maximum weight of Y.
         max_l3: Maximum weight of Z.
-        dtype: The data type of the generated tensors. Default is torch.float64 for
-            higher precision.
+        dtype: The data type of the generated arrays.
 
     Return:
         Coupling operators and rules,
         {l1-l2-l3-normalize: {'rule': rule, 'symbolic': ..., 'numerical': ...}}
     """
-    torch.set_default_dtype(dtype)
-
     if not max_l1 + max_l2 >= max_l3:
         raise ValueError("l1 + l2 must be greater than or equal to l3")
 
@@ -55,7 +51,7 @@ def generate_coupling_operators(
             for l3 in range(abs(l1 - l2), min(l1 + l2 + 1, max_l3 + 1)):
                 for normalize in ["unity", "none"]:
                     K_symbolic, _, _, _ = get_coupling_symbolic(l1, l2, l3)
-                    K, rule = get_coupling_operator(l1, l2, l3, normalize)
+                    K, rule = get_coupling_operator(l1, l2, l3, normalize, dtype=dtype)
 
                     K_symbolic = simplify_linear_combination(K_symbolic)
                     # replace δ (delta) by d

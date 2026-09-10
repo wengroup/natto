@@ -12,10 +12,11 @@ composition of the other two, taking `T` straight to `T'` without forming `X`,
 which is what you want when the natural tensor itself is not of interest.
 
 Change the `rank` and `symmetry` arguments at the bottom to try other classes;
-`symmetry=None` means a tensor with no assumed symmetry.
+`symmetry=None` means a tensor with no assumed symmetry. The elastic tensor,
+`ijkl=jikl=klij`, is included as the richest of them.
 """
 
-import torch
+import numpy as np
 
 from natto.mappings import get_reduction
 from natto.sym import symmetrize
@@ -31,10 +32,8 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
             tensor. None for a tensor with no assumed symmetry.
     """
 
-    torch.manual_seed(35)
-
     # Create a random tensor T of the given rank and symmetry
-    T = torch.randn(*[3] * rank)
+    T = np.random.default_rng(35).standard_normal((3,) * rank)
     if symmetry is not None:
         T = symmetrize(T, symmetry)
 
@@ -46,13 +45,13 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
             zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
         ):
             # Extract the natural tensor of this weight and channel
-            X = torch.einsum(extraction["rule"], extraction["numerical"], T)
+            X = np.einsum(extraction["rule"], extraction["numerical"], T)
             assert is_symmetric_traceless(X), (
                 "X is not symmetric traceless for j={j}, p={p}"
             )
 
             # Embed it back into the Cartesian space
-            T_p_1 = torch.einsum(embedding["rule"], embedding["numerical"], X)
+            T_p_1 = np.einsum(embedding["rule"], embedding["numerical"], X)
             print(
                 f"T' (j={j}, p={p}), symmetric:",
                 is_symmetric(T_p_1),
@@ -61,21 +60,29 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
             )
 
             # The same thing in one step
-            T_p_2 = torch.einsum(decomposition["rule"], decomposition["numerical"], T)
+            T_p_2 = np.einsum(decomposition["rule"], decomposition["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
-            assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+            assert np.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
                 f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
             )
 
             all_T_prime.append(T_p_1)
 
-    sum_T_prime = torch.sum(torch.stack(all_T_prime), dim=0)
+    sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 
-    assert torch.allclose(sum_T_prime, T)
+    assert np.allclose(sum_T_prime, T)
 
 
 if __name__ == "__main__":
+    # a rank-2 tensor with no assumed symmetry: weights 0, 1 and 2, one channel each
     reduce_and_reconstruct(rank=2)
+
     print("=" * 40)
+    # rank 3, where a weight first appears more than once
     reduce_and_reconstruct(rank=3)
+
+    print("=" * 40)
+    # the elastic tensor: minor symmetry within each pair of indices, and major
+    # symmetry between the pairs, leaving weights 0, 2 and 4
+    reduce_and_reconstruct(rank=4, symmetry="ijkl=jikl=klij")

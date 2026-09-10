@@ -6,14 +6,15 @@ chosen for: that contracting the harmonic of one direction with another
 direction gives the Legendre polynomial of the angle between them, and that the
 result is symmetric and traceless, which is what makes it a natural tensor.
 
-`torch.special.legendre_polynomial_p` is the independent reference; nothing in
+`scipy.special.eval_legendre` is the independent reference; nothing in
 the package is used to compute the expected values.
 """
 
 import math
 
+import numpy as np
 import pytest
-import torch
+import scipy.special
 
 from natto.harmonics import coeff_harmonic, get_harmonic_operator
 from natto.utils import is_symmetric_traceless
@@ -23,26 +24,25 @@ from natto.utils import is_symmetric_traceless
 MAX_WEIGHT = 5
 
 
-def unit_vector(seed: int) -> torch.Tensor:
+def unit_vector(seed: int) -> np.ndarray:
     """A reproducible unit vector."""
-    generator = torch.Generator().manual_seed(seed)
-    vector = torch.randn(3, generator=generator, dtype=torch.float64)
+    vector = np.random.default_rng(seed).standard_normal(3)
 
-    return vector / vector.norm()
+    return vector / np.linalg.norm(vector)
 
 
-def harmonic(direction: torch.Tensor, weight: int, normalize: str = "unity"):
+def harmonic(direction: np.ndarray, weight: int, normalize: str = "unity"):
     """The Cartesian harmonic of `direction`, through the operator."""
-    operator, rule = get_harmonic_operator(weight, normalize, dtype=torch.float64)
+    operator, rule = get_harmonic_operator(weight, normalize, dtype=np.float64)
 
-    return torch.einsum(rule, operator, *[direction] * weight)
+    return np.einsum(rule, operator, *[direction] * weight)
 
 
-def outer_power(vector: torch.Tensor, power: int) -> torch.Tensor:
+def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
     """The polyadic `vector^(otimes power)`."""
-    result = torch.ones((), dtype=vector.dtype)
+    result = np.ones((), dtype=vector.dtype)
     for _ in range(power):
-        result = torch.tensordot(result, vector, dims=0)
+        result = np.tensordot(result, vector, axes=0)
 
     return result
 
@@ -52,10 +52,10 @@ def test_generates_the_legendre_polynomial(weight: int):
     """The condition that fixes the normalization, Eq. (41)."""
     a, b = unit_vector(0), unit_vector(1)
 
-    value = torch.tensordot(harmonic(a, weight), outer_power(b, weight), dims=weight)
-    expected = torch.special.legendre_polynomial_p(a @ b, weight)
+    value = np.tensordot(harmonic(a, weight), outer_power(b, weight), axes=weight)
+    expected = scipy.special.eval_legendre(weight, a @ b)
 
-    torch.testing.assert_close(value, expected)
+    np.testing.assert_allclose(value, expected, atol=1e-12)
 
 
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
@@ -63,9 +63,9 @@ def test_contracting_with_its_own_direction_gives_one(weight: int):
     """The same condition at zero angle, where the Legendre polynomial is 1."""
     a = unit_vector(0)
 
-    value = torch.tensordot(harmonic(a, weight), outer_power(a, weight), dims=weight)
+    value = np.tensordot(harmonic(a, weight), outer_power(a, weight), axes=weight)
 
-    torch.testing.assert_close(value, torch.ones((), dtype=value.dtype))
+    np.testing.assert_allclose(value, np.ones((), dtype=value.dtype), atol=1e-12)
 
 
 @pytest.mark.parametrize("weight", range(2, MAX_WEIGHT + 1))
@@ -81,7 +81,7 @@ def test_without_normalization_the_scale_is_the_only_difference(weight: int):
 
     scaled = harmonic(a, weight, normalize="none") * coeff_harmonic(weight)
 
-    torch.testing.assert_close(scaled, harmonic(a, weight))
+    np.testing.assert_allclose(scaled, harmonic(a, weight), atol=1e-12)
 
 
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
@@ -94,12 +94,12 @@ def test_coefficient_matches_the_paper(weight: int):
 
 def test_a_batch_of_directions_works_like_one():
     """Every rule carries a leading ellipsis, so batches need no special case."""
-    directions = torch.stack([unit_vector(seed) for seed in range(4)])
+    directions = np.stack([unit_vector(seed) for seed in range(4)])
 
     batched = harmonic(directions, 3)
 
     for index, direction in enumerate(directions):
-        torch.testing.assert_close(batched[index], harmonic(direction, 3))
+        np.testing.assert_allclose(batched[index], harmonic(direction, 3), atol=1e-12)
 
 
 def test_a_negative_weight_is_rejected():

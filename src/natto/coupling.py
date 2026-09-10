@@ -41,10 +41,9 @@ through the reduction of a rank-six tensor once $\ell_1 = \ell_2 = 3$.
 """
 
 from fractions import Fraction
-from typing import Optional
 
-import torch
-from torch import Tensor
+import numpy as np
+from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -61,8 +60,8 @@ from natto.utils import (
 
 
 def get_coupling_operator(
-    l1: int, l2: int, l3: int, normalize: str = "unity"
-) -> tuple[Tensor, str]:
+    l1: int, l2: int, l3: int, normalize: str = "unity", dtype: DTypeLike = None
+) -> tuple[np.ndarray, str]:
     """Build the coupling operator `K` of one weight triple, evaluated.
 
     Args:
@@ -72,15 +71,17 @@ def get_coupling_operator(
         normalize: `unity` applies the normalization constant `C` of the paper,
             fixing the scale by the condition for the parity of
             `L = l1 + l2 + l3`; `none` leaves the operator unscaled.
+        dtype: Floating-point dtype of the evaluated operator, double precision
+            if not given.
 
     Returns:
         The evaluated operator, and the einsum rule that applies it, so that
-        `Z = torch.einsum(rule, K, X, Y)`.
+        `Z = numpy.einsum(rule, K, X, Y)`.
     """
     if (l1 + l2 - l3) % 2 == 0:
-        return _get_coupling_operator_even(l1, l2, l3, normalize)
+        return _get_coupling_operator_even(l1, l2, l3, normalize, dtype)
 
-    return _get_coupling_operator_odd(l1, l2, l3, normalize)
+    return _get_coupling_operator_odd(l1, l2, l3, normalize, dtype)
 
 
 def get_coupling_symbolic(
@@ -106,8 +107,8 @@ def get_coupling_symbolic(
 
 
 def _get_coupling_operator_even(
-    l1: int, l2: int, l3: int, normalize: str = "unity"
-) -> tuple[Tensor, str]:
+    l1: int, l2: int, l3: int, normalize: str = "unity", dtype: DTypeLike = None
+) -> tuple[np.ndarray, str]:
     """Evaluate `K` for even `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_even(l1, l2, l3)
 
@@ -125,7 +126,7 @@ def _get_coupling_operator_even(
     # Then, we can use this to do K:XY.
     #
     # TODO, create a new function like evaluate_tensors to deal with this case.
-    K_numerical = evaluate_tensors(K, mode="extraction")
+    K_numerical = evaluate_tensors(K, mode="extraction", dtype=dtype)
 
     if normalize == "unity":
         c = coeff_C_even(l1, l2, l3)
@@ -149,12 +150,13 @@ def _get_coupling_operator_odd(
     l2: int,
     l3: int,
     normalize: str = "unity",
-) -> tuple[Tensor, str]:
+    dtype: DTypeLike = None,
+) -> tuple[np.ndarray, str]:
     """Evaluate `K` for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_odd(l1, l2, l3)
     K = simplify_linear_combination(K)
 
-    K_numerical = evaluate_tensors(K, mode="extraction")
+    K_numerical = evaluate_tensors(K, mode="extraction", dtype=dtype)
 
     if normalize == "unity":
         c = coeff_C_odd(l1, l2, l3)
@@ -184,7 +186,7 @@ def _get_coupling_symbolic_even(
     out = []
     for t in range(min(l1, l2) - k + 1):
         coeff = Fraction(
-            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2).item()
+            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2)
         )
 
         all_rules = _get_coupling_rules_even(l1, l2, l3, t)
@@ -222,7 +224,7 @@ def _get_coupling_symbolic_odd(
 
     for t in range(min(l1, l2) - k):
         coeff = Fraction(
-            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2).item()
+            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2)
         )
 
         all_rules = _get_coupling_rules_odd(l1, l2, l3, t)
@@ -530,7 +532,7 @@ def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
     return rule, symmetry, delta_indices
 
 
-def coeff_C_even(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
+def coeff_C_even(l1: int, l2: int, l3: int) -> float:
     """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
 
     The constant is fixed by requiring that the l3-fold contraction of the output
@@ -540,7 +542,6 @@ def coeff_C_even(l1: int, l2: int, l3: int, device: Optional[torch.device] = Non
         l1: Weight of the first natural tensor X.
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
-        device: Device the constant is computed on.
 
     Returns:
         The normalization constant.
@@ -551,20 +552,20 @@ def coeff_C_even(l1: int, l2: int, l3: int, device: Optional[torch.device] = Non
     L3 = L - 2 * l3 - 1
 
     return (
-        factorial(l1, device)
-        * factorial(l2, device)
-        * double_factorial(2 * l3 - 1, device=device)
-        * factorial((L1 + 1) // 2, device=device)
-        * factorial((L2 + 1) // 2, device=device)
-        / factorial(l3, device=device)
-        / double_factorial(L1, device=device)
-        / double_factorial(L2, device=device)
-        / double_factorial(L3, device=device)
-        / factorial(L // 2, device=device)
+        factorial(l1)
+        * factorial(l2)
+        * double_factorial(2 * l3 - 1)
+        * factorial((L1 + 1) // 2)
+        * factorial((L2 + 1) // 2)
+        / factorial(l3)
+        / double_factorial(L1)
+        / double_factorial(L2)
+        / double_factorial(L3)
+        / factorial(L // 2)
     )
 
 
-def coeff_C_odd(l1: int, l2: int, l3: int, device: Optional[torch.device] = None):
+def coeff_C_odd(l1: int, l2: int, l3: int) -> float:
     r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
 
     The condition differs from the one behind `coeff_C_even`. For odd `L` the
@@ -583,7 +584,6 @@ def coeff_C_odd(l1: int, l2: int, l3: int, device: Optional[torch.device] = None
         l1: Weight of the first natural tensor X.
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
-        device: Device the constant is computed on.
 
     Returns:
         The normalization constant.
@@ -595,14 +595,14 @@ def coeff_C_odd(l1: int, l2: int, l3: int, device: Optional[torch.device] = None
 
     return (
         2
-        * factorial(l1, device)
-        * factorial(l2, device)
-        * double_factorial(2 * l3 - 1, device=device)
-        * factorial(L1 // 2, device=device)
-        * factorial(L2 // 2, device=device)
-        / factorial(l3 - 1, device=device)
-        / double_factorial(L1 + 1, device=device)
-        / double_factorial(L2 + 1, device=device)
-        / double_factorial(L3 + 1, device=device)
-        / factorial((L + 1) // 2, device=device)
+        * factorial(l1)
+        * factorial(l2)
+        * double_factorial(2 * l3 - 1)
+        * factorial(L1 // 2)
+        * factorial(L2 // 2)
+        / factorial(l3 - 1)
+        / double_factorial(L1 + 1)
+        / double_factorial(L2 + 1)
+        / double_factorial(L3 + 1)
+        / factorial((L + 1) // 2)
     )

@@ -38,8 +38,8 @@ it; a fresh clone gets the rank-four coverage and a skip.
 import functools
 from pathlib import Path
 
+import numpy as np
 import pytest
-import torch
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -94,7 +94,7 @@ THIRD_ORDER_ELASTIC = "ijklmn=jiklmn=klijmn=ijmnkl"
 @functools.lru_cache(maxsize=None)
 def get_orthonormal_cached(rank: int, symmetry: str | None) -> dict:
     """The reduction in the self-dual basis, once per class; rank 4 costs seconds."""
-    return get_reduction(rank, symmetry, basis="orthonormal", dtype=torch.float64)
+    return get_reduction(rank, symmetry, basis="orthonormal", dtype=np.float64)
 
 
 def dual_pair_content(rank: int, symmetry: str | None) -> dict:

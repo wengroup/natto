@@ -8,8 +8,8 @@ that it does not cry wolf over the last bits of a float.
 
 from fractions import Fraction
 
+import numpy as np
 import pytest
-import torch
 
 from tests.golden import (
     DEFAULT_ATOL,
@@ -30,9 +30,9 @@ def test_to_snapshot_keeps_fractions_exact():
 
 def test_to_snapshot_carries_tensor_shape():
     """Nesting carries shape, so a reshaped operator is a mismatch."""
-    assert to_snapshot(torch.zeros(2, 3)) == [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-    assert to_snapshot(torch.tensor(1.5)) == 1.5
-    assert compare(to_snapshot(torch.zeros(2, 3)), to_snapshot(torch.zeros(3, 2))) != []
+    assert to_snapshot(np.zeros((2, 3))) == [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    assert to_snapshot(np.array(1.5)) == 1.5
+    assert compare(to_snapshot(np.zeros((2, 3))), to_snapshot(np.zeros((3, 2)))) != []
 
 
 def test_to_snapshot_rejects_unknown_types():
@@ -95,7 +95,7 @@ def test_assert_snapshot_refuses_to_create_one(tmp_path):
 
 def test_assert_snapshot_round_trip(tmp_path):
     """What is written is what is read back and matched."""
-    data = {"g": [Fraction(9), Fraction(6)], "G": torch.eye(2)}
+    data = {"g": [Fraction(9), Fraction(6)], "G": np.eye(2)}
     write_snapshot("round_trip", data, directory=tmp_path)
 
     assert read_snapshot("round_trip", directory=tmp_path) == to_snapshot(data)

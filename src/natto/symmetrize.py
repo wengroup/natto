@@ -8,15 +8,14 @@ of condensed matter using irreducible tensors, Advances in Physics 27, 609 (1978
 
 import itertools
 
-import torch
-from torch import Tensor
+import numpy as np
 
 from natto.utils import dij, double_index, letter_index, repeat_double_index
 
 
 def symmetrize_via_permutation(
-    t: Tensor, perms: list[list[int]], mode: str = "sum"
-) -> Tensor:
+    t: np.ndarray, perms: list[list[int]], mode: str = "sum"
+) -> np.ndarray:
     """
     Symmetrize a tensor by summing/averaging over all permutations.
 
@@ -30,44 +29,16 @@ def symmetrize_via_permutation(
         The symmetrized tensor.
     """
     if mode == "sum":
-        return torch.stack([t.permute(p) for p in perms]).sum(dim=0)
+        return np.stack([np.transpose(t, p) for p in perms]).sum(axis=0)
     elif mode == "mean":
-        return torch.stack([t.permute(p) for p in perms]).mean(dim=0)
+        return np.stack([np.transpose(t, p) for p in perms]).mean(axis=0)
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
 
-# TODO This is more memory efficient than the above function, but is it more time efficient?
-# def symmetrize_via_permutation(
-#     t: Tensor, perms: list[list[int]], mode: str = "sum"
-# ) -> Tensor:
-#     """
-#     Symmetrize a tensor by summing/averaging over all permutations.
-#
-#     Args:
-#         t: The tensor to symmetrize.
-#         perms: Permutations of the indices for symmetrization.
-#         mode: The mode of symmetrization. For `sum`, summation is performed over all
-#             permutations. For `mean`, the average is taken.
-#
-#     Returns:
-#         The symmetrized tensor.
-#     """
-#     result = torch.zeros_like(t)
-#
-#     for p in perms:
-#         result += t.permute(p)
-#
-#     if mode == "sum":
-#         return result
-#     elif mode == "mean":
-#         return result / len(perms)
-#     else:
-#         raise ValueError(f"Unknown mode: {mode}")
-#
 def symmetrize_and_remove_trace(
-    t: Tensor, start_dim: int = 0, symmetry: str = None
-) -> Tensor:
+    t: np.ndarray, start_dim: int = 0, symmetry: str = None
+) -> np.ndarray:
     """
     Symmetrize and remove the trace of a (generic) tensor.
 
@@ -92,8 +63,8 @@ def symmetrize_and_remove_trace(
 
 # TODO, this fn has the same name as one in the sym.py file. We should rename
 def symmetrize(
-    t: Tensor, start_dim: int = 0, symmetry: str = None, mode: str = "mean"
-) -> Tensor:
+    t: np.ndarray, start_dim: int = 0, symmetry: str = None, mode: str = "mean"
+) -> np.ndarray:
     """
     Symmetrize a tensor.
 
@@ -130,16 +101,16 @@ def symmetrize(
         permutations = get_permutations(symmetry, start_dim)
 
     if mode == "mean":
-        u = torch.mean(torch.stack([t.permute(p) for p in permutations]), dim=0)
+        u = np.mean(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
     elif mode == "sum":
-        u = torch.sum(torch.stack([t.permute(p) for p in permutations]), dim=0)
+        u = np.sum(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
     else:
         raise ValueError("The mode must be either 'mean' or 'sum'.")
 
     return u
 
 
-def symmetrize_2(t: Tensor, num_delta: int, start_dim: int = 0) -> Tensor:
+def symmetrize_2(t: np.ndarray, num_delta: int, start_dim: int = 0) -> np.ndarray:
     """
     Symmetrize a tensor that is obtained by contracting a symmetric tensor with deltas.
 
@@ -162,13 +133,13 @@ def symmetrize_2(t: Tensor, num_delta: int, start_dim: int = 0) -> Tensor:
     permutations = get_permutations_2(m, num_delta, start_dim)
 
     # Sum over the permutations
-    u = torch.sum(torch.stack([t.permute(p) for p in permutations]), dim=0)
+    u = np.sum(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
 
     return u
 
 
 # TODO, this can be refactored to be similar as unit_vector.py
-def remove_trace(u: Tensor, start_dim: int = 0) -> Tensor:
+def remove_trace(u: np.ndarray, start_dim: int = 0) -> np.ndarray:
     r"""
     Remove the trace of a symmetric tensors to get a natural tensor of the same rank.
 
@@ -194,23 +165,22 @@ def remove_trace(u: Tensor, start_dim: int = 0) -> Tensor:
     Returns:
         A natural tensor of the same shape as the input tensor.
     """
-    device = u.device
 
     m = u.ndim - start_dim
     D = m // 2
 
-    delta = dij(device)
+    delta = dij(u.dtype)
     coeff = 1
     out = u
     for d in range(1, D + 1):
         rule = remove_trace_rule(m, d)
 
         # Contract with multiple deltas to get a tensor of the same rank as u
-        prod = torch.einsum(rule, u, *([delta] * d))
+        prod = np.einsum(rule, u, *([delta] * d))
 
         prod = symmetrize_2(prod, num_delta=d, start_dim=start_dim)
 
-        # coeff = (-1) ** d / double_factorial(2 * m - 1, 2 * m - 2 * d - 1 + 2, device)
+        # coeff = (-1) ** d / double_factorial(2 * m - 1, 2 * m - 2 * d - 1 + 2)
         coeff = -coeff / (2 * m - 2 * d + 1)
 
         out = out + coeff * prod
@@ -384,13 +354,7 @@ def get_permutations_delta(
         Each inner tuple contains the permutation indices for symmetrization.
     """
 
-    # TODO, this is not TorchScript compatible
-    # If we want to use this in TorchScript,
-    # We can create a data file to store the permutations and load it here.
-    # start_dim can be easily handled by adding a constant.
-    all_perms = itertools.permutations(
-        torch.arange(start_dim, start_dim + len(symmetry))
-    )
+    all_perms = itertools.permutations(range(start_dim, start_dim + len(symmetry)))
 
     prefix = list(range(start_dim))
     unique_perms: list[list[int]] = []
@@ -453,12 +417,11 @@ def remove_trace_rule(m: int, d: int) -> str:
     )
 
 
-def get_random_natural_tensor(rank: int, seed: int = 35) -> Tensor:
+def get_random_natural_tensor(rank: int, seed: int = 35) -> np.ndarray:
     """
     Create a random symmetric traceless tensor of the given rank.
     """
-    torch.manual_seed(seed)
-    X = torch.randn((3,) * rank)
+    X = np.random.default_rng(seed).standard_normal((3,) * rank)
     X = symmetrize_and_remove_trace(X)
 
     return X

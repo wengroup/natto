@@ -19,8 +19,7 @@ plain ASCII.
 
 from pathlib import Path
 
-import torch
-from torch import Tensor
+import numpy as np
 
 from natto.algebra import simplify_linear_combination
 from natto.harmonics import get_harmonic_operator, get_harmonic_symbolic
@@ -28,27 +27,24 @@ from natto.utils import yaml_dump
 
 
 def generate_harmonic_operators(
-    max_weight: int, dtype=torch.float64
-) -> dict[str, dict[str, Tensor]]:
+    max_weight: int, dtype=np.float64
+) -> dict[str, dict[str, np.ndarray]]:
     """
     Generate harmonic operators and the corresponding einsum rules.
 
     Args:
         max_weight: Maximum weight of the harmonic.
-        dtype: The data type of the generated tensors. Default is torch.float64 for
-            higher precision.
+        dtype: The data type of the generated arrays.
 
     Return:
         Harmonic operators and rules,
         {weight-normalize: {'rule': rule, 'symbolic': ..., 'numerical': ...}}
     """
-    torch.set_default_dtype(dtype)
-
     all_H = {}
     for weight in range(max_weight + 1):
         for normalize in ["unity", "none"]:
             H_symbolic, _, _ = get_harmonic_symbolic(weight)
-            H, rule = get_harmonic_operator(weight, normalize)
+            H, rule = get_harmonic_operator(weight, normalize, dtype=dtype)
 
             H_symbolic = simplify_linear_combination(H_symbolic)
             # replace δ (delta) by d and ε (epsilon) by e

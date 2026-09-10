@@ -1,15 +1,15 @@
 r"""Numerical evaluation of the symbolic operators.
 
 A symbolic operator is a linear combination of products of Kronecker deltas and
-Levi-Civita symbols. This module contracts one into the array that `torch.einsum`
+Levi-Civita symbols. This module contracts one into the array that `numpy.einsum`
 applies, in the index order the operator is used in: `embedding`, `extraction`
 or `decomposition`.
 """
 
 from functools import lru_cache
 
-import torch
-from torch import Tensor
+import numpy as np
+from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
@@ -20,31 +20,31 @@ _MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
 
 @lru_cache(maxsize=512)
 def _cached_delta_epsilon_contraction(
-    rule: str, num_delta: int, num_epsilon: int, dtype: torch.dtype = None
-) -> Tensor:
+    rule: str, num_delta: int, num_epsilon: int, dtype: DTypeLike = None
+) -> np.ndarray:
     """Contract and cache a small product of delta and Levi-Civita tensors."""
     data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
 
-    return torch.einsum(rule, *data)
+    return np.einsum(rule, *data)
 
 
 def _contract_delta_epsilon(
-    rule: str, num_delta: int, num_epsilon: int, dtype: torch.dtype = None
-) -> Tensor:
+    rule: str, num_delta: int, num_epsilon: int, dtype: DTypeLike = None
+) -> np.ndarray:
     """Contract a product of Kronecker deltas and Levi-Civita symbols.
 
     The operands are fixed constants whose multiplicities are given by ``num_delta``
     and ``num_epsilon``, so small results depend only on the arguments and are cached.
     A tensor expansion contains many terms sharing the same index pattern -- for the
     rank-six weight-two mappings, 11358 contractions use only 190 distinct rules --
-    and ``torch.einsum`` spends most of its time searching for a contraction path
+    and ``numpy.einsum`` spends most of its time searching for a contraction path
     rather than contracting, so caching removes the bulk of that cost. Results larger
     than ``3**8`` elements bypass the cache to keep its memory use bounded.
 
     A cached result is shared; callers must not modify it in place.
     """
     if dtype is None:
-        dtype = torch.get_default_dtype()
+        dtype = np.float64
 
     output_indices = rule.rsplit("->", maxsplit=1)[1]
     output_elements = 3 ** len(output_indices)
@@ -53,10 +53,12 @@ def _contract_delta_epsilon(
 
     data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
 
-    return torch.einsum(rule, *data)
+    return np.einsum(rule, *data)
 
 
-def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) -> Tensor:
+def tp_delta_epsilon(
+    tp: TensorProduct, mode: str, dtype: DTypeLike = None
+) -> np.ndarray:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
     Note, the order of the indices need to be taken care of.
@@ -95,7 +97,7 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
 
     # The tensor product actually has no delta or epsilon tensors
     if not delta_rules and not epsilon_rules:
-        return torch.tensor(float(tp.factor), dtype=dtype)
+        return np.asarray(float(tp.factor), dtype=dtype)
 
     left = ",".join(delta_rules + epsilon_rules)
 
@@ -136,8 +138,8 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
 
 
 def evaluate_tensors(
-    tensors: LinearCombination, mode: str, dtype: torch.dtype = None
-) -> Tensor:
+    tensors: LinearCombination, mode: str, dtype: DTypeLike = None
+) -> np.ndarray:
     """
     Evaluate the tensor product of Kronecker delta and Levi-Civita tensors to get
     numerical values.
@@ -154,7 +156,7 @@ def evaluate_tensors(
     return output
 
 
-def extract(G_tilde: LinearCombination, T: Tensor) -> Tensor:
+def extract(G_tilde: LinearCombination, T: np.ndarray) -> np.ndarray:
     r"""
     Evaluate X(j) = G~(j|n) \odot^n T(n).
 
@@ -172,8 +174,8 @@ def extract(G_tilde: LinearCombination, T: Tensor) -> Tensor:
     G_tilde = simplify_linear_combination(G_tilde)
     G_tilde_num = evaluate_tensors(G_tilde, mode="extraction")
 
-    n = T.dim()
-    j = G_tilde_num.dim() - n
+    n = T.ndim
+    j = G_tilde_num.ndim - n
 
     lower = letter_index(j)
     upper = letter_index(n, upper_case=True)
@@ -182,12 +184,12 @@ def extract(G_tilde: LinearCombination, T: Tensor) -> Tensor:
     X_indices = lower
     rule = f"{G_tilde_indices},{T_indices}->{X_indices}"
 
-    out = torch.einsum(rule, G_tilde_num, T)
+    out = np.einsum(rule, G_tilde_num, T)
 
     return out
 
 
-def embed(G: LinearCombination, X: Tensor) -> Tensor:
+def embed(G: LinearCombination, X: np.ndarray) -> np.ndarray:
     r"""
     Evaluate T'(n) = G(n|j) \odot^j X(j).
 
@@ -205,8 +207,8 @@ def embed(G: LinearCombination, X: Tensor) -> Tensor:
     G = simplify_linear_combination(G)
     G_num = evaluate_tensors(G, mode="embedding")
 
-    j = X.dim()
-    n = G_num.dim() - j
+    j = X.ndim
+    n = G_num.ndim - j
 
     lower = letter_index(j)
     upper = letter_index(n, upper_case=True)
@@ -215,6 +217,6 @@ def embed(G: LinearCombination, X: Tensor) -> Tensor:
     T_prime_indices = upper
     rule = f"{G_indices},{X_indices}->{T_prime_indices}"
 
-    out = torch.einsum(rule, G_num, X)
+    out = np.einsum(rule, G_num, X)
 
     return out

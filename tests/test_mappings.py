@@ -2,8 +2,8 @@ import contextlib
 import functools
 from typing import NamedTuple, Optional
 
+import numpy as np
 import pytest
-import torch
 
 import natto.mappings
 from natto.evaluate import evaluate_tensors
@@ -62,6 +62,11 @@ PHYSICAL_TENSOR_CLASSES = [
     TensorClass("elasticity", 4, "ijkl=jikl=klij", 21, {0: 2, 2: 2, 4: 1}),
     TensorClass("Cauchy relations", 4, "ijkl=jikl=kjil=ljki", 15, {0: 1, 2: 1, 4: 1}),
 ]
+
+#: The symbolic Gram matrix is exact, so a structural zero in it meets a float64
+#: residue of order 1e-17 on the numerical side. `assert_allclose` defaults to
+#: atol=0, which no residue can pass, so the comparison needs one.
+GRAM_ATOL = 1e-12
 
 # Classes `get_reduction` cannot handle yet, as {test_id: reason}. Kept out of the table
 # above so that it stays a statement about the physics, not about the code.
@@ -167,12 +172,10 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
             weight, tensor_class.rank, tensor_class.symmetry
         )
         Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
-        numerical_Q = torch.stack(
-            [evaluate_tensors(Q_p, mode="embedding") for Q_p in Q]
-        )
+        numerical_Q = np.stack([evaluate_tensors(Q_p, mode="embedding") for Q_p in Q])
         flattened_Q = numerical_Q.reshape(len(Q), -1)
         numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
-        symbolic = torch.tensor(
+        symbolic = np.array(
             [
                 [float(value) for value in row]
                 for row in get_gram_matrix(weight, tensor_class.rank, Q_with_zeros)
@@ -180,7 +183,9 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
             dtype=numerical.dtype,
         )
 
-        torch.testing.assert_close(symbolic, numerical)
+        # a Gram entry that is exactly zero meets a float64 residue of ~1e-17,
+        # and `assert_allclose` defaults to atol=0, which no residue can pass
+        np.testing.assert_allclose(symbolic, numerical, atol=GRAM_ATOL)
 
 
 def test_symmetry_rank_must_match_tensor_rank():
@@ -203,8 +208,7 @@ def test_reduction_round_trip(tensor_class: TensorClass):
     rank = tensor_class.rank
     symmetry = tensor_class.symmetry
 
-    torch.manual_seed(35)
-    T = torch.randn((3,) * rank)
+    T = np.random.default_rng(35).standard_normal((3,) * rank)
 
     # symmetrize the tensor if `symmetry` is not None
     if symmetry is not None:
@@ -218,21 +222,21 @@ def test_reduction_round_trip(tensor_class: TensorClass):
             zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
         ):
             # X = G~ . T
-            X = torch.einsum(extraction["rule"], extraction["numerical"], T)
+            X = np.einsum(extraction["rule"], extraction["numerical"], T)
 
             # T' = G . X
-            T_p_1 = torch.einsum(embedding["rule"], embedding["numerical"], X)
+            T_p_1 = np.einsum(embedding["rule"], embedding["numerical"], X)
 
             # T' = S . T
-            T_p_2 = torch.einsum(decomposition["rule"], decomposition["numerical"], T)
+            T_p_2 = np.einsum(decomposition["rule"], decomposition["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
-            assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+            assert np.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
                 f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
             )
 
             all_T_prime.append(T_p_1)
 
-    sum_T_prime = torch.sum(torch.stack(all_T_prime), dim=0)
+    sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 
-    assert torch.allclose(sum_T_prime, T, rtol=1e-5, atol=1e-6)
+    assert np.allclose(sum_T_prime, T, rtol=1e-5, atol=1e-6)

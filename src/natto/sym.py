@@ -2,13 +2,12 @@
 Symmetrization of a generic tensor to get a tensor with specific symmetry.
 """
 
-import torch
-from torch import Tensor
+import numpy as np
 
 
 # TODO, this fn has the same name as one in the symmetrize.py file. We should
 #  rename one of them
-def symmetrize(t: Tensor, symmetry: str, mode: str = "mean") -> Tensor:
+def symmetrize(t: np.ndarray, symmetry: str, mode: str = "mean") -> np.ndarray:
     """
     Symmetrize a generic tensor to obtain a tensor with the specified symmetry.
 
@@ -29,18 +28,18 @@ def symmetrize(t: Tensor, symmetry: str, mode: str = "mean") -> Tensor:
         raise ValueError(f"Symmetry {symmetry} does not match tensor rank {rank}.")
 
     transformed = [
-        sign * torch.permute(t, permutation) for permutation, sign in permutations
+        sign * np.transpose(t, permutation) for permutation, sign in permutations
     ]
     if mode == "mean":
-        return torch.mean(torch.stack(transformed), dim=0)
+        return np.mean(np.stack(transformed), axis=0)
     elif mode == "sum":
-        return torch.sum(torch.stack(transformed), dim=0)
+        return np.sum(np.stack(transformed), axis=0)
     else:
         raise ValueError(f"Unknown pooling operation: {mode}. Use 'mean' or 'sum'.")
 
 
 def check_symmetry(
-    t: Tensor,
+    t: np.ndarray,
     symmetry: str,
     rtol: float = 1e-5,
     atol: float = 1e-7,
@@ -59,8 +58,8 @@ def check_symmetry(
         True if the tensor has the specified symmetry, False otherwise.
     """
     for permutation, sign in parse_symmetry_generators(symmetry, rank=t.ndim):
-        if not torch.allclose(
-            torch.permute(t, permutation), sign * t, rtol=rtol, atol=atol
+        if not np.allclose(
+            np.transpose(t, permutation), sign * t, rtol=rtol, atol=atol
         ):
             return False
     return True
@@ -188,12 +187,13 @@ def parse_symmetry_generators(
     return generators
 
 
-def get_random_tensor_of_symmetry(rank: int, symmetry: str, seed: int = 35) -> Tensor:
+def get_random_tensor_of_symmetry(
+    rank: int, symmetry: str, seed: int = 35
+) -> np.ndarray:
     """
     Create a random tensor of the given rank and symmetry.
     """
-    torch.manual_seed(seed)
-    T = torch.randn((3,) * rank)
+    T = np.random.default_rng(seed).standard_normal((3,) * rank)
     T = symmetrize(T, symmetry)
 
     return T

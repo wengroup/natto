@@ -1,6 +1,6 @@
 import itertools
 
-import torch
+import numpy as np
 
 from natto.sym import (
     check_symmetry,
@@ -55,14 +55,14 @@ def test_generate_permutations():
 
 
 def test_symmetrize():
-    torch.manual_seed(35)
+    rng = np.random.default_rng(35)
 
-    t = torch.randn(3, 3)
+    t = rng.standard_normal((3, 3))
     symmetry = "ij=ji"
     out = symmetrize(t, symmetry)
     assert check_symmetry(out, symmetry)
 
-    t = torch.randn(3, 3, 3)
+    t = rng.standard_normal((3, 3, 3))
     symmetry = "ijk=ikj"
     out = symmetrize(t, symmetry)
     assert check_symmetry(out, symmetry)
@@ -71,7 +71,7 @@ def test_symmetrize():
     out = symmetrize(t, symmetry)
     assert check_symmetry(out, symmetry)
 
-    t = torch.randn(3, 3, 3, 3)
+    t = rng.standard_normal((3, 3, 3, 3))
     symmetry = "ijkl=jikl=klij"
     out = symmetrize(t, symmetry)
     assert check_symmetry(out, symmetry)
@@ -90,17 +90,15 @@ def test_antisymmetric_rank_two():
         ((1, 0), -1),
     }
 
-    torch.manual_seed(35)
-    tensor = torch.randn(3, 3)
+    tensor = np.random.default_rng(35).standard_normal((3, 3))
     output = symmetrize(tensor, symmetry)
     assert check_symmetry(output, symmetry)
-    assert torch.allclose(output, (tensor - tensor.T) / 2)
+    assert np.allclose(output, (tensor - tensor.T) / 2)
 
 
 def test_fully_antisymmetric_rank_three():
     """Check float32 projection onto the fully antisymmetric rank-three space."""
     symmetry = "ijk=-jik=-ikj"
-    torch.manual_seed(35)
-    output = symmetrize(torch.randn(3, 3, 3), symmetry)
+    output = symmetrize(np.random.default_rng(35).standard_normal((3, 3, 3)), symmetry)
 
     assert check_symmetry(output, symmetry)
