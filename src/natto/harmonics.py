@@ -23,10 +23,9 @@ rather than a sum over the terms of Eq. (41).
 """
 
 import math
-from typing import Optional
 
-import torch
-from torch import Tensor
+import numpy as np
+from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -36,8 +35,8 @@ from natto.utils import double_factorial, letter_index
 
 
 def get_harmonic_operator(
-    weight: int, normalize: str = "unity", dtype: Optional[torch.dtype] = None
-) -> tuple[Tensor, str]:
+    weight: int, normalize: str = "unity", dtype: DTypeLike = None
+) -> tuple[np.ndarray, str]:
     """Build the harmonic operator `H` of one weight, evaluated.
 
     Args:
@@ -46,12 +45,12 @@ def get_harmonic_operator(
             weight-fold contraction of the harmonic with a unit vector is the
             Legendre polynomial of the angle between the two, and is 1 when the
             two coincide. `none` leaves the natural projector unscaled.
-        dtype: Floating-point dtype of the evaluated operator, the torch default
+        dtype: Floating-point dtype of the evaluated operator, double precision
             if not given.
 
     Returns:
         The evaluated operator, and the einsum rule that applies it, so that
-        `V = torch.einsum(rule, H, *[a] * weight)` for a unit vector `a`.
+        `V = numpy.einsum(rule, H, *[a] * weight)` for a unit vector `a`.
 
     Raises:
         ValueError: If `weight` is negative, or `normalize` is not recognized.
@@ -107,4 +106,4 @@ def coeff_harmonic(weight: int) -> float:
     Returns:
         The normalization constant.
     """
-    return double_factorial(2 * weight - 1).item() / math.factorial(weight)
+    return double_factorial(2 * weight - 1) / math.factorial(weight)

@@ -1,5 +1,5 @@
+import numpy as np
 import pytest
-import torch
 
 from natto.symmetrize import symmetrize_and_remove_trace
 
@@ -69,8 +69,8 @@ def NT4(T4):
 def get_T(rank: int):
     """Create a tensor of rank `rank` for testing."""
     if rank == 0:
-        return torch.tensor(1.0)
-    t = torch.arange(3**rank).reshape([3] * rank).to(torch.float32)
+        return np.array(1.0)
+    t = np.arange(3**rank).reshape([3] * rank).astype(np.float32)
     return t / t.mean()
 
 

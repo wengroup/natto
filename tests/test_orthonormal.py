@@ -6,8 +6,8 @@ possible -- the mappings of a weight are orthonormal under the Cartesian inner
 product -- and that extraction followed by embedding still recovers the tensor.
 """
 
+import numpy as np
 import pytest
-import torch
 
 from natto.mappings import get_reduction
 from natto.sym import check_symmetry, symmetrize
@@ -22,33 +22,31 @@ RECONSTRUCTION_TOL = 1e-10
 
 def orthonormal(rank: int, symmetry: str = None, weight: int = None) -> dict:
     """The reduction in the self-dual basis, in double precision."""
-    output = get_reduction(rank, symmetry, basis="orthonormal", dtype=torch.float64)
+    output = get_reduction(rank, symmetry, basis="orthonormal", dtype=np.float64)
 
     return output if weight is None else output[weight]
 
 
 def assert_orthonormal(per_weight: dict, weight: int):
     """Assert the mappings of one weight are orthonormal under Eq. (21)."""
-    stacked = torch.stack([entry["numerical"] for entry in per_weight["embedding"]])
+    stacked = np.stack([entry["numerical"] for entry in per_weight["embedding"]])
     flattened = stacked.reshape(len(stacked), -1)
     gram = flattened @ flattened.T / (2 * weight + 1)
 
-    torch.testing.assert_close(
-        gram, torch.eye(len(stacked), dtype=gram.dtype), rtol=0, atol=ORTHONORMAL_ATOL
+    np.testing.assert_allclose(
+        gram, np.eye(len(stacked), dtype=gram.dtype), rtol=0, atol=ORTHONORMAL_ATOL
     )
 
 
-def reconstruct(output: dict, tensor: torch.Tensor) -> list[torch.Tensor]:
+def reconstruct(output: dict, tensor: np.ndarray) -> list[np.ndarray]:
     """Extract and embed back through each channel, returning the parts."""
     parts = []
     for per_weight in output.values():
         for embedding, extraction in zip(
             per_weight["embedding"], per_weight["extraction"]
         ):
-            natural = torch.einsum(extraction["rule"], extraction["numerical"], tensor)
-            parts.append(
-                torch.einsum(embedding["rule"], embedding["numerical"], natural)
-            )
+            natural = np.einsum(extraction["rule"], extraction["numerical"], tensor)
+            parts.append(np.einsum(embedding["rule"], embedding["numerical"], natural))
 
     return parts
 
@@ -66,23 +64,22 @@ def test_piezoelectric_gram_matrix():
     """Pin the piezoelectric weight-1 Gram matrix, and its orthonormal mappings."""
     per_weight = orthonormal(3, "ijk=ikj", weight=1)
 
-    expected_gram = torch.tensor([[3.0, 2.0], [2.0, 8.0]], dtype=torch.float64)
-    torch.testing.assert_close(per_weight["gram"], expected_gram)
+    expected_gram = np.array([[3.0, 2.0], [2.0, 8.0]], dtype=np.float64)
+    np.testing.assert_allclose(per_weight["gram"], expected_gram, atol=1e-12)
     assert_orthonormal(per_weight, weight=1)
 
 
 @pytest.mark.parametrize("rank", [1, 2])
 def test_reconstructs_a_general_tensor(rank: int):
     """Unrestricted orthonormal mappings, and their self-dual reconstruction."""
-    torch.manual_seed(35)
-    tensor = torch.randn((3,) * rank, dtype=torch.float64)
+    tensor = np.random.default_rng(35).standard_normal((3,) * rank)
     output = orthonormal(rank)
 
     for weight, per_weight in output.items():
         assert_orthonormal(per_weight, weight)
 
-    reconstructed = torch.stack(reconstruct(output, tensor)).sum(dim=0)
-    torch.testing.assert_close(
+    reconstructed = np.stack(reconstruct(output, tensor)).sum(axis=0)
+    np.testing.assert_allclose(
         reconstructed, tensor, rtol=RECONSTRUCTION_TOL, atol=RECONSTRUCTION_TOL
     )
 
@@ -94,15 +91,16 @@ def test_reconstructs_a_symmetric_tensor(rank: int, symmetry: str):
     Each embedded part must carry the symmetry of the class on its own, not
     only in the sum.
     """
-    torch.manual_seed(35)
-    tensor = symmetrize(torch.randn((3,) * rank, dtype=torch.float64), symmetry)
+    tensor = symmetrize(
+        np.random.default_rng(35).standard_normal((3,) * rank), symmetry
+    )
     output = orthonormal(rank, symmetry)
 
     parts = reconstruct(output, tensor)
     for part in parts:
         assert check_symmetry(part, symmetry, atol=RECONSTRUCTION_TOL)
 
-    reconstructed = torch.stack(parts).sum(dim=0)
-    torch.testing.assert_close(
+    reconstructed = np.stack(parts).sum(axis=0)
+    np.testing.assert_allclose(
         reconstructed, tensor, rtol=RECONSTRUCTION_TOL, atol=RECONSTRUCTION_TOL
     )

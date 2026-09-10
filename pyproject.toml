@@ -7,7 +7,6 @@ name = "natto"
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "torch",
     "numpy",
     "scipy",
     "monty",
@@ -35,6 +34,8 @@ default-tag = "0.0.1"
 
 [tool.ruff]
 src = ["src", "tests"]
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle
     "F",   # pyflakes
@@ -43,7 +44,7 @@ select = [
 fixable = ['I']
 ignore = ["E501"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
 # This duplicates the functionlity of ruff but it is nicer to have it for pycharm usage:

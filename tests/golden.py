@@ -39,7 +39,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-import torch
+import numpy as np
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 
@@ -98,8 +98,8 @@ def to_snapshot(value: Any) -> Any:
     Raises:
         TypeError: If `value` contains a type with no defined snapshot form.
     """
-    if isinstance(value, torch.Tensor):
-        return value.detach().cpu().tolist()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
 
     if isinstance(value, Fraction):
         return str(value)
@@ -123,7 +123,7 @@ def to_snapshot(value: Any) -> Any:
     )
 
 
-def fingerprint(tensor: torch.Tensor, tol: float = DEFAULT_ATOL) -> dict[str, Any]:
+def fingerprint(tensor: np.ndarray, tol: float = DEFAULT_ATOL) -> dict[str, Any]:
     """Reduce an evaluated operator to a handful of comparable numbers.
 
     Storing evaluated operators in full is not affordable: a rank-4 class runs to
@@ -144,14 +144,14 @@ def fingerprint(tensor: torch.Tensor, tol: float = DEFAULT_ATOL) -> dict[str, An
     Returns:
         Statistics comparable under the harness's float tolerance.
     """
-    flat = tensor.detach().cpu().flatten().to(torch.float64)
-    positions = torch.arange(1, flat.numel() + 1, dtype=torch.float64)
+    flat = tensor.ravel().astype(np.float64)
+    positions = np.arange(1, flat.size + 1, dtype=np.float64)
 
     return {
         "shape": list(tensor.shape),
-        "nonzero": int((flat.abs() > tol).sum()),
+        "nonzero": int((np.abs(flat) > tol).sum()),
         "sum": float(flat.sum()),
-        "abs_sum": float(flat.abs().sum()),
+        "abs_sum": float(np.abs(flat).sum()),
         "square_sum": float((flat * flat).sum()),
         "min": float(flat.min()),
         "max": float(flat.max()),

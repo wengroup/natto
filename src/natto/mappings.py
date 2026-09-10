@@ -32,7 +32,8 @@ the numerical rotation to a self-dual basis, in `orthonormal`.
 
 from fractions import Fraction
 
-import torch
+import numpy as np
+from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
@@ -57,7 +58,7 @@ def get_reduction(
     symmetry: str = None,
     basis: str = "dual",
     numerical: bool = True,
-    dtype: torch.dtype = None,
+    dtype: DTypeLike = None,
 ) -> dict:
     """Reduce a Cartesian tensor space into its irreducible parts.
 
@@ -87,7 +88,7 @@ def get_reduction(
         numerical: Whether to evaluate the operators as well as building them
             symbolically. Ignored for `basis="orthonormal"`, which is numerical
             by construction.
-        dtype: Floating-point dtype of the evaluated operators, the torch default
+        dtype: Floating-point dtype of the evaluated operators, double precision
             if not given. The orthonormal basis is computed in double precision
             whatever this is, and cast at the end, since it rests on an
             eigendecomposition.
@@ -136,7 +137,7 @@ def get_reduction(
 
 
 def _orthonormal_entries(
-    weight: int, rank: int, G: list[LinearCombination], dtype: torch.dtype = None
+    weight: int, rank: int, G: list[LinearCombination], dtype: DTypeLike = None
 ) -> dict:
     """Pack one weight's operators in the self-dual basis of Eq. (26).
 
@@ -146,10 +147,10 @@ def _orthonormal_entries(
     """
     _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, weight, rank)
     if dtype is None:
-        dtype = torch.get_default_dtype()
-    gram = gram.to(dtype)
-    gram_inverse_sqrt = gram_inverse_sqrt.to(dtype)
-    G_hat = G_hat.to(dtype)
+        dtype = np.float64
+    gram = gram.astype(dtype)
+    gram_inverse_sqrt = gram_inverse_sqrt.astype(dtype)
+    G_hat = G_hat.astype(dtype)
 
     lower = letter_index(weight)
     upper = letter_index(rank, upper_case=True)
@@ -289,7 +290,7 @@ def assemble_operator_entries(
     numerical: bool = True,
     include_gram: bool = True,
     include_gram_inverse: bool = True,
-    dtype: torch.dtype = None,
+    dtype: DTypeLike = None,
 ) -> dict:
     """Pack the operators of one weight into the form the package publishes.
 

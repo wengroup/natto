@@ -30,20 +30,17 @@ LAPACK builds and versions, so the canonical dual could silently change under an
 unrelated BLAS upgrade.
 """
 
-from fractions import Fraction
 from typing import Literal
 
 import numpy as np
 import scipy.linalg
-import torch
-from torch import Tensor
 
 Method = Literal["gram_schmidt", "scipy_qr", "qr_unpivoted"]
 
 
 def find_independent_tensors(
-    tensors: list[Tensor], tolerance=1e-4, method: Method = "gram_schmidt"
-) -> tuple[list[Tensor], list[int]]:
+    tensors: list[np.ndarray], tolerance=1e-4, method: Method = "gram_schmidt"
+) -> tuple[list[np.ndarray], list[int]]:
     """Find linearly independent tensors.
 
     Args:
@@ -71,8 +68,8 @@ def find_independent_tensors(
 
 
 def find_independent_tensors_gram_schmidt(
-    tensors: list[Tensor], tolerance=1e-4
-) -> tuple[list[Tensor], list[int]]:
+    tensors: list[np.ndarray], tolerance=1e-4
+) -> tuple[list[np.ndarray], list[int]]:
     """Find linearly independent tensors by sequential Gram-Schmidt, rank-revealing.
 
     A tensor is kept if its residual, after projecting out the span of the
@@ -95,18 +92,18 @@ def find_independent_tensors_gram_schmidt(
         independent_tensors: list of linearly independent tensors
         independent_indices: indices of the independent tensors in the original list
     """
-    vectors = [t.flatten().to(torch.float64) for t in tensors]
+    vectors = [np.asarray(t, dtype=np.float64).ravel() for t in tensors]
 
     independent_indices = []
-    basis: list[Tensor] = []
+    basis: list[np.ndarray] = []
     for i, v in enumerate(vectors):
-        r = v.clone()
+        r = v.copy()
         # Project out the current basis twice for numerical stability
         # (modified Gram-Schmidt with reorthogonalization).
         for _ in range(2):
             for q in basis:
                 r = r - (r @ q) * q
-        norm = torch.linalg.norm(r)
+        norm = np.linalg.norm(r)
         if norm > tolerance:
             independent_indices.append(i)
             basis.append(r / norm)
@@ -117,8 +114,8 @@ def find_independent_tensors_gram_schmidt(
 
 
 def find_independent_tensors_scipy_qr(
-    tensors: list[Tensor], tolerance=1e-4, pivoting: bool = True
-) -> tuple[list[Tensor], list[int]]:
+    tensors: list[np.ndarray], tolerance=1e-4, pivoting: bool = True
+) -> tuple[list[np.ndarray], list[int]]:
     """Find linearly independent tensors using scipy's QR decomposition.
 
     The tensors are flattened into the columns of a matrix `A`, which is factorized
@@ -154,11 +151,7 @@ def find_independent_tensors_scipy_qr(
 
     # each column of the matrix is a flattened tensor
     matrix = np.stack(
-        [
-            t.detach().flatten().to(dtype=torch.float64, device="cpu").numpy()
-            for t in tensors
-        ],
-        axis=1,
+        [np.asarray(t, dtype=np.float64).ravel() for t in tensors], axis=1
     )
 
     if pivoting:
@@ -182,8 +175,8 @@ def find_independent_tensors_scipy_qr(
 #  tests can pin the failure modes. Delete it once we are confident nothing depends on
 #  it, and use `find_independent_tensors_scipy_qr` instead.
 def find_independent_tensors_qr_unpivoted(
-    tensors: list[Tensor], tolerance=1e-4
-) -> tuple[list[Tensor], list[int]]:
+    tensors: list[np.ndarray], tolerance=1e-4
+) -> tuple[list[np.ndarray], list[int]]:
     """Find linearly independent tensors from the diagonal of an unpivoted QR factor.
 
     This is the original implementation. It is NOT rank-revealing and is kept only
@@ -209,39 +202,16 @@ def find_independent_tensors_qr_unpivoted(
         independent_tensors: list of linearly independent tensors
         independent_indices: indices of the independent tensors in the original list
     """
-    vectors = [t.flatten() for t in tensors]
-    matrix = torch.vstack(vectors)
-    Q, R = torch.linalg.qr(matrix.T, mode="complete")
+    vectors = [np.asarray(t, dtype=np.float64).ravel() for t in tensors]
+    matrix = np.vstack(vectors)
+    _, R = np.linalg.qr(matrix.T, mode="complete")
 
     # Check all diagonal elements
     independent_indices = []
     for i in range(min(matrix.shape)):
-        if torch.abs(R[i, i]) > tolerance:
+        if abs(R[i, i]) > tolerance:
             independent_indices.append(i)
 
     independent_tensors = [tensors[i] for i in independent_indices]
 
     return independent_tensors, independent_indices
-
-
-# TODO, this is not used, delete
-def is_linear_independent(a: list[Fraction], m: list[list[Fraction]]) -> bool:
-    """Check whether a vector can be written as a linear combination of other vectors.
-
-    Args:
-        a: vector to check
-        m: list of vectors to check against, each row is a vector
-
-    Returns:
-        True if a is linearly dependent on m, False otherwise
-    """
-    matrix = m.copy()
-    matrix.append(a)
-    matrix = [torch.tensor([float(x) for x in row]) for row in matrix]
-
-    _, independent_indices = find_independent_tensors(matrix)
-
-    if set(independent_indices) == set(range(len(matrix))):
-        return True
-    else:
-        return False

@@ -14,12 +14,10 @@ Levi-Civita symbol, so the file stays plain ASCII.
 
 from pathlib import Path
 
-import torch
+import numpy as np
 
 from natto.mappings import get_reduction
 from natto.utils import yaml_dump
-
-torch.set_default_dtype(torch.float64)
 
 
 def convert_to_list(tensor):
@@ -28,7 +26,7 @@ def convert_to_list(tensor):
     Tensors become nested lists, and a symbolic form becomes its string with the
     delta and epsilon characters spelled out in ASCII.
     """
-    if isinstance(tensor, torch.Tensor):
+    if isinstance(tensor, np.ndarray):
         return tensor.tolist()
     elif isinstance(tensor, dict):
         if "symbolic" in tensor:

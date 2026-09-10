@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 
 from natto.symmetrize import (
     get_permutations,
@@ -57,13 +57,13 @@ def test_remove_trace(T2, T3, T4):
     # second rank tensor
     t2 = symmetrize(T2)
     t2_1 = remove_trace(t2, start_dim=0)
-    assert torch.einsum("ii", t2_1) == 0.0
+    assert np.einsum("ii", t2_1) == 0.0
 
     t2_2 = t2.reshape(1, 1, 3, 3)
     t2_tl = remove_trace(t2_2, start_dim=2)
     assert t2_tl.shape == t2_2.shape
 
-    assert torch.einsum("...ii", t2_tl) == 0.0
+    assert np.einsum("...ii", t2_tl) == 0.0
 
     # third rank tensor
     t3 = symmetrize(T3)
@@ -72,8 +72,8 @@ def test_remove_trace(T2, T3, T4):
     assert t3_tl.shape == t3.shape
 
     for rule in ["...iij", "...iji", "...jii"]:
-        out = torch.einsum(rule, t3_tl)
-        assert torch.allclose(out, torch.zeros(3), atol=1e-5)
+        out = np.einsum(rule, t3_tl)
+        assert np.allclose(out, np.zeros(3), atol=1e-5)
 
     # fourth rank tensor
     t4 = symmetrize(T4)
@@ -82,5 +82,5 @@ def test_remove_trace(T2, T3, T4):
     assert t4_tl.shape == t4.shape
 
     for rule in ["...iijk", "...ijik", "...ijki", "...jiik", "...jiki", "...jkii"]:
-        out = torch.einsum(rule, t4_tl)
-        assert torch.allclose(out, torch.zeros(3, 3), atol=1e-4)
+        out = np.einsum(rule, t4_tl)
+        assert np.allclose(out, np.zeros((3, 3)), atol=1e-4)

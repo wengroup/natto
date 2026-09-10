@@ -1,11 +1,20 @@
-# natto
+# natto - natural tensor operations
 
-`natto` is a Python package for constructing, analyzing, and embedding **natural tensors** — symmetric traceless tensors that form irreducible representations of the rotation group O(3).
-It provides tools to decompose arbitrary Cartesian tensors into natural tensor components and to embed natural tensors back into the original Cartesian tensor space.
+
+`natto` is a Python package for irreducible Cartesian tensor operations.
+It provides reusable operators for extracting irreducible Cartesian tensors (ICTs,
+also known as **natural tensors**), from Cartesian tensors.
+It also provides operators to embed ICTs back into Cartesian tensor space.
+
+Some other features:
+1. operators to deal with physical tensors with intrinsic symmetry
+2. operators to couple two ICTs into a third
+3. operators to build Cartesian harmonics
 
 ## Installation
 
-It is recommended to create a virtual environment first (e.g. using conda) before installing `natto`:
+It is recommended to create a virtual environment first (e.g. using `conda` ) and
+then do:
 
 ```bash
 git clone https://github.com/wengroup/natto.git
@@ -15,119 +24,90 @@ pip install -e .
 
 ## Example
 
-The operators depend only on a tensor's rank and its intrinsic symmetry, not on
-any particular tensor, so they are built once and then applied to every tensor
-of that class. Each arrives with the einsum rule that applies it.
+A rank-2 Cartesian tensor splits into three ICTs, of weight 0, 1 and 2 -- a
+scalar, a vector, and a symmetric traceless matrix:
 
 ```python
-import torch
+import textwrap
+
+import numpy as np
 
 from natto.mappings import get_reduction
-from natto.sym import symmetrize
 
-# The elastic tensor: rank 4, minor and major symmetry.
-operators = get_reduction(rank=4, symmetry="ijkl=jikl=klij")
+T = np.array([
+    [1.0, 2.0, 3.0],
+    [4.0, 5.0, 6.0],
+    [7.0, 8.0, 12.0]
+])
 
-# {0: 2, 2: 2, 4: 1} -- two channels of weight 0, two of weight 2, one of weight 4
-print({weight: len(w["embedding"]) for weight, w in operators.items()})
-
-# a random tensor of that class; averaging by hand does not work, since each
-# averaging step breaks the symmetry the previous one established
-T = symmetrize(torch.randn(3, 3, 3, 3), "ijkl=jikl=klij")
-
-parts = []
-for weight, per_weight in operators.items():
-    for embedding, extraction in zip(per_weight["embedding"], per_weight["extraction"]):
-        # X is the natural tensor of this weight and channel: symmetric and traceless
-        X = torch.einsum(extraction["rule"], extraction["numerical"], T)
-
-        # and this is the part of T that it accounts for
-        parts.append(torch.einsum(embedding["rule"], embedding["numerical"], X))
-
-# the parts sum back to the tensor they came from
-assert torch.allclose(torch.stack(parts).sum(dim=0), T, atol=1e-5)
+operators = get_reduction(rank=2)
+for weight, data in operators.items():
+    extraction = data["extraction"][0]
+    X = np.einsum(extraction["rule"], extraction["numerical"], T)
+    print(f"weight {weight}:")
+    print(f"  operator: {extraction['symbolic']}")
+    print(f"  X{weight}:")
+    print(textwrap.indent(str(X), "    "))
 ```
 
-Every rule carries a leading ellipsis, so a batch of tensors of shape
-`(..., 3, 3, 3, 3)` works exactly as one does.
+```
+weight 0:
+  operator: +1/3 δ_AB
+  X0:
+    6.0
+weight 1:
+  operator: +1/2 ε_ABa
+  X1:
+    [-1.  2. -1.]
+weight 2:
+  operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
+  X2:
+    [[-5.  3.  5.]
+     [ 3. -1.  7.]
+     [ 5.  7.  6.]]
+```
 
-Each operator also carries its exact symbolic form under `"symbolic"`, as a
-combination of Kronecker deltas and Levi-Civita symbols with rational
-coefficients. Nothing in the construction is numerical until it is evaluated.
+Each operator is printed beside its result, as `natto` built it. `1/3 δ_AB`
+takes a third of the trace, `18 / 3`; `1/2 ε_ABa` the antisymmetric part; the
+three terms of `X2` symmetrize `T` and subtract that trace.
 
-See [`example/reduce_and_reconstruct.py`](example/reduce_and_reconstruct.py)
-for a complete working example.
+### Intrinsic symmetry
 
-### An orthonormal basis
-
-`basis="orthonormal"` returns the mappings rotated so that they are orthonormal
-under the Cartesian inner product. Those are self-dual: one array both extracts
-and embeds, and only the einsum rule tells the two apart.
+Declaring a symmetry removes the weights the class cannot carry. A symmetric
+rank-2 tensor has no antisymmetric part, so weight 1 is gone, leaving two ICTs:
 
 ```python
-operators = get_reduction(rank=2, symmetry="ij=ji", basis="orthonormal")
+T = (T + T.T) / 2
 
-per_weight = operators[2]
-embedding, extraction = per_weight["embedding"][0], per_weight["extraction"][0]
-assert embedding["numerical"] is extraction["numerical"]
+operators = get_reduction(rank=2, symmetry="ij=ji")
+for weight, data in operators.items():
+    extraction = data["extraction"][0]
+    X = np.einsum(extraction["rule"], extraction["numerical"], T)
+    print(f"weight {weight}:")
+    print(f"  operator: {extraction['symbolic']}")
+    print(f"  X{weight}:")
+    print(textwrap.indent(str(X), "    "))
 ```
 
-The rotation is the inverse square root of the Gram matrix, which is generally
-irrational, so these operators have no symbolic form.
-
-### Coupling two natural tensors
-
-`get_coupling_operator` builds the Cartesian counterpart of a Clebsch-Gordan
-coefficient, taking natural tensors of weights `l1` and `l2` to the weight-`l3`
-part of their product.
-
-```python
-from natto.coupling import get_coupling_operator
-
-# two vectors are natural tensors of weight 1; couple them to weight 2
-K, rule = get_coupling_operator(l1=1, l2=1, l3=2)
-
-X, Y = torch.randn(3), torch.randn(3)
-Z = torch.einsum(rule, K, X, Y)  # shape (3, 3), symmetric and traceless
-
-assert torch.allclose(Z, Z.T, atol=1e-6)
-assert abs(Z.trace()) < 1e-6
+```
+weight 0:
+  operator: +1/3 δ_AB
+  X0:
+    6.0
+weight 2:
+  operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
+  X2:
+    [[-5.  3.  5.]
+     [ 3. -1.  7.]
+     [ 5.  7.  6.]]
 ```
 
-### Cartesian harmonics
+Weight 1 is absent from the reduction, not present and zero. `X0` and `X2` are
+unchanged: symmetrizing removed only what weight 1 carried.
 
-`get_harmonic_operator` builds the operator taking the polyadic of a unit vector
-to the Cartesian harmonic of a given weight, the Cartesian counterpart of a
-spherical harmonic.
-
-```python
-from natto.harmonics import get_harmonic_operator
-
-H, rule = get_harmonic_operator(weight=2)
-
-a = torch.randn(3)
-a = a / a.norm()
-V = torch.einsum(rule, H, a, a)  # symmetric and traceless
-
-# contracting with a second direction gives the Legendre polynomial of the angle
-b = torch.randn(3)
-b = b / b.norm()
-value = torch.einsum("ab,a,b->", V, b, b)
-assert torch.allclose(value, torch.special.legendre_polynomial_p(a @ b, 2), atol=1e-6)
-```
-
-## Generating operator files
-
-`natto` can generate the coupling operators and the reduction operators for
-physical Cartesian tensors, as YAML files.
-See the `generate_*.py` scripts in the [`example/`](example/) directory and
-[`example/README.md`](example/README.md) for details.
-
+For more examples, see the [`example/`](example/) directory.
 
 ## Citation
-
-`natto` implements the constructions of the following paper; please cite it if you
-use the package.
 
 Wen, M., 2026. Reusable Operators for Irreducible Cartesian Tensor Decomposition and Coupling. arXiv preprint arXiv:2609.05971.
 
@@ -138,20 +118,5 @@ Wen, M., 2026. Reusable Operators for Irreducible Cartesian Tensor Decomposition
   journal = {arXiv preprint arXiv:2609.05971},
   year    = {2026},
   doi     = {10.48550/arXiv.2609.05971},
-}
-```
-
-For the machine-learning models built on these tensors:
-
-Chen, Q., Pattamatta, A.S.L., Wang, B., Srolovitz, D.J. and Wen, M., 2025. Atomistic Machine Learning with Irreducible Cartesian Natural Tensors. arXiv preprint arXiv:2510.04015.
-
-```latex
-@article{chen2026atomistic,
-  title   = {Atomistic Machine Learning with Irreducible Cartesian Natural Tensors},
-  author  = {Chen, Qun and Pattamatta, ASL and Wang, Boyu and Srolovitz, David J and Wen,
-  Mingjian},
-  journal = {arXiv preprint arXiv:2510.04015},
-  year    = {2025},
-  doi     = {10.48550/arXiv.2510.04015},
 }
 ```

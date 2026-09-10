@@ -19,8 +19,8 @@ returns these in place of the mappings and their duals, whether or not a
 symmetry was asked for.
 """
 
-import torch
-from torch import Tensor
+import numpy as np
+from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -32,8 +32,8 @@ def orthonormalize_mappings(
     mappings: list[LinearCombination],
     weight: int,
     rank: int,
-    dtype: torch.dtype = torch.float64,
-) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+    dtype: DTypeLike = np.float64,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     r"""Orthonormalize mapping tensors with their Cartesian Gram matrix.
 
     The Gram matrix is evaluated as
@@ -61,7 +61,7 @@ def orthonormalize_mappings(
     if not mappings:
         raise ValueError("At least one mapping tensor is required")
 
-    numerical = torch.stack(
+    numerical = np.stack(
         [
             evaluate_tensors(
                 simplify_linear_combination(mapping), mode="embedding", dtype=dtype
@@ -74,24 +74,24 @@ def orthonormalize_mappings(
     flattened = numerical.reshape(len(mappings), -1)
     gram = flattened @ flattened.T / (2 * weight + 1)
     gram_inverse_sqrt = _symmetric_inverse_square_root(gram)
-    orthonormal = torch.einsum("pq,q...->p...", gram_inverse_sqrt, numerical)
+    orthonormal = np.einsum("pq,q...->p...", gram_inverse_sqrt, numerical)
 
     return numerical, gram, gram_inverse_sqrt, orthonormal
 
 
 def _symmetric_inverse_square_root(
-    matrix: Tensor, rtol: float = 1e-10, atol: float = 1e-12
-) -> Tensor:
+    matrix: np.ndarray, rtol: float = 1e-10, atol: float = 1e-12
+) -> np.ndarray:
     """Compute the symmetric inverse square root of a positive-definite matrix."""
-    if not torch.allclose(matrix, matrix.T, rtol=rtol, atol=atol):
+    if not np.allclose(matrix, matrix.T, rtol=rtol, atol=atol):
         raise ValueError("Gram matrix must be symmetric")
 
-    eigenvalues, eigenvectors = torch.linalg.eigh(matrix)
-    threshold = atol + rtol * torch.max(torch.abs(eigenvalues))
-    if torch.any(eigenvalues <= threshold):
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    threshold = atol + rtol * np.max(np.abs(eigenvalues))
+    if np.any(eigenvalues <= threshold):
         raise ValueError("Gram matrix must be positive definite")
 
-    inverse_sqrt = eigenvectors @ torch.diag(eigenvalues.rsqrt()) @ eigenvectors.T
+    inverse_sqrt = eigenvectors @ np.diag(1 / np.sqrt(eigenvalues)) @ eigenvectors.T
 
     return inverse_sqrt
 

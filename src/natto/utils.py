@@ -1,12 +1,13 @@
 import gzip
 import itertools
+import math
 import string
 from pathlib import Path
 from typing import Optional
 
-import torch
+import numpy as np
 import yaml
-from torch import Tensor
+from numpy.typing import DTypeLike
 
 
 def letter_index(n: int, start: int = 0, upper_case: bool = False) -> str:
@@ -60,22 +61,17 @@ def repeat_double_index(n: int, start: int = 0, upper_case: bool = False) -> lis
     """
     indices = letter_index(n, start, upper_case)
 
-    # TorchScript does not allow `s*2`
     return [s + s for s in indices]
 
 
-def dij(
-    device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None
-) -> Tensor:
+def dij(dtype: DTypeLike = None) -> np.ndarray:
     """Kronecker delta tensor."""
-    return torch.eye(3, device=device, dtype=dtype)
+    return np.eye(3, dtype=dtype)
 
 
-def eijk(
-    device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None
-) -> Tensor:
+def eijk(dtype: DTypeLike = None) -> np.ndarray:
     """Levi-Civita tensor."""
-    e = torch.zeros(3, 3, 3, device=device, dtype=dtype)
+    e = np.zeros((3, 3, 3), dtype=dtype)
     e[0, 1, 2] = 1.0
     e[1, 2, 0] = 1.0
     e[2, 0, 1] = 1.0
@@ -86,44 +82,53 @@ def eijk(
     return e
 
 
-def factorial(n: int, device: Optional[torch.device] = None):
-    """
-    Get the factorial of a number.
-    """
-    return torch.prod(torch.arange(1, n + 1, device=device))
+def factorial(n: int) -> int:
+    """Get the factorial of a number.
 
-
-def double_factorial(
-    n: int, lower_bound: Optional[int] = None, device: Optional[torch.device] = None
-) -> Tensor:
-    """
-    Get the double factorial of a number.
+    Exact, as a Python integer. These counts appear in the denominators of the
+    exact coefficients, where a float would silently stop being exact well
+    before the weights this package reaches.
 
     Args:
-        n: The number to calculate the double factorial
-        lower_bound: The lower bound of the double factorial. If lower bound is
-            provided, this is calculated as n * (n-2) * ... * lower_bound. Default is
-            None, meaning 1 if n odd and 2 if n even.
-        device: The device to put the tensor on.
-    """
+        n: The number to take the factorial of.
 
+    Returns:
+        `n!`.
+    """
+    return math.factorial(n)
+
+
+def double_factorial(n: int, lower_bound: Optional[int] = None) -> int:
+    """Get the double factorial of a number, exactly.
+
+    Args:
+        n: The number to calculate the double factorial.
+        lower_bound: The lower bound of the double factorial. If given, this is
+            calculated as n * (n-2) * ... * lower_bound. Default is None,
+            meaning 1 if n is odd and 2 if n is even.
+
+    Returns:
+        `n!!`, or the bounded product; 1 when the product is empty, which is the
+        convention that makes `(-1)!! = 1`.
+    """
     if n == 0 or n == 1:
-        return torch.tensor(1, device=device)
-    elif n % 2 == 0:
+        return 1
+
+    if n % 2 == 0:
         if lower_bound is None:
             lower_bound = 2
         else:
             assert lower_bound % 2 == 0, "lower_bound must be even"
-        return torch.prod(torch.arange(lower_bound, n + 2, step=2, device=device))
     else:
         if lower_bound is None:
             lower_bound = 1
         else:
             assert lower_bound % 2 == 1, "lower_bound must be odd"
-        return torch.prod(torch.arange(lower_bound, n + 2, step=2, device=device))
+
+    return math.prod(range(lower_bound, n + 2, 2))
 
 
-def get_trace(T: Tensor, i: int, j: int) -> Tensor:
+def get_trace(T: np.ndarray, i: int, j: int) -> np.ndarray:
     """
     Trace of a tensor between two indices.
 
@@ -140,13 +145,13 @@ def get_trace(T: Tensor, i: int, j: int) -> Tensor:
 
     indices = letter_index(T.ndim)
     rule = indices.replace(indices[j], indices[i])
-    trace = torch.einsum(rule, T)
+    trace = np.einsum(rule, T)
 
     return trace
 
 
 def is_symmetric(
-    T: Tensor, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5
+    T: np.ndarray, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5
 ) -> bool:
     """
     Check if a tensor is fully symmetric.
@@ -161,8 +166,8 @@ def is_symmetric(
 
     for p in itertools.permutations(range(start_dim, T.ndim)):
         p = list(range(start_dim)) + list(p)
-        permuted = T.permute(*p)
-        if not torch.allclose(T, permuted, atol=atol, rtol=rtol):
+        permuted = np.transpose(T, p)
+        if not np.allclose(T, permuted, atol=atol, rtol=rtol):
             return False
 
     return True
@@ -183,16 +188,15 @@ def is_traceless(T, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5) 
 
     for i, j in itertools.combinations(range(start_dim, T.ndim), 2):
         trace = get_trace(T, i, j)
-        # `zeros_like` rather than a fresh zero tensor: `torch.allclose` raises
-        # on a dtype mismatch, so a default-dtype zero rejects every tensor that
-        # is not in the default dtype rather than reporting on its trace.
-        if not torch.allclose(trace, torch.zeros_like(trace), atol=atol, rtol=rtol):
+        if not np.allclose(trace, np.zeros_like(trace), atol=atol, rtol=rtol):
             return False
 
     return True
 
 
-def is_symmetric_traceless(T: Tensor, atol: float = 1e-6, rtol: float = 1e-5) -> bool:
+def is_symmetric_traceless(
+    T: np.ndarray, atol: float = 1e-6, rtol: float = 1e-5
+) -> bool:
     """Check if a tensor is symmetric and traceless."""
     return is_symmetric(T, atol=atol, rtol=rtol) and is_traceless(
         T, atol=atol, rtol=rtol
