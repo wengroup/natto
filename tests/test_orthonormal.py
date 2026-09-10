@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from natto.GHS import get_orthonormal_G, get_orthonormal_Q
+from natto.orthonormal import get_orthonormal_G, get_orthonormal_Q
 from natto.sym import check_symmetry, symmetrize
 
 

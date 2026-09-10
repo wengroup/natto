@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from natto.GHS import get_G_H_S
+from natto.mappings import get_G_H_S
 from natto.utils import yaml_dump
 
 torch.set_default_dtype(torch.float64)
@@ -50,9 +50,9 @@ if __name__ == "__main__":
     results = {}
     for name, info in physical_tensors.items():
         out = get_G_H_S(info["rank"], info["symmetry"], numerical=True)
-        info["GHS"] = convert_to_list(out)
+        info["operators"] = convert_to_list(out)
         results[name] = info
 
     # Same to yaml
-    filename = Path("./decomposition_and_reconstruction_projector.yaml")
+    filename = Path("./reduction_operators.yaml")
     yaml_dump(results, filename)

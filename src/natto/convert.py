@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from natto.GHS import get_G_H_S
+from natto.mappings import get_G_H_S
 
 
 # TODO, this function should be reimplemented for simplicity, not consider batching

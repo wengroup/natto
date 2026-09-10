@@ -16,13 +16,13 @@ The scale is not fixed by the construction. One factor per weight triple is
 free, and the normalization constants $C$ of Eqs. (49) and (50) fix it, one per
 parity; `tests/test_coupling.py` asserts the two conditions they come from.
 
-## Why this is not a call into `GHS`
+## Why this is not a call into the reduction
 
 This is the only route to the coupling, and it is a closed form rather than a
-call into the general symmetry machinery of `GHS`. That is worth explaining,
-since $\mathbf{X} \otimes \mathbf{Y}$ is symmetric within its first $\ell_1$
-indices and within its last $\ell_2$, which is an intrinsic symmetry in the
-ordinary sense, and the symmetry route does apply to it.
+call into the general symmetry machinery of `mappings`. That is worth
+explaining, since $\mathbf{X} \otimes \mathbf{Y}$ is symmetric within its first
+$\ell_1$ indices and within its last $\ell_2$, which is an intrinsic symmetry in
+the ordinary sense, and the symmetry route does apply to it.
 
 Applying it is not enough on its own. What reduces the weight-$\ell_3$ mapping
 space to a single dimension is a second property: $\mathbf{X}$ and $\mathbf{Y}$

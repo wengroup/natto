@@ -10,7 +10,7 @@ from natto.EGH import (
     relabel_indices_2,
 )
 from natto.evaluate import evaluate_tensors
-from natto.GHS import get_G_H_of_j
+from natto.mappings import get_G_H_of_j
 from natto.utils import letter_index
 
 

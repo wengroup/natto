@@ -119,6 +119,7 @@ Names that meant something else, or several things, and must not come back.
 | `H` | the coupling operator, in `H_tp` | `get_coupling_operator` |
 | `H` | an index-ordering flag, `mode="H"` | `mode="extraction"` |
 | `H_tp` | module name | `coupling` |
+| `GHS` | module name | `mappings`, plus `orthonormal` and `symmetry_adapted` |
 | `G_tilde`, `Q_tilde` | the *orthonormal* mappings, i.e. the paper's hat | `basis="orthonormal"`. `G_tilde` is free again, and correct, for a dual |
 | `coeff_D` | the odd-parity coupling constant | `coeff_C_odd` |
 | `seniority` | the multiplicity index | `p`, "channel" |

@@ -4,7 +4,7 @@
 The `generate_*.py` scripts in this directory generate the corresponding YAML files:
 
 - `generate_tensor_product_projector.py` generates `tensor_product_projector.yaml`
-- `generate_decomposition_and_reconstruction_projector.py` generates `decomposition_and_reconstruction_projector.yaml`
+- `generate_reduction_operators.py` generates `reduction_operators.yaml`
 - `generate_unit_vector_projector.py` generates `unit_vector_projector.yaml`
 
 Run a script directly to generate the corresponding YAML file, e.g.:
@@ -61,7 +61,7 @@ The data is organized in the following way:
   `none` or `unity`, indicating whether K is normalized or not.
 
 
-# decomposition_and_reconstruction_projector.yaml
+# reduction_operators.yaml
 
 These projectors decompose a physical Cartesian tensor (e.g. polarizability, elasticity)
 into its natural tensor components and reconstruct it back. Specifically:
@@ -79,7 +79,7 @@ The data is organized in the following way:
 {physical_tensor_name:
     {"rank": rank of the physical tensor,
      "symmetry": symmetry of the physical tensor,
-     "GHS":
+     "operators":
         weight:
             {"embedding": [{"symbolic": symbolic expression,
                    "numerical": numerical values }],
