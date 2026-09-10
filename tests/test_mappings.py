@@ -66,11 +66,18 @@ PHYSICAL_TENSOR_CLASSES = [
 # above so that it stays a statement about the physics, not about the code.
 NOT_SUPPORTED = {}
 
+#: Constructing a rank-four class costs a few seconds and a rank-three one a
+#: fraction of that, so the rank-four rows are what make the suite slow. They are
+#: marked `slow` and left out of the default run -- all but this one, which stays
+#: so that the default still exercises the rank-four path, symmetry adaptation
+#: included. Elasticity is the class the paper leads with.
+DEFAULT_RANK_FOUR_CLASS = "rank4_elasticity"
+
 
 def get_tensor_class_params(
     tensor_classes: Optional[list[TensorClass]] = None,
 ) -> list:
-    """Parametrize over tensor classes, xfailing the ones that are not supported yet.
+    """Parametrize over tensor classes, xfailing the unsupported and marking the slow.
 
     Args:
         tensor_classes: classes to parametrize over, all of Table 1 by default.
@@ -80,12 +87,14 @@ def get_tensor_class_params(
 
     params = []
     for tc in tensor_classes:
+        marks = []
         reason = NOT_SUPPORTED.get(tc.test_id)
-        marks = (
-            pytest.mark.xfail(raises=AssertionError, strict=True, reason=reason)
-            if reason is not None
-            else ()
-        )
+        if reason is not None:
+            marks.append(
+                pytest.mark.xfail(raises=AssertionError, strict=True, reason=reason)
+            )
+        if tc.rank >= 4 and tc.test_id != DEFAULT_RANK_FOUR_CLASS:
+            marks.append(pytest.mark.slow)
         params.append(pytest.param(tc, id=tc.test_id, marks=marks))
 
     return params
@@ -111,7 +120,10 @@ def get_G_H_S_cached(rank: int, symmetry: str, method: str = "gram_schmidt") -> 
         return get_G_H_S(rank, symmetry)
 
 
-@pytest.mark.parametrize("method", ["gram_schmidt", "scipy_qr"])
+@pytest.mark.parametrize(
+    "method",
+    ["gram_schmidt", pytest.param("scipy_qr", marks=pytest.mark.slow)],
+)
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
 def test_weight_multiplicity(tensor_class: TensorClass, method: str):
     """Check the weight decomposition of each physical tensor class in Table 1.

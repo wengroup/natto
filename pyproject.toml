@@ -19,6 +19,16 @@ test = [
 ]
 dev = ["pre-commit>=2.19.0"]
 
+[tool.pytest.ini_options]
+# `pytest` runs the fast tests, `pytest -m full` runs everything, and
+# `pytest -m slow` runs only what the default leaves out. The rank-six sectors
+# and most of the rank-four classes are the expensive part; see
+# `tests/test_mappings.DEFAULT_RANK_FOUR_CLASS`.
+addopts = "-m 'not slow'"
+markers = [
+    "slow: seconds to minutes each, and excluded by the default run",
+]
+
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.1"
