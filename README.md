@@ -62,12 +62,30 @@ See the `generate_*.py` scripts in the [`example/`](example/) directory and [`ex
 
 
 ## Citation
-Chen, Q., Pattamatta, A.S.L., Wang, B., Srolovitz, D.J. and Wen, M., 2026. Atomistic Machine Learning with Irreducible Cartesian Natural Tensors. arXiv preprint arXiv:2510.04015.
+
+`natto` implements the constructions of the following paper; please cite it if you
+use the package.
+
+Wen, M., 2026. Reusable Operators for Irreducible Cartesian Tensor Decomposition and Coupling. arXiv preprint arXiv:2609.05971.
+
+```latex
+@article{wen2026reusable,
+  title   = {Reusable Operators for Irreducible Cartesian Tensor Decomposition and Coupling},
+  author  = {Wen, Mingjian},
+  journal = {arXiv preprint arXiv:2609.05971},
+  year    = {2026},
+  doi     = {10.48550/arXiv.2609.05971},
+}
+```
+
+For the machine-learning models built on these tensors:
+
+Chen, Q., Pattamatta, A.S.L., Wang, B., Srolovitz, D.J. and Wen, M., 2025. Atomistic Machine Learning with Irreducible Cartesian Natural Tensors. arXiv preprint arXiv:2510.04015.
 
 ```latex
 @article{chen2026atomistic,
   title   = {Atomistic Machine Learning with Irreducible Cartesian Natural Tensors},
-  author  = {Chen, Qun and Pattamatta, ASL and Wang, Boyu and Srolovitz, David J and Wen, 
+  author  = {Chen, Qun and Pattamatta, ASL and Wang, Boyu and Srolovitz, David J and Wen,
   Mingjian},
   journal = {arXiv preprint arXiv:2510.04015},
   year    = {2025},
