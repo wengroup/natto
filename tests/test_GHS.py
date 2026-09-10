@@ -8,11 +8,9 @@ import torch
 import natto.GHS
 from natto.EGH import get_g_matrix
 from natto.evaluate import evaluate_tensors
-from natto.GHS import get_G_H_S, get_G_H_S_natural, get_G_H_S_of_j
+from natto.GHS import get_G_H_S, get_G_H_S_of_j
 from natto.qr import find_independent_tensors
 from natto.sym import symmetrize
-from natto.symmetrize import get_random_natural_tensor
-from natto.utils import letter_index
 
 
 class TensorClass(NamedTuple):
@@ -189,51 +187,6 @@ def test_get_G_H_S(tensor_class: TensorClass):
         T = symmetrize(T, symmetry)
 
     output = get_G_H_S_cached(rank, symmetry)
-
-    all_T_prime = []
-    for j, out_j in output.items():
-        for p, (H, G, S) in enumerate(zip(out_j["H"], out_j["G"], out_j["S"])):
-            # X = H T
-            X = torch.einsum(H["rule"], H["numerical"], T)
-
-            # T' = G X
-            T_p_1 = torch.einsum(G["rule"], G["numerical"], X)
-
-            # T' = S T
-            T_p_2 = torch.einsum(S["rule"], S["numerical"], T)
-
-            # T_p_1 and T_p_2 should be equal
-            assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
-                f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
-            )
-
-            all_T_prime.append(T_p_1)
-
-    sum_T_prime = torch.sum(torch.stack(all_T_prime), dim=0)
-
-    assert torch.allclose(sum_T_prime, T, rtol=1e-5, atol=1e-6)
-
-
-@pytest.mark.parametrize(
-    "j1,j2",
-    [
-        (0, 1),
-        (0, 2),
-        (1, 1),
-        (1, 2),
-        (2, 2),
-    ],
-)
-def test_get_G_H_S_natural(j1: int, j2: int):
-
-    # Create T = T1 \otimes T2
-    T1 = get_random_natural_tensor(j1, 35)
-    T2 = get_random_natural_tensor(j2, 36)
-    idx1 = letter_index(j1)
-    idx2 = letter_index(j2, start=j1)
-    T = torch.einsum(f"{idx1},{idx2}->{idx1}{idx2}", T1, T2)
-
-    output = get_G_H_S_natural(j1, j2)
 
     all_T_prime = []
     for j, out_j in output.items():

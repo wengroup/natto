@@ -17,14 +17,12 @@ import torch
 from torch import Tensor
 
 from natto.EGH import get_G_even, get_g_matrix, get_G_odd, get_H, get_S
-from natto.evaluate import embed, evaluate_tensors, extract
+from natto.evaluate import embed, evaluate_tensors
 from natto.matrix import (
     float_matrix,
     fraction_matrix,
     matrix_inverse,
-    matrix_multiply,
     matrix_null_space,
-    matrix_transpose,
 )
 from natto.ops import simplify_linear_combination
 from natto.qr import find_independent_tensors
@@ -225,51 +223,6 @@ def get_orthonormal_Q(
     return out
 
 
-def get_G_H_S_natural(
-    j1: int, j2: int, max_j3: int = None, numerical: bool = True
-) -> dict:
-    r"""
-    Get all the G, H, S tensors of a tensor product of two natural tensors.
-
-    Z = X \otimes Y, where X and Y are natural tensors.
-
-    This uses the general method to do it. We also have a specific way, in H_tp.py.
-
-    Args:
-        j1: rank of X
-        j2: rank of Y
-        max_j3: rank of Z. The output will have ranks of abs(j1-j2) <= j3 <= max_j3.
-            If max_j3 is None, it will be set to j1 + j2.
-        numerical: whether to return numerical values of G, H, S.
-
-    Returns:
-        G, H, S, and g_pq, h_pq information corresponding to Z.
-    """
-
-    if max_j3 is None:
-        max_j3 = j1 + j2
-    else:
-        if max_j3 > j1 + j2:
-            raise ValueError("`max_j3` must be smaller than or equal to `j1 + j2`.")
-
-    out = {}
-    for j in range(abs(j1 - j2), max_j3 + 1):
-        G, H, S, g, h = get_G_H_S_of_j_natural(j1, j2, j)
-
-        # No natural tensor of this rank
-        if len(G) == 0:
-            continue
-
-        # Get rules and numerical values
-        out_j = get_G_H_S_rules_and_values(
-            j, j1 + j2, [G], [H], [S], g, h, numerical, include_g=True, include_h=True
-        )
-
-        out[j] = out_j
-
-    return out
-
-
 def get_G_H_S_of_j(
     j: int, n: int, symmetry: str = None
 ) -> tuple[
@@ -326,67 +279,6 @@ def get_G_H_S_of_j(
     S = get_S(G, H, n)
 
     return G, H, S, g, h
-
-
-def get_G_H_S_of_j_natural(
-    j1: int, j2: int, j3: int
-) -> tuple[
-    LinearCombination,
-    LinearCombination,
-    LinearCombination,
-    list[list[Fraction]],
-    list[list[Fraction]],
-]:
-    r"""
-    Get the G, H, S tensors Z = X \otimes Y, where X and Y are natural tensors.
-
-    There will be a single G, H, S tensors for a given j1, j2, and j3.
-
-    Args:
-        j1: rank of X
-        j2: rank of Y
-        j3: rank of Z
-
-    Returns:
-        G: independent G tensor of different seniority p
-        H: H corresponding to G
-        S: S corresponding to G and H
-        g: g_pq matrix
-        h: h_pq matrix
-    """
-    n = j1 + j2
-
-    # Get independent G and H tensors for a general tensor
-    ind_G, ind_H, g, h = get_G_H_of_j(j3, n)
-
-    # Further down select G and H for tensors with symmetry
-
-    # Create a random tensor Z = X \otimes Y
-    X = get_random_natural_tensor(j1, seed=35)
-    Y = get_random_natural_tensor(j2, seed=36)
-    X_indices = letter_index(j1)
-    Y_indices = letter_index(j2, start=j1)
-    Z = torch.einsum(f"{X_indices},{Y_indices}->{X_indices}{Y_indices}", X, Y)
-
-    # Get independency of G by using Z
-    _, indices_group = group_G(Z, ind_G)
-
-    if len(indices_group) != 1:
-        raise RuntimeError(
-            "There should only be one group of G tensors, but got "
-            f"{len(indices_group)} groups"
-        )
-
-    # Combine G (and H) to create new independent G (and H) tensors
-    ind_G, ind_H = combine_G_H_of_j(ind_G, ind_H, h, indices_group)
-
-    # Get S tensors
-    G = [simplify_linear_combination(G) for G in ind_G]
-    H = [simplify_linear_combination(H) for H in ind_H]
-    S = get_S(G, H, n)
-
-    # There should only be one G, H, S
-    return G[0], H[0], S[0], g, h
 
 
 def get_G_H_of_j(
@@ -448,51 +340,6 @@ def get_G_H_of_j(
     ind_H = get_H(h, ind_G)
 
     return ind_G, ind_H, g, h
-
-
-def combine_G_H_of_j(
-    G: list[LinearCombination],
-    H: list[LinearCombination],
-    h: list[list[Fraction]],
-    indices_group: list[list[int]],
-) -> tuple[list[LinearCombination], list[LinearCombination]]:
-    """
-    Combine the G and H tensors based on the symmetry of the tensor.
-
-    For tensors with certain symmetry, the independent G and H tensors obtained via
-    `get_G_H_of_j` are not independent anymore. This functions linearly combines the
-    G and H tensors to obtain new independent G and H tensors.
-
-    Args:
-        G: independent G tensors for ordinary tensor
-        H: independent H tensors for ordinary tensor
-        h: h_pq matrix
-        indices_group: each inner list contains indices of G tensors that are equivalent
-        to each other.
-
-    Returns:
-        ind_G: independent G tensors for tensor with symmetry
-        ind_H: independent H tensors for tensor with symmetry, corresponding to G
-    """
-
-    # All G result in zero
-    if len(indices_group) == 0:
-        Q = []
-        ind_idx = []
-    # Each G form its own group, i.e. all G are independent
-    elif len(indices_group) == len(G):
-        Q = G
-        ind_idx = range(len(G))
-    # Some G are not unique
-    else:
-        coeff, ind_idx, dep_idx = get_independent_H_coeff(h, indices_group)
-        Q = get_Q(G, coeff, ind_idx, dep_idx)
-
-    # We use Q as G now
-    ind_G = Q
-    ind_H = [H[i] for i in ind_idx]
-
-    return ind_G, ind_H
 
 
 def get_G_H_S_rules_and_values(
@@ -703,163 +550,6 @@ def _get_symmetry_action_matrix(
 #  2. multiply_2() to get X = G \odot^n T
 #  3. Simplify_linear_combination() to get the simplified X.
 #  4. Compare X to see if they are the same.
-def group_G(
-    T: Tensor,
-    all_G: list[LinearCombination],
-    rtol: float = 1e-5,
-    atol: float = 1e-6,
-) -> tuple[list[int], list[list[int]]]:
-    r"""
-    Group G tensors numerically for validation or exploratory screening.
-
-    This randomized method only recognizes mappings that vanish individually or give
-    equal outputs. Use :func:`get_G_H_S_of_j` for deterministic internal-symmetry
-    reduction, including signed and general linear relations. This helper remains in
-    the natural tensor-product specialization and is also useful for validation and
-    exploratory screening.
-
-    The grouping is obtained as follows:
-    1. For each G, obtain X = G \odot^n T.
-    2. Check each X to verify whether:
-        a. it is zero;
-        b) it is unique (i.e. the same as another X),
-    and then label the corresponding G accordingly.
-
-    Args:
-        T: the tensor for G to operate on. It can be a general tensor, or tensors of
-            certain symmetry, and it can be traceless too.
-        all_G: linear independent G tensors.
-        rtol: relative tolerance for checking if two tensors are equal.
-        atol: absolute tolerance for checking if two tensors are equal.
-
-     Returns:
-        indices_zero: Indices of zero G.
-        indices_group: Each inner list contains the indices of G tensors that are
-            equivalent to each other, meaning their corresponding X tensors are the
-            same.
-    """
-    all_X = [extract(G, T) for G in all_G]
-
-    indices_zero = []
-    indices_group = []
-    for i, X in enumerate(all_X):
-        # Check zeros
-        if torch.allclose(X, torch.tensor(0.0), rtol=rtol, atol=atol):
-            indices_zero.append(i)
-            continue
-
-        # Create groups of equivalent G tensors
-        is_unique = True
-        for group in indices_group:
-            j = group[0]
-
-            if torch.allclose(X, all_X[j], rtol=rtol, atol=atol):
-                # Equivalent to values in an existing group, then add to the group
-                group.append(i)
-                is_unique = False
-                break
-
-        # Not in existing groups, create a new group
-        if is_unique:
-            indices_group.append([i])
-
-    return indices_zero, indices_group
-
-
-def get_independent_H_coeff(
-    h: list[list[Fraction]], indices_group: list[list[int]]
-) -> tuple[list[list[Fraction]], list[int], list[int]]:
-    """
-    Construct coefficient matrix to combine independent H tensors to obtain other H.
-
-    This is based on the values of the G:
-    1. For GT=0, we ignore the corresponding h_pq.
-    2. For G1, G2, ..., Gq that gives the same GT values, we sum the corresponding h_pq
-    over q.
-
-    Args:
-        h:
-        indices_group:
-
-    Returns:
-        coeff: Each column gives the coefficients of combining independent H to obtain
-            other H.
-        ind_indices: indices of independent H
-        dep_indices: indices of dependent H
-    """
-    num_ind = len(indices_group)
-
-    # Gather coefficients of equivalent G tensors
-    # We have:
-    # H_p = h_p1 G_1 _+ h_p2 G_2 + ... + h_pq G_q
-    # and the G are equivalent in each group.
-    # We obtain:
-    # H_p = u_p1 G_1 + u_p2 G_2 + u_pr G_r
-    # where r is the number of unique groups, u_pi are the sum of some h_pj over j.
-    u = []
-    for h_p in h:
-        u_p = []
-        for group in indices_group:
-            # sum over the group
-            u_pq = sum(h_p[i] for i in group)
-            u_p.append(u_pq)
-        u.append(u_p)
-
-    # Split the H tensors (u here) into independent ones M and dependent ones N
-    tensor_u = [torch.tensor([float(x) for x in row]) for row in u]
-    _, M_indices = find_independent_tensors(tensor_u)
-
-    if len(M_indices) != num_ind:
-        raise RuntimeError("Not enough independent H tensors found.")
-
-    N_indices = []
-    M = []
-    N = []
-    for i in range(len(u)):
-        if i in M_indices:
-            M.append(u[i])
-        else:
-            N.append(u[i])
-            N_indices.append(i)
-
-    M = matrix_transpose(M)
-    N = matrix_transpose(N)
-    M_inv = matrix_inverse(M)
-    coeff = matrix_multiply(M_inv, N)
-
-    return coeff, M_indices, N_indices
-
-
-def get_Q(
-    all_G: list[LinearCombination],
-    coeff: list[list[Fraction]],
-    ind_indices: list[int],
-    dep_indices: list[int],
-) -> list[LinearCombination]:
-    """
-    Get Q tensors.
-
-    Q are linear combinations of G and be used as new G tensors.
-
-    Args:
-        all_G:
-        coeff: Each column gives the coefficients of combining independent H to obtain
-            other H.
-        ind_indices: indices of independent G
-        dep_indices: indices of dependent G
-
-    Returns:
-        Q tensors that can be used as new G tensors.
-    """
-
-    all_Q = []
-    for ii, i in enumerate(ind_indices):
-        Q = all_G[i]
-        for jj, j in enumerate(dep_indices):
-            Q += coeff[ii][jj] * all_G[j]
-        all_Q.append(Q)
-
-    return all_Q
 
 
 if __name__ == "__main__":
