@@ -9,7 +9,7 @@ from pathlib import Path
 import torch
 from carnet.core.unit_vector_2 import get_H, get_H_numerical
 
-from natto.ops import simplify_linear_combination
+from natto.algebra import simplify_linear_combination
 from natto.utils import yaml_dump
 
 

@@ -32,16 +32,16 @@ the numerical rotation to a self-dual basis, in `orthonormal`.
 
 from fractions import Fraction
 
-from natto.EGH import (
+from natto.algebra import simplify_linear_combination
+from natto.evaluate import embed, evaluate_tensors
+from natto.matrix import float_matrix, fraction_matrix, matrix_inverse
+from natto.operators import (
     get_extraction_operators,
     get_G_even,
     get_G_odd,
     get_gram_matrix,
     get_S,
 )
-from natto.evaluate import embed, evaluate_tensors
-from natto.matrix import float_matrix, fraction_matrix, matrix_inverse
-from natto.ops import simplify_linear_combination
 from natto.qr import find_independent_tensors
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_random_natural_tensor
@@ -49,50 +49,58 @@ from natto.symmetry_adapted import get_symmetry_adapted_mappings
 from natto.utils import letter_index
 
 
-def get_G_H_S(n: int, symmetry: str = None, numerical: bool = True) -> dict:
-    """
-    Get all the G, H, S tensors of dimension n.
+def get_reduction(rank: int, symmetry: str = None, numerical: bool = True) -> dict:
+    """Reduce a Cartesian tensor space into its irreducible parts.
 
     Args:
-        n: dim of the space T is in
-        symmetry: symmetry of the tensor in space n, if any. For example,
-            - "ij=ji" means that the target is a fully symmetric rank-2 tensor (e.g.
-                stress tensor);
-            - "ij=-ji" means that the target is an antisymmetric rank-2 tensor;
-            - "ijk=ikj" means that the target is a rank-3 tensor with the last two
-                indices symmetric (e.g. piezoelectric tensor);
-            - "ijk=ikj=jik" means that the target is a fully symmetric rank-3 tensor;
-            - "ijkl=jikl=klij" means that the target is a rank-4 tensor with both minor
-                symmetry (between i and j, and between k and l) and major symmetry (
-                between ij and kl). For example, the elastic tensor has this symmetry;
-            The number of unique letters gives the rank of the tensor (what letters to
-            use does not matter).
-        numerical: whether to return numerical values of G, H, S.
+        rank: Rank of the Cartesian tensor.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any. For example,
+            - "ij=ji" is a fully symmetric rank-2 tensor, e.g. the stress tensor;
+            - "ij=-ji" is an antisymmetric rank-2 tensor;
+            - "ijk=ikj" is a rank-3 tensor with the last two indices symmetric,
+              e.g. the piezoelectric tensor;
+            - "ijk=ikj=jik" is a fully symmetric rank-3 tensor;
+            - "ijkl=jikl=klij" is a rank-4 tensor with both minor symmetry
+              (between i and j, and between k and l) and major symmetry (between
+              ij and kl), e.g. the elastic tensor.
+            The number of distinct letters gives the rank; which letters are used
+            does not matter.
+        numerical: Whether to evaluate the operators as well as building them
+            symbolically.
 
     Returns:
-        The embedding, extraction and decomposition operators, with the Gram matrix
-        and its inverse.
+        The embedding, extraction and decomposition operators keyed by weight,
+        with the Gram matrix and its inverse. A weight the symmetry extinguishes
+        is absent rather than empty.
     """
     out = {}
-    for j in range(n + 1):
-        G, H, S, g, h = get_G_H_S_of_j(j, n, symmetry)
+    for weight in range(rank + 1):
+        G, G_tilde, S, gram, gram_inverse = get_reduction_of_weight(
+            weight, rank, symmetry
+        )
 
-        # No natural tensor of this rank
+        # No natural tensor of this weight
         if len(G) == 0:
             continue
 
-        # Get rules and numerical values
-        out_j = get_G_H_S_rules_and_values(
-            j, n, G, H, S, g, h, numerical, include_g=True, include_h=True
+        out[weight] = assemble_operator_entries(
+            weight,
+            rank,
+            G,
+            G_tilde,
+            S,
+            gram,
+            gram_inverse,
+            numerical,
+            include_gram=True,
+            include_gram_inverse=True,
         )
-
-        out[j] = out_j
 
     return out
 
 
-def get_G_H_S_of_j(
-    j: int, n: int, symmetry: str = None
+def get_reduction_of_weight(
+    weight: int, rank: int, symmetry: str = None
 ) -> tuple[
     list[LinearCombination],
     list[LinearCombination],
@@ -100,195 +108,177 @@ def get_G_H_S_of_j(
     list[list[Fraction]],
     list[list[Fraction]],
 ]:
-    """
-    Get the G, H, S tensors for a given weight j and rank n.
-
-    This can deal with / without symmetry.
+    """Build the operators of one weight, with or without an intrinsic symmetry.
 
     Args:
-        j: weight
-        n: dim of the space T is in
-        symmetry: symmetry of the tensor in space n, if any. For example,
-            - "ij=ji" means that the target is a fully symmetric rank-2 tensor (e.g.
-                stress tensor);
-            - "ij=-ji" means that the target is an antisymmetric rank-2 tensor;
-            - "ijk=ikj" means that the target is a rank-3 tensor with the last two
-                indices symmetric (e.g. piezoelectric tensor);
-            - "ijk=ikj=jik" means that the target is a fully symmetric rank-3 tensor;
-            - "ijkl=jikl=klij" means that the target is a rank-4 tensor with both minor
-                symmetry (between i and j, and between k and l) and major symmetry (
-                between ij and kl). For example, the elastic tensor has this symmetry;
-            The number of unique letters gives the rank of the tensor (what letters to
-            use does not matter).
+        weight: Weight of the natural-tensor space.
+        rank: Rank of the Cartesian tensor.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any. For example,
+            - "ij=ji" is a fully symmetric rank-2 tensor, e.g. the stress tensor;
+            - "ij=-ji" is an antisymmetric rank-2 tensor;
+            - "ijk=ikj" is a rank-3 tensor with the last two indices symmetric,
+              e.g. the piezoelectric tensor;
+            - "ijk=ikj=jik" is a fully symmetric rank-3 tensor;
+            - "ijkl=jikl=klij" is a rank-4 tensor with both minor symmetry
+              (between i and j, and between k and l) and major symmetry (between
+              ij and kl), e.g. the elastic tensor.
+            The number of distinct letters gives the rank; which letters are used
+            does not matter.
 
     Returns:
-        G: independent embedding operators, one per channel p
-        H: H corresponding to G
-        S: S corresponding to G and H
-        g: Gram matrix
-        h: Inverse Gram matrix
+        The embedding operators, one per channel; the extraction operators dual
+        to them; their composition; the Gram matrix; and its inverse. All five
+        are empty when the symmetry leaves no mapping of this weight.
     """
-    # Get independent G and H tensors for a general tensor
-    ind_G, ind_H, g, h = get_G_H_of_j(j, n)
+    # The mappings independent for a Cartesian tensor with no assumed symmetry
+    ind_G, ind_G_tilde, gram, gram_inverse = get_dual_pair_of_weight(weight, rank)
 
-    # Further reduce the mappings for tensors with internal symmetry.
+    # An intrinsic symmetry admits fewer of them, and mixes them into new ones.
     if symmetry is not None:
-        ind_G = get_symmetry_adapted_mappings(j, n, ind_G, h, symmetry)
+        ind_G = get_symmetry_adapted_mappings(
+            weight, rank, ind_G, gram_inverse, symmetry
+        )
         if not ind_G:
             return [], [], [], [], []
 
-        g = get_gram_matrix(j, n, ind_G)
-        h = matrix_inverse(g)
-        ind_H = get_extraction_operators(h, ind_G)
+        gram = get_gram_matrix(weight, rank, ind_G)
+        gram_inverse = matrix_inverse(gram)
+        ind_G_tilde = get_extraction_operators(gram_inverse, ind_G)
 
-    # Get S tensors
-    G = [simplify_linear_combination(G) for G in ind_G]
-    H = [simplify_linear_combination(H) for H in ind_H]
-    S = get_S(G, H, n)
+    G = [simplify_linear_combination(G_p) for G_p in ind_G]
+    G_tilde = [simplify_linear_combination(G_tilde_p) for G_tilde_p in ind_G_tilde]
+    S = get_S(G, G_tilde, rank)
 
-    return G, H, S, g, h
+    return G, G_tilde, S, gram, gram_inverse
 
 
-def get_G_H_of_j(
-    j: int, n: int
+def get_dual_pair_of_weight(
+    weight: int, rank: int
 ) -> tuple[
     list[LinearCombination],
     list[LinearCombination],
     list[list[Fraction]],
     list[list[Fraction]],
 ]:
-    """
-    Get the independent G and H tensors for a given weight j and rank n.
+    """Build the mappings of one weight and the duals extracting through them.
 
-    Note, here, the independence of G and H are for a general tensor T. For tensors with
-    certain symmetry (e.g. tensor that is the product of two natural tensors),
-    further processing is needed to get the independent G and H tensors.
+    The independence here is that of a Cartesian tensor with no assumed
+    symmetry. A tensor with an intrinsic symmetry admits fewer, which
+    `get_symmetry_adapted_mappings` selects from these.
 
     Args:
-        j: weight of the natural tensor X
-        n: rank of the ordinary tensor T
+        weight: Weight of the natural-tensor space.
+        rank: Rank of the Cartesian tensor.
 
     Returns:
-        G: independent G tensors for ordinary tensor
-        H: independent H tensors for ordinary tensor, corresponding to G
-        g: Gram matrix
-        h: Inverse Gram matrix
+        The independent mappings, one per channel; the duals corresponding to
+        them; their Gram matrix; and its exact inverse.
     """
     # No isotropic rank-one mapping exists from a scalar natural tensor.
-    if n == 1 and j == 0:
+    if rank == 1 and weight == 0:
         return [], [], [], []
 
-    # create G mapping operator
-    if (n - j) % 2 == 0:
-        all_G = get_G_even(j, n)
+    if (rank - weight) % 2 == 0:
+        candidates = get_G_even(weight, rank)
     else:
-        all_G = get_G_odd(j, n)
+        candidates = get_G_odd(weight, rank)
 
-    # WARNING, should not simplify G using the below function, as get_gram_matrix() below
-    # is set up to work with the original G tensors.
-    # all_G = [simplify_linear_combination(g) for g in all_G]
+    # WARNING, the candidates must not be simplified here: `get_gram_matrix` below
+    # is set up to work with the mappings in their original form.
 
-    # Get numerical S tensors, embedding a random natura tensor X in space j to space n
-    X = get_random_natural_tensor(j)
-    all_num_S = [embed(G, X) for G in all_G]
+    # Embed one random natural tensor through each candidate; the candidates are
+    # independent exactly when the tensors they produce are.
+    X = get_random_natural_tensor(weight)
+    embedded = [embed(candidate, X) for candidate in candidates]
+    _, independent_indices = find_independent_tensors(embedded)
+    ind_G = [candidates[i] for i in independent_indices]
 
-    # Get linearly independent S tensors
-    _, independent_indices = find_independent_tensors(all_num_S)
+    gram = get_gram_matrix(weight, rank, ind_G)
+    gram_inverse = matrix_inverse(gram)
+    ind_G_tilde = get_extraction_operators(gram_inverse, ind_G)
 
-    # Get linearly independent G tensors
-    ind_G = [all_G[i] for i in independent_indices]
-
-    # Gram matrix of the independent embedding operators
-    g = get_gram_matrix(j, n, ind_G)
-
-    # and its exact inverse
-    h = matrix_inverse(g)
-
-    # Get H tensors, corresponding to independent G
-    ind_H = get_extraction_operators(h, ind_G)
-
-    return ind_G, ind_H, g, h
+    return ind_G, ind_G_tilde, gram, gram_inverse
 
 
-def get_G_H_S_rules_and_values(
-    j: int,
-    n: int,
+def assemble_operator_entries(
+    weight: int,
+    rank: int,
     G: list[LinearCombination],
-    H: list[LinearCombination],
+    G_tilde: list[LinearCombination],
     S: list[LinearCombination],
-    g: list[list[Fraction]],
-    h: list[list[Fraction]],
+    gram: list[list[Fraction]],
+    gram_inverse: list[list[Fraction]],
     numerical: bool = True,
-    include_g: bool = True,
-    include_h: bool = True,
-):
-    """
-    Get the numerical values of G, H, S tensors and the rules for performing tensor
-    products.
+    include_gram: bool = True,
+    include_gram_inverse: bool = True,
+) -> dict:
+    """Pack the operators of one weight into the form the package publishes.
+
+    Each operator is paired with the einsum rule that applies it, and optionally
+    with its evaluated array. The rules carry a leading ellipsis, so an operator
+    applies to a batch of tensors as readily as to one.
 
     Args:
-        j:
-        n:
-        G:
-        H:
-        S:
-        g:
-        h:
-        numerical:
-        include_g:
-        include_h:
+        weight: Weight of the natural-tensor space.
+        rank: Rank of the Cartesian tensor.
+        G: Embedding operators, one per channel.
+        G_tilde: Extraction operators dual to them.
+        S: Their composition, one per channel.
+        gram: Gram matrix of the embedding operators.
+        gram_inverse: Its exact inverse.
+        numerical: Whether to evaluate each operator as well as recording it
+            symbolically.
+        include_gram: Whether to report the Gram matrix.
+        include_gram_inverse: Whether to report its inverse.
 
     Returns:
-
+        The operators under the keys `embedding`, `extraction` and
+        `decomposition`, plus `gram` and `gram_inverse` when asked for.
     """
+    out_weight = {"embedding": [], "extraction": [], "decomposition": []}
 
-    out_j = {"embedding": [], "extraction": [], "decomposition": []}
-
-    if include_g:
-        out_j["gram"] = {"symbolic": fraction_matrix(g), "numerical": float_matrix(g)}
-
-    if include_h:
-        out_j["gram_inverse"] = {
-            "symbolic": fraction_matrix(h),
-            "numerical": float_matrix(h),
+    if include_gram:
+        out_weight["gram"] = {
+            "symbolic": fraction_matrix(gram),
+            "numerical": float_matrix(gram),
         }
 
-    for G_p, G_tilde_p, S_p in zip(G, H, S):
-        lower = letter_index(j)
-        upper = letter_index(n, upper_case=True)
-        upper2 = letter_index(n, start=n, upper_case=True)
+    if include_gram_inverse:
+        out_weight["gram_inverse"] = {
+            "symbolic": fraction_matrix(gram_inverse),
+            "numerical": float_matrix(gram_inverse),
+        }
 
-        out_j["embedding"].append(
-            {
-                "symbolic": str(G_p),
-                "rule": (f"{upper}{lower},...{lower}->...{upper}"),
-            },
+    lower = letter_index(weight)
+    upper = letter_index(rank, upper_case=True)
+    upper2 = letter_index(rank, start=rank, upper_case=True)
+
+    for G_p, G_tilde_p, S_p in zip(G, G_tilde, S):
+        out_weight["embedding"].append(
+            {"symbolic": str(G_p), "rule": f"{upper}{lower},...{lower}->...{upper}"}
         )
         if numerical:
-            out_j["embedding"][-1]["numerical"] = evaluate_tensors(
+            out_weight["embedding"][-1]["numerical"] = evaluate_tensors(
                 G_p, mode="embedding"
             )
 
-        out_j["extraction"].append(
+        out_weight["extraction"].append(
             {
                 "symbolic": str(G_tilde_p),
                 "rule": f"{lower}{upper},...{upper}->...{lower}",
             }
         )
         if numerical:
-            out_j["extraction"][-1]["numerical"] = evaluate_tensors(
+            out_weight["extraction"][-1]["numerical"] = evaluate_tensors(
                 G_tilde_p, mode="extraction"
             )
 
-        out_j["decomposition"].append(
-            {
-                "symbolic": str(S_p),
-                "rule": f"{upper}{upper2},...{upper2}->...{upper}",
-            }
+        out_weight["decomposition"].append(
+            {"symbolic": str(S_p), "rule": f"{upper}{upper2},...{upper2}->...{upper}"}
         )
         if numerical:
-            out_j["decomposition"][-1]["numerical"] = evaluate_tensors(
+            out_weight["decomposition"][-1]["numerical"] = evaluate_tensors(
                 S_p, mode="decomposition"
             )
 
-    return out_j
+    return out_weight

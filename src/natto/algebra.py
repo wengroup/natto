@@ -1,5 +1,8 @@
-"""
-Operations on symbolic cartesian tensors.
+"""Algebra of the symbolic Cartesian tensors.
+
+Contraction, simplification and multiplication of products of Kronecker deltas
+and Levi-Civita symbols. `operators` builds the package's operators out of these
+operations, and `symbolic` defines the terms they act on.
 """
 
 import itertools

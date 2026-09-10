@@ -1,7 +1,12 @@
-"""
-Symbolic E, G, and H tensors.
+r"""Symbolic construction of the operators, from deltas and Levi-Civita symbols.
 
-Reference:
+This is the layer underneath the reduction. It builds the natural projector
+$\mathbf{E}_{(\ell\mid\ell)}$ of Eq. (12), the candidate mapping tensors
+$\mathbf{G}^p$ of Eq. (19), the duals $\widetilde{\mathbf{G}}^p$ of Eq. (22)
+and their composition, along with the exact Gram entries of Eq. (21) that relate
+them. Everything here is symbolic and exact; `mappings` is what selects an
+independent set out of the candidates and `evaluate` is what turns one into an
+array.
 
 References:
 1. [CS70] Irreducible Cartesian Tensors. II. General Formulation, http://dx.doi.org/10.1063/1.1665190
@@ -14,7 +19,7 @@ from fractions import Fraction
 from functools import reduce
 from math import gcd
 
-from natto.ops import multiply_2, simplify_linear_combination
+from natto.algebra import multiply_2, simplify_linear_combination
 from natto.symbolic import (
     CartesianTensor,
     Delta,
@@ -183,24 +188,24 @@ def get_extraction_operators(
 
 
 def get_S(
-    G: list[LinearCombination], H: list[LinearCombination], n: int
+    G: list[LinearCombination], G_tilde: list[LinearCombination], n: int
 ) -> list[LinearCombination]:
     r"""
-    Get S tensors for a given G and H.
+    Get the decomposition operators of a mapping and its dual.
 
-    S = G \odot^j H
+    S = G \odot^j G~
 
     Args:
-        G: G tensors
-        H: H tensors. The order of H tensors should correspond to the order of G.
+        G: mapping tensors
+        G_tilde: the duals, in the order of the mappings they correspond to.
+        n: rank of the Cartesian tensor.
 
     Returns:
-        S: S tensors
+        S: one decomposition operator per channel
     """
-
     S = []
-    for G_i, dual_i in zip(G, H):
-        # Shift upper letters of H to distinguish those from G
+    for G_i, dual_i in zip(G, G_tilde):
+        # Shift upper letters of the dual to distinguish them from those of G
         dual_i = shift_index_2(dual_i, n, letter_index(24, upper_case=True))
 
         S_i = multiply_2(G_i, dual_i)

@@ -9,8 +9,8 @@ from pathlib import Path
 import torch
 from torch import Tensor
 
+from natto.algebra import simplify_linear_combination
 from natto.coupling import get_coupling_operator, get_coupling_symbolic
-from natto.ops import simplify_linear_combination
 from natto.utils import yaml_dump
 
 

@@ -46,9 +46,9 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from natto.EGH import create_delta_epsilon_tensors
+from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
-from natto.ops import simplify_linear_combination
+from natto.operators import create_delta_epsilon_tensors
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_permutations_delta
 from natto.utils import (

@@ -6,9 +6,9 @@ import pytest
 import torch
 
 import natto.mappings
-from natto.EGH import get_gram_matrix
 from natto.evaluate import evaluate_tensors
-from natto.mappings import get_G_H_S, get_G_H_S_of_j
+from natto.mappings import get_reduction, get_reduction_of_weight
+from natto.operators import get_gram_matrix
 from natto.qr import find_independent_tensors
 from natto.sym import symmetrize
 
@@ -20,7 +20,8 @@ class TensorClass(NamedTuple):
     example: str
     # `Rank n` column
     rank: int
-    # `Symmetry` column, spelled the way `get_G_H_S` wants it; the table writes it with
+    # `Symmetry` column, spelled the way `get_reduction` wants it; the table writes
+    # it with
     # parentheses around the symmetric index groups, so its `(ij)kl` is `ijkl=jikl`
     # here. None when the indices are unconstrained.
     symmetry: Optional[str]
@@ -62,7 +63,7 @@ PHYSICAL_TENSOR_CLASSES = [
     TensorClass("Cauchy relations", 4, "ijkl=jikl=kjil=ljki", 15, {0: 1, 2: 1, 4: 1}),
 ]
 
-# Classes `get_G_H_S` cannot handle yet, as {test_id: reason}. Kept out of the table
+# Classes `get_reduction` cannot handle yet, as {test_id: reason}. Kept out of the table
 # above so that it stays a statement about the physics, not about the code.
 NOT_SUPPORTED = {}
 
@@ -114,10 +115,12 @@ def selection_scheme(method: str):
 
 
 @functools.lru_cache(maxsize=None)
-def get_G_H_S_cached(rank: int, symmetry: str, method: str = "gram_schmidt") -> dict:
-    """`get_G_H_S`, computed once per (class, scheme); rank 4 takes a couple seconds."""
+def get_reduction_cached(
+    rank: int, symmetry: str, method: str = "gram_schmidt"
+) -> dict:
+    """`get_reduction`, computed once per class and scheme; rank 4 costs seconds."""
     with selection_scheme(method):
-        return get_G_H_S(rank, symmetry)
+        return get_reduction(rank, symmetry)
 
 
 @pytest.mark.parametrize(
@@ -139,7 +142,7 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
         tensor_class: physical tensor class to check
         method: `natto.qr` scheme used to select the independent mappings
     """
-    output = get_G_H_S_cached(tensor_class.rank, tensor_class.symmetry, method)
+    output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry, method)
 
     found = {
         m: len(out_m["extraction"])
@@ -160,7 +163,9 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
 def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     """Check exact Gram matrices for every internally symmetric weight sector."""
     for weight in tensor_class.multiplicity:
-        Q, _, _, _, _ = get_G_H_S_of_j(weight, tensor_class.rank, tensor_class.symmetry)
+        Q, _, _, _, _ = get_reduction_of_weight(
+            weight, tensor_class.rank, tensor_class.symmetry
+        )
         Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
         numerical_Q = torch.stack(
             [evaluate_tensors(Q_p, mode="embedding") for Q_p in Q]
@@ -181,15 +186,16 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
 def test_symmetry_rank_must_match_tensor_rank():
     """Reject a symmetry whose reference term has the wrong tensor rank."""
     with pytest.raises(ValueError):
-        get_G_H_S(3, "ij", numerical=False)
+        get_reduction(3, "ij", numerical=False)
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
-def test_get_G_H_S(tensor_class: TensorClass):
-    """Test the get_G_H_S function.
+def test_reduction_round_trip(tensor_class: TensorClass):
+    """Check that extracting and embedding recovers the tensor it started from.
 
-    For a given tensor T, obtain the natural tensors X with the extraction
-    operators, then embed them back with the embedding operators. We check that we can recover T.
+    Every weight and channel of `T` is extracted into its natural tensor and
+    embedded back; the parts must sum to `T`. The decomposition operator is
+    checked against the two-step route on the way, since it is their composition.
 
     Args:
         tensor_class: physical tensor class to check
@@ -204,7 +210,7 @@ def test_get_G_H_S(tensor_class: TensorClass):
     if symmetry is not None:
         T = symmetrize(T, symmetry)
 
-    output = get_G_H_S_cached(rank, symmetry)
+    output = get_reduction_cached(rank, symmetry)
 
     all_T_prime = []
     for j, out_j in output.items():

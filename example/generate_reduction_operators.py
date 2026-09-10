@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from natto.mappings import get_G_H_S
+from natto.mappings import get_reduction
 from natto.utils import yaml_dump
 
 torch.set_default_dtype(torch.float64)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     results = {}
     for name, info in physical_tensors.items():
-        out = get_G_H_S(info["rank"], info["symmetry"], numerical=True)
+        out = get_reduction(info["rank"], info["symmetry"], numerical=True)
         info["operators"] = convert_to_list(out)
         results[name] = info
 

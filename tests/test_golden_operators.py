@@ -13,7 +13,7 @@ symbolic form and run to hundreds of kilobytes per class; `golden.fingerprint`
 guards the evaluation instead.
 
 `S` is not snapshotted. It is the composition `G` and the extraction operator,
-carrying nothing they do not, and `test_mappings.test_get_G_H_S` already asserts
+carrying nothing they do not, and `test_mappings.test_reduction_round_trip` already asserts
 `G (H T) == S T` for every class, so pinning the two pins `S` with them.
 
 The classes come from `test_mappings.PHYSICAL_TENSOR_CLASSES` rather than being
@@ -40,10 +40,10 @@ from pathlib import Path
 
 import pytest
 
+from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
-from natto.mappings import get_G_H_of_j, get_G_H_S_of_j
+from natto.mappings import get_dual_pair_of_weight, get_reduction_of_weight
 from natto.matrix import fraction_matrix
-from natto.ops import simplify_linear_combination
 from natto.orthonormal import get_orthonormal_Q
 from natto.utils import letter_index
 from tests.golden import (
@@ -53,7 +53,7 @@ from tests.golden import (
     regolding,
     snapshot_path,
 )
-from tests.test_mappings import get_G_H_S_cached, get_tensor_class_params
+from tests.test_mappings import get_reduction_cached, get_tensor_class_params
 
 #: `LinearCombination.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "
@@ -103,7 +103,7 @@ def dual_pair_content(rank: int, symmetry: str | None) -> dict:
     Returns:
         The operators keyed by weight.
     """
-    output = get_G_H_S_cached(rank, symmetry)
+    output = get_reduction_cached(rank, symmetry)
 
     content = {}
     for weight, per_weight in output.items():
@@ -154,7 +154,7 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
 def rank_six_content(symmetry: str | None) -> dict:
     """Collect the affordable rank-six sectors of one class into snapshot form.
 
-    `get_G_H_S` cannot be used here. It walks every weight, which would pull in
+    `get_reduction` cannot be used here. It walks every weight, which would pull in
     the two that cost minutes, and it evaluates `S`, which at rank six is a
     rank-12 array of half a million entries per channel. This goes weight by
     weight instead and builds only what is snapshotted.
@@ -173,9 +173,11 @@ def rank_six_content(symmetry: str | None) -> dict:
     content = {}
     for weight in RANK_SIX_WEIGHTS:
         if symmetry is None:
-            embedding, extraction, gram, gram_inverse = get_G_H_of_j(weight, RANK_SIX)
+            embedding, extraction, gram, gram_inverse = get_dual_pair_of_weight(
+                weight, RANK_SIX
+            )
         else:
-            embedding, extraction, _, gram, gram_inverse = get_G_H_S_of_j(
+            embedding, extraction, _, gram, gram_inverse = get_reduction_of_weight(
                 weight, RANK_SIX, symmetry
             )
 
@@ -208,7 +210,7 @@ def rank_six_content(symmetry: str | None) -> dict:
 def _rank_six_operator(operator, mode: str, rule: str) -> dict:
     """Snapshot form of one rank-six operator, evaluated on the spot.
 
-    The rank-four path takes its operators from `get_G_H_S`, which has already
+    The rank-four path takes its operators from `get_reduction`, which has already
     simplified and evaluated them. Here they arrive raw, so both steps happen
     here.
     """

@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from natto.mappings import get_G_H_S
+from natto.mappings import get_reduction
 
 
 # TODO, this function should be reimplemented for simplicity, not consider batching
@@ -42,7 +42,7 @@ class Converter(nn.Module):
         self.rank = rank
         self.symmetry = symmetry
 
-        out = get_G_H_S(rank, symmetry)
+        out = get_reduction(rank, symmetry)
 
         self.l_num_p = {}
         for weight, out_weight in out.items():
