@@ -33,15 +33,17 @@ def convert(rank=3, symmetry: str = None):
 
     all_T_prime = []
     for j, out_j in GHS.items():
-        for p, (H, G, S) in enumerate(zip(out_j["H"], out_j["G"], out_j["S"])):
-            # X = H T
-            X = torch.einsum(H["rule"], H["numerical"], T)
+        for p, (extraction, embedding, decomposition) in enumerate(
+            zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
+        ):
+            # Extract the natural tensor of this weight and channel
+            X = torch.einsum(extraction["rule"], extraction["numerical"], T)
             assert is_symmetric_traceless(X), (
                 "X is not symmetric traceless for j={j}, p={p}"
             )
 
-            # T' = G X
-            T_p_1 = torch.einsum(G["rule"], G["numerical"], X)
+            # Embed it back into the Cartesian space
+            T_p_1 = torch.einsum(embedding["rule"], embedding["numerical"], X)
             print(
                 f"T' (j={j}, p={p}), symmetric:",
                 is_symmetric(T_p_1),
@@ -49,8 +51,8 @@ def convert(rank=3, symmetry: str = None):
                 is_traceless(T_p_1),
             )
 
-            # T' = S T
-            T_p_2 = torch.einsum(S["rule"], S["numerical"], T)
+            # The same thing in one step
+            T_p_2 = torch.einsum(decomposition["rule"], decomposition["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
             assert torch.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (

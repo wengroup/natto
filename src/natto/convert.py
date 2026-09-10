@@ -1,4 +1,4 @@
-"""Convertion between ordinary cartesian tensor T and natural tensors X."""
+"""Conversion between an ordinary Cartesian tensor T and its natural tensors X."""
 
 import torch
 import torch.nn as nn
@@ -10,12 +10,17 @@ from natto.GHS import get_G_H_S
 # TODO, this function should be reimplemented for simplicity, not consider batching
 #   and such. In `carten` we have a batched version
 class Converter(nn.Module):
-    """
+    r"""
     Convertor to map between ordinary cartesian tensor T and natural tensors X.
 
-    The conversion is done as follows:
-    X = H T
-    T'= G T
+    Writing $\widetilde{\mathbf{G}}$ for the extraction operator and
+    $\mathbf{G}$ for the embedding operator, the conversion is
+
+    $$
+    \mathbf{X}_\ell^p = \widetilde{\mathbf{G}}^p_{(\ell|n)} \odot^n \mathbf{T}_n
+    \qquad
+    \mathbf{S}_n^{\ell,p} = \mathbf{G}^p_{(\ell|n)} \odot^\ell \mathbf{X}_\ell^p
+    $$
 
     Args:
         rank: The rank of the tensor T.
@@ -41,14 +46,20 @@ class Converter(nn.Module):
 
         self.l_num_p = {}
         for weight, out_weight in out.items():
-            self.l_num_p[weight] = len(out_weight["G"])
+            self.l_num_p[weight] = len(out_weight["embedding"])
             # TODO, the tensors of different G_j_p might be batched, which can
             #  accelerate the computation
-            for p, (G, H) in enumerate(zip(out_weight["G"], out_weight["H"])):
-                self.register_buffer(f"G_{weight}_{p}", torch.tensor(G["numerical"]))
-                self.register_buffer(f"H_{weight}_{p}", torch.tensor(H["numerical"]))
-                setattr(self, f"G_{weight}_{p}_rule", G["rule"])
-                setattr(self, f"H_{weight}_{p}_rule", H["rule"])
+            for p, (embedding, extraction) in enumerate(
+                zip(out_weight["embedding"], out_weight["extraction"])
+            ):
+                self.register_buffer(
+                    f"embedding_{weight}_{p}", torch.tensor(embedding["numerical"])
+                )
+                self.register_buffer(
+                    f"extraction_{weight}_{p}", torch.tensor(extraction["numerical"])
+                )
+                setattr(self, f"embedding_{weight}_{p}_rule", embedding["rule"])
+                setattr(self, f"extraction_{weight}_{p}_rule", extraction["rule"])
 
     def to_natural_tensor(self, T: Tensor) -> dict[int, Tensor]:
         """
@@ -64,7 +75,7 @@ class Converter(nn.Module):
             corresponding tensor value. The shape of X is (B, F, 3^l) where B represents
             arbitrary batch dimensions, F is the number of natural tensors of rank l,
             and 3^l is the flattened dimension of the tensor. The second dimension F
-            batches natural tensors of the same rank l, but different seniority p.
+            batches natural tensors of the same weight l, one per channel p.
         """
         B = T.shape[: -self.rank]
 
@@ -74,8 +85,8 @@ class Converter(nn.Module):
             out[weight] = torch.stack(
                 [
                     torch.einsum(
-                        getattr(self, f"H_{weight}_{p}_rule"),
-                        getattr(self, f"H_{weight}_{p}"),
+                        getattr(self, f"extraction_{weight}_{p}_rule"),
+                        getattr(self, f"extraction_{weight}_{p}"),
                         T,
                     ).reshape(*B, 3**weight)
                     for p in range(num_p)
@@ -96,7 +107,7 @@ class Converter(nn.Module):
             corresponding tensor value. The shape of X is (B, F, 3^l) where B represents
             arbitrary batch dimensions, F is the number of natural tensors of rank l,
             and 3^l is the flattened dimension of the tensor. The second dimension F
-            batches natural tensors of the same rank l, but different seniority p.
+            batches natural tensors of the same weight l, one per channel p.
 
         Returns:
             An ordinary cartesian tensor T corresponding to the natural tensors X.
@@ -109,8 +120,8 @@ class Converter(nn.Module):
         # TODO, the looping is very inefficient, need to think about better ways
         for weight, num_p in self.l_num_p.items():
             for p in range(num_p):
-                rule = getattr(self, f"G_{weight}_{p}_rule")
-                G = getattr(self, f"G_{weight}_{p}")
+                rule = getattr(self, f"embedding_{weight}_{p}_rule")
+                G = getattr(self, f"embedding_{weight}_{p}")
                 X_ = X[weight][..., p, :]
 
                 # special rule for scalars

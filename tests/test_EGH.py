@@ -2,11 +2,11 @@ import pytest
 import torch
 
 from natto.EGH import (
-    get_E,
     get_E_rules,
     get_G_even,
-    get_g_matrix,
     get_G_odd,
+    get_gram_matrix,
+    get_natural_projector,
     relabel_indices_2,
 )
 from natto.evaluate import evaluate_tensors
@@ -68,17 +68,17 @@ def test_get_E_rules():
 
 
 def test_E():
-    e = get_E(1)
+    e = get_natural_projector(1)
     assert e.to_str_list() == ["+1 δ_aA"]
 
-    e = get_E(2)
+    e = get_natural_projector(2)
     assert set(e.to_str_list()) == {
         "+1/2 δ_aA δ_bB",
         "+1/2 δ_aB δ_bA",
         "-1/3 δ_ab δ_AB",
     }
 
-    e = get_E(3)
+    e = get_natural_projector(3)
     assert set(e.to_str_list()) == {
         "+1/6 δ_aA δ_bB δ_cC",
         "+1/6 δ_aA δ_bC δ_cB",
@@ -97,7 +97,7 @@ def test_E():
         "-1/15 δ_aA δ_bc δ_BC",
     }
 
-    e = get_E(4)
+    e = get_natural_projector(4)
     assert set(e.to_str_list()) == {
         ## t = 0
         "+1/24 δ_aA δ_bB δ_cC δ_dD",
@@ -223,7 +223,7 @@ def test_E():
 @pytest.mark.parametrize("m", range(5))
 def test_E_trace(m):
     """Verify that the full contraction of E_(m|m) with I_(m|m) is 2m + 1."""
-    projector = evaluate_tensors(get_E(m), mode="H")
+    projector = evaluate_tensors(get_natural_projector(m), mode="extraction")
     indices = letter_index(m)
     contraction_rule = indices * 2
     trace = torch.einsum(contraction_rule, projector)
@@ -266,7 +266,7 @@ def test_G_even():
     # n=3, j=3
     all_G = get_G_even(j=3, n=3)
     assert len(all_G) == 1
-    assert set(all_G[0].to_str_list()) == set(get_E(3).to_str_list())
+    assert set(all_G[0].to_str_list()) == set(get_natural_projector(3).to_str_list())
 
     # n=4, j=0
     all_G = get_G_even(j=0, n=4)
@@ -319,7 +319,9 @@ def test_g_matrix_ignores_symbolic_zero_terms():
     all_G = get_G_even(j=2, n=4)
     mapping_with_zeros = all_G[0] + 0 * all_G[1]
 
-    assert get_g_matrix(2, 4, [mapping_with_zeros]) == get_g_matrix(2, 4, [all_G[0]])
+    assert get_gram_matrix(2, 4, [mapping_with_zeros]) == get_gram_matrix(
+        2, 4, [all_G[0]]
+    )
 
 
 def test_G_odd():

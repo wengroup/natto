@@ -1,13 +1,29 @@
-"""
-Symbolic and numerical G, H, S tensors.
+r"""
+Symbolic and numerical mapping operators between a Cartesian tensor and its
+irreducible parts.
 
-G, H, and S are made of only the Kronecker delta and Levi-Civita symbols.
+Three operators per weight $\ell$ and channel $p$, built from the Kronecker
+delta and the Levi-Civita symbol alone. Writing $\mathbf{G}$ for the embedding
+operator, $\widetilde{\mathbf{G}}$ for the extraction operator dual to it, and
+$\mathbf{S}$ for their composition:
 
-G, H, and S can be used to map a general tensor T and a natural tensor X.
-S = G H
-X = H T
-T' = G X = (G H) T = S T
-where T' is the embedding of X in the T space.
+$$
+\mathbf{X}_\ell^p = \widetilde{\mathbf{G}}^p_{(\ell|n)} \odot^n \mathbf{T}_n
+\qquad\text{(Eq. 24)}
+$$
+
+$$
+\mathbf{S}_n^{\ell,p} = \mathbf{G}^p_{(\ell|n)} \odot^\ell \mathbf{X}_\ell^p
+\qquad\text{(Eq. 25)}
+$$
+
+so that $\mathbf{S} = \mathbf{G} \odot^\ell \widetilde{\mathbf{G}}$ takes
+$\mathbf{T}$ straight to its weight-$\ell$, channel-$p$ part without forming
+$\mathbf{X}$ on the way. Summing that part over every weight and channel
+returns $\mathbf{T}$ (Eq. 30).
+
+They are returned under the keys `embedding`, `extraction` and `decomposition`;
+see docs/notation.md for the correspondence with the paper throughout.
 """
 
 from fractions import Fraction
@@ -17,11 +33,11 @@ import torch
 from torch import Tensor
 
 from natto.EGH import (
+    get_extraction_operators,
     get_G_even,
-    get_g_matrix,
     get_G_odd,
-    get_g_pq,
-    get_H,
+    get_gram_entry,
+    get_gram_matrix,
     get_S,
     relabel_indices_2,
 )
@@ -62,7 +78,8 @@ def get_G_H_S(n: int, symmetry: str = None, numerical: bool = True) -> dict:
         numerical: whether to return numerical values of G, H, S.
 
     Returns:
-        G, H, S, and g_pq, h_pq information.
+        The embedding, extraction and decomposition operators, with the Gram matrix
+        and its inverse.
     """
     out = {}
     for j in range(n + 1):
@@ -91,7 +108,9 @@ def orthonormalize_mappings(
     r"""Orthonormalize mapping tensors with their Cartesian Gram matrix.
 
     The Gram matrix is evaluated as
-    ``g[p, q] = (mapping[p] \odot^(rank+weight) mapping[q]) / (2*weight + 1)``.
+    $$
+    g_{pq} = \frac{\mathbf{G}^p \odot^{n+\ell} \mathbf{G}^q}{2\ell + 1}
+    $$
     Its unique symmetric positive-definite inverse square root transforms the input
     mappings into an orthonormal set.
 
@@ -116,7 +135,7 @@ def orthonormalize_mappings(
     numerical = torch.stack(
         [
             evaluate_tensors(
-                simplify_linear_combination(mapping), mode="G", dtype=dtype
+                simplify_linear_combination(mapping), mode="embedding", dtype=dtype
             )
             for mapping in mappings
         ]
@@ -139,9 +158,9 @@ def get_orthonormal_G(n: int, dtype: torch.dtype = torch.float64) -> dict:
         dtype: Floating-point dtype used for evaluation and eigendecomposition.
 
     Returns:
-        A dictionary keyed by weight. Each value contains the exact ``G`` tensors,
-        their numerical Gram matrix and its inverse square root, and the numerical
-        orthonormal tensors ``G_tilde``.
+        A dictionary keyed by weight, with the exact embedding operators, their
+        Gram matrix and its symmetric inverse square root, and the orthonormal
+        operators built from them.
     """
     out = {}
     for j in range(n + 1):
@@ -149,24 +168,22 @@ def get_orthonormal_G(n: int, dtype: torch.dtype = torch.float64) -> dict:
         if not G:
             continue
 
-        G_numerical, g_G, g_G_inverse_sqrt, G_tilde = orthonormalize_mappings(
-            G, j, n, dtype
-        )
+        G_numerical, g, g_inverse_sqrt, G_hat = orthonormalize_mappings(G, j, n, dtype)
         extraction_rule, embedding_rule = _orthonormal_mapping_rules(j, n)
         out[j] = {
-            "G": [
+            "embedding": [
                 {"symbolic": str(G_p), "numerical": G_p_numerical}
                 for G_p, G_p_numerical in zip(G, G_numerical)
             ],
-            "g_G": g_G,
-            "g_G_inverse_sqrt": g_G_inverse_sqrt,
-            "G_tilde": [
+            "gram": g,
+            "gram_inverse_sqrt": g_inverse_sqrt,
+            "orthonormal": [
                 {
-                    "numerical": G_tilde_p,
+                    "numerical": G_hat_p,
                     "extraction_rule": extraction_rule,
                     "embedding_rule": embedding_rule,
                 }
-                for G_tilde_p in G_tilde
+                for G_hat_p in G_hat
             ],
         }
 
@@ -181,9 +198,11 @@ def get_orthonormal_Q(
     For each weight ``j``, the exact symmetry-adapted embedding tensors ``Q`` are
     obtained from :func:`get_G_H_S_of_j`. Their Gram matrix is evaluated as
 
-    ``g_Q[p, q] = (Q[p] \odot^(n+j) Q[q]) / (2*j + 1)``.
+    $$
+    g_{pq} = \frac{\mathbf{Q}^p \odot^{n+\ell} \mathbf{Q}^q}{2\ell + 1}
+    $$
 
-    The returned tensors ``Q_tilde = g_Q^(-1/2) Q`` are orthonormal and can be used
+    The returned $\widehat{\mathbf{Q}} = \mathbf{g}^{-1/2}\mathbf{Q}$ are orthonormal and can be used
     for both extraction from and embedding into the target symmetry class.
 
     Args:
@@ -195,11 +214,11 @@ def get_orthonormal_Q(
             numerical tensors.
 
     Returns:
-        A dictionary keyed by weight. Each value contains the exact ``Q`` tensors,
-        their numerical Gram matrix ``g_Q``, its symmetric inverse square root
-        ``g_Q_inverse_sqrt``, and the numerical orthonormal tensors ``Q_tilde``.
-        Every ``Q_tilde`` entry provides separate einsum rules for extraction and
-        embedding because the same numerical tensor performs both operations.
+        A dictionary keyed by weight, with the exact symmetry-adapted operators,
+        their Gram matrix and its symmetric inverse square root, and the
+        orthonormal operators built from them. Each orthonormal entry carries an
+        einsum rule for extraction and one for embedding, since the same tensor
+        performs both.
     """
     out = {}
     for j in range(n + 1):
@@ -207,25 +226,23 @@ def get_orthonormal_Q(
         if len(Q) == 0:
             continue
 
-        Q_numerical, g_Q, g_Q_inverse_sqrt, Q_tilde = orthonormalize_mappings(
-            Q, j, n, dtype
-        )
+        Q_numerical, g, g_inverse_sqrt, Q_hat = orthonormalize_mappings(Q, j, n, dtype)
 
         extraction_rule, embedding_rule = _orthonormal_mapping_rules(j, n)
         out[j] = {
-            "Q": [
+            "embedding": [
                 {"symbolic": str(Q_p), "numerical": Q_p_numerical}
                 for Q_p, Q_p_numerical in zip(Q, Q_numerical)
             ],
-            "g_Q": g_Q,
-            "g_Q_inverse_sqrt": g_Q_inverse_sqrt,
-            "Q_tilde": [
+            "gram": g,
+            "gram_inverse_sqrt": g_inverse_sqrt,
+            "orthonormal": [
                 {
-                    "numerical": Q_tilde_p,
+                    "numerical": Q_hat_p,
                     "extraction_rule": extraction_rule,
                     "embedding_rule": embedding_rule,
                 }
-                for Q_tilde_p in Q_tilde
+                for Q_hat_p in Q_hat
             ],
         }
 
@@ -263,11 +280,11 @@ def get_G_H_S_of_j(
             use does not matter).
 
     Returns:
-        G: independent G tensors of different seniority p
+        G: independent embedding operators, one per channel p
         H: H corresponding to G
         S: S corresponding to G and H
-        g: g_pq matrix
-        h: h_pq matrix
+        g: Gram matrix
+        h: Inverse Gram matrix
     """
     # Get independent G and H tensors for a general tensor
     ind_G, ind_H, g, h = get_G_H_of_j(j, n)
@@ -278,9 +295,9 @@ def get_G_H_S_of_j(
         if not ind_G:
             return [], [], [], [], []
 
-        g = get_g_matrix(j, n, ind_G)
+        g = get_gram_matrix(j, n, ind_G)
         h = matrix_inverse(g)
-        ind_H = get_H(h, ind_G)
+        ind_H = get_extraction_operators(h, ind_G)
 
     # Get S tensors
     G = [simplify_linear_combination(G) for G in ind_G]
@@ -312,8 +329,8 @@ def get_G_H_of_j(
     Returns:
         G: independent G tensors for ordinary tensor
         H: independent H tensors for ordinary tensor, corresponding to G
-        g: g_pq matrix
-        h: h_pq matrix
+        g: Gram matrix
+        h: Inverse Gram matrix
     """
     # No isotropic rank-one mapping exists from a scalar natural tensor.
     if n == 1 and j == 0:
@@ -325,7 +342,7 @@ def get_G_H_of_j(
     else:
         all_G = get_G_odd(j, n)
 
-    # WARNING, should not simplify G using the below function, as get_g_matrix() below
+    # WARNING, should not simplify G using the below function, as get_gram_matrix() below
     # is set up to work with the original G tensors.
     # all_G = [simplify_linear_combination(g) for g in all_G]
 
@@ -339,14 +356,14 @@ def get_G_H_of_j(
     # Get linearly independent G tensors
     ind_G = [all_G[i] for i in independent_indices]
 
-    # Get g_pq matrix for independent G
-    g = get_g_matrix(j, n, ind_G)
+    # Gram matrix of the independent embedding operators
+    g = get_gram_matrix(j, n, ind_G)
 
-    # Get h_pq matrix
+    # and its exact inverse
     h = matrix_inverse(g)
 
     # Get H tensors, corresponding to independent G
-    ind_H = get_H(h, ind_G)
+    ind_H = get_extraction_operators(h, ind_G)
 
     return ind_G, ind_H, g, h
 
@@ -383,46 +400,54 @@ def get_G_H_S_rules_and_values(
 
     """
 
-    out_j = {"G": [], "H": [], "S": []}
+    out_j = {"embedding": [], "extraction": [], "decomposition": []}
 
     if include_g:
-        out_j["g_pq"] = {"symbolic": fraction_matrix(g), "numerical": float_matrix(g)}
+        out_j["gram"] = {"symbolic": fraction_matrix(g), "numerical": float_matrix(g)}
 
     if include_h:
-        out_j["h_pq"] = {"symbolic": fraction_matrix(h), "numerical": float_matrix(h)}
+        out_j["gram_inverse"] = {
+            "symbolic": fraction_matrix(h),
+            "numerical": float_matrix(h),
+        }
 
-    # loop over seniority p
-    for G_p, H_p, S_p in zip(G, H, S):
+    for G_p, G_tilde_p, S_p in zip(G, H, S):
         lower = letter_index(j)
         upper = letter_index(n, upper_case=True)
         upper2 = letter_index(n, start=n, upper_case=True)
 
-        # G
-        out_j["G"].append(
+        out_j["embedding"].append(
             {
                 "symbolic": str(G_p),
                 "rule": (f"{upper}{lower},...{lower}->...{upper}"),
             },
         )
         if numerical:
-            out_j["G"][-1]["numerical"] = evaluate_tensors(G_p, mode="G")
+            out_j["embedding"][-1]["numerical"] = evaluate_tensors(
+                G_p, mode="embedding"
+            )
 
-        # H
-        out_j["H"].append(
-            {"symbolic": str(H_p), "rule": f"{lower}{upper},...{upper}->...{lower}"}
+        out_j["extraction"].append(
+            {
+                "symbolic": str(G_tilde_p),
+                "rule": f"{lower}{upper},...{upper}->...{lower}",
+            }
         )
         if numerical:
-            out_j["H"][-1]["numerical"] = evaluate_tensors(H_p, mode="H")
+            out_j["extraction"][-1]["numerical"] = evaluate_tensors(
+                G_tilde_p, mode="extraction"
+            )
 
-        # S
-        out_j["S"].append(
+        out_j["decomposition"].append(
             {
                 "symbolic": str(S_p),
                 "rule": f"{upper}{upper2},...{upper2}->...{upper}",
             }
         )
         if numerical:
-            out_j["S"][-1]["numerical"] = evaluate_tensors(S_p, mode="S")
+            out_j["decomposition"][-1]["numerical"] = evaluate_tensors(
+                S_p, mode="decomposition"
+            )
 
     return out_j
 
@@ -494,13 +519,7 @@ def _get_symmetry_adapted_mappings(
     coefficients = matrix_null_space(constraints, len(mappings))
     adapted = []
     for vector in coefficients:
-        mapping = sum(
-            (
-                coefficient * candidate
-                for coefficient, candidate in zip(vector, mappings)
-            ),
-            LinearCombination(),
-        )
+        mapping = sum((c * G for c, G in zip(vector, mappings)), LinearCombination())
         adapted.append(simplify_linear_combination(mapping))
 
     return adapted
@@ -516,14 +535,21 @@ def _get_symmetry_action_matrix(
     r"""Evaluate the action of one index permutation on the mapping basis.
 
     If ``P G[q] = sum_p M[p, q] G[p]``, duality gives
-    ``M[p, q] = (G_dual[p] \odot^(rank+weight) P G[q]) / (2*weight + 1)``.
+    $$
+    M^a_{pq} = \frac{\widetilde{\mathbf{G}}^p \odot^{n+\ell}
+        (\Pi_a \mathbf{G}^q)}{2\ell + 1}
+    $$
 
     That form is not the one evaluated. A dual is a combination of all ``N``
     mappings, so contracting one costs ``N`` times a plain contraction, and the
     matrix costs ``N^3``. Expanding the dual moves the inverse Gram matrix
     outside the contraction,
 
-        ``M = g^-1 O``,  ``O[p, q] = (G[p] \odot^(rank+weight) P G[q]) / (2w+1)``
+    $$
+    \mathbf{M}^a = \mathbf{g}^{-1} \mathbf{O},
+    \qquad
+    O_{pq} = \frac{\mathbf{G}^p \odot^{n+\ell} (\Pi_a \mathbf{G}^q)}{2\ell + 1}
+    $$
 
     which is the same matrix from contractions between single mappings. At rank
     six and weight three that is the difference between eighteen minutes and
@@ -552,7 +578,7 @@ def _get_symmetry_action_matrix(
     permuted = [relabel_indices_2(mapping, relabeling) for mapping in mappings]
 
     overlap = [
-        [get_g_pq(weight, rank, mapping, image) for image in permuted]
+        [get_gram_entry(weight, rank, mapping, image) for image in permuted]
         for mapping in mappings
     ]
 

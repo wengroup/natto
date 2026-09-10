@@ -111,9 +111,9 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str, dtype: torch.dtype = None) ->
     right = "".join(delta_rules + epsilon_rules)
     lower = sorted([c for c in right if c.islower()])
     upper = sorted([c for c in right if c.isupper()])
-    if mode == "G" or mode == "S":
+    if mode == "embedding" or mode == "decomposition":
         right = "".join(upper + lower)
-    elif mode == "H":
+    elif mode == "extraction":
         right = "".join(lower + upper)
     else:
         raise ValueError(f"Unknown mode: {mode}")
@@ -166,7 +166,7 @@ def extract(H: LinearCombination, T: Tensor) -> Tensor:
     # Get numerical values of H
 
     H = simplify_linear_combination(H)
-    H_num = evaluate_tensors(H, mode="H")
+    H_num = evaluate_tensors(H, mode="extraction")
 
     n = T.dim()
     j = H_num.dim() - n
@@ -199,7 +199,7 @@ def embed(G: LinearCombination, X: Tensor) -> Tensor:
     """
     # Get numerical values of G
     G = simplify_linear_combination(G)
-    G_num = evaluate_tensors(G, mode="G")
+    G_num = evaluate_tensors(G, mode="embedding")
 
     j = X.dim()
     n = G_num.dim() - j

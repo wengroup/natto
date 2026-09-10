@@ -66,11 +66,12 @@ The data is organized in the following way:
 These projectors decompose a physical Cartesian tensor (e.g. polarizability, elasticity)
 into its natural tensor components and reconstruct it back. Specifically:
 
-- `H` extracts a natural tensor component from the physical tensor.
-- `G` embeds a natural tensor component back into the physical tensor space.
-- `S` is the normalization projector.
+- `extraction` extracts a natural tensor component from the physical tensor.
+- `embedding` embeds a natural tensor component back into the physical tensor space.
+- `projector` is their composition, taking the physical tensor straight to its
+  weight-`l`, channel-`p` part without forming the natural tensor.
 
-The file contains the symbolic and numerical values of `G`, `H`, and `S` for each
+The file contains the symbolic and numerical values of the three for each
 physical tensor and each natural tensor component (labeled by its weight).
 
 The data is organized in the following way:
@@ -80,12 +81,12 @@ The data is organized in the following way:
      "symmetry": symmetry of the physical tensor,
      "GHS":
         weight:
-            {"G": [{"symbolic": symbolic expression for the projector G,
-                   "numerical": numerical values of the projector G }],
-             "H": [{"symbolic": symbolic expression for the projector H,
-                   "numerical": numerical values of the projector H }],
-             "S": [{"symbolic": symbolic expression for the projector S,]
-                   "numerical": numerical values of the projector S }]
+            {"embedding": [{"symbolic": symbolic expression,
+                   "numerical": numerical values }],
+             "extraction": [{"symbolic": symbolic expression,
+                   "numerical": numerical values }],
+             "decomposition": [{"symbolic": symbolic expression,
+                   "numerical": numerical values }]
             }
     }
 }

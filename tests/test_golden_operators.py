@@ -101,10 +101,10 @@ def dual_pair_content(rank: int, symmetry: str | None) -> dict:
     content = {}
     for weight, per_weight in output.items():
         content[weight] = {
-            "gram": per_weight["g_pq"]["symbolic"],
-            "gram_inverse": per_weight["h_pq"]["symbolic"],
-            "embedding": [_operator(entry) for entry in per_weight["G"]],
-            "extraction": [_operator(entry) for entry in per_weight["H"]],
+            "gram": per_weight["gram"]["symbolic"],
+            "gram_inverse": per_weight["gram_inverse"]["symbolic"],
+            "embedding": [_operator(entry) for entry in per_weight["embedding"]],
+            "extraction": [_operator(entry) for entry in per_weight["extraction"]],
         }
 
     return content
@@ -129,15 +129,15 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     content = {}
     for weight, per_weight in output.items():
         content[weight] = {
-            "gram": per_weight["g_Q"],
-            "gram_inverse_sqrt": per_weight["g_Q_inverse_sqrt"],
+            "gram": per_weight["gram"],
+            "gram_inverse_sqrt": per_weight["gram_inverse_sqrt"],
             "orthonormal": [
                 {
                     "extraction_rule": entry["extraction_rule"],
                     "embedding_rule": entry["embedding_rule"],
                     "numerical": fingerprint(entry["numerical"]),
                 }
-                for entry in per_weight["Q_tilde"]
+                for entry in per_weight["orthonormal"]
             ],
         }
 
@@ -183,13 +183,13 @@ def rank_six_content(symmetry: str | None) -> dict:
             "gram_inverse": fraction_matrix(gram_inverse),
             "embedding": [
                 _rank_six_operator(
-                    operator, "G", f"{upper}{lower},...{lower}->...{upper}"
+                    operator, "embedding", f"{upper}{lower},...{lower}->...{upper}"
                 )
                 for operator in embedding
             ],
             "extraction": [
                 _rank_six_operator(
-                    operator, "H", f"{lower}{upper},...{upper}->...{lower}"
+                    operator, "extraction", f"{lower}{upper},...{upper}->...{lower}"
                 )
                 for operator in extraction
             ],
