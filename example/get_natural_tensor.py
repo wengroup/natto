@@ -4,7 +4,7 @@ Example to convert ordinary tensor and natural tensor back and forth.
 
 import torch
 
-from natto.GHS import get_G_H_S
+from natto.mappings import get_G_H_S
 from natto.sym import symmetrize
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
@@ -29,10 +29,10 @@ def convert(rank=3, symmetry: str = None):
     if symmetry is not None:
         T = symmetrize(T, symmetry)
 
-    GHS = get_G_H_S(rank, symmetry)
+    output = get_G_H_S(rank, symmetry)
 
     all_T_prime = []
-    for j, out_j in GHS.items():
+    for j, out_j in output.items():
         for p, (extraction, embedding, decomposition) in enumerate(
             zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
         ):

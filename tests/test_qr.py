@@ -270,7 +270,7 @@ def test_more_tensors_than_components_unpivoted_is_wrong():
 #
 
 # Coefficient matrix of the j=1 sector of the photoelastic class `(ij)kl`, recorded
-# from the numerical grouping route that `GHS` used to carry. It hits both failure
+# from the numerical grouping route that the reduction used to carry. It hits both failure
 # modes at once: the first row is identically zero, and there are 6 rows of only 3
 # components each, so the rank-3 subset needs the last row.
 PHOTOELASTIC_J1_U = [

@@ -19,24 +19,26 @@ The example below converts a rank-2 Cartesian tensor into its natural tensor com
 
 ```python
 import torch
-from natto.GHS import get_G_H_S
+from natto.mappings import get_G_H_S
 
 # Create a rank-2 tensor
 T = torch.arange(9, dtype=torch.float).reshape(3, 3)
 
-# Get the G, H, S matrices for the decomposition
+# Get the operators for the reduction
 rank = 2
-symmetry=None # `None` means no additional symmetry; `ij=ji` means symmetric tensors... 
-GHS = get_G_H_S(rank, symmetry)
+symmetry=None # `None` means no additional symmetry; `ij=ji` means symmetric tensors...
+output = get_G_H_S(rank, symmetry)
 
 all_T_prime = []
-for j, out_j in GHS.items():
-    for p, (H, G, S) in enumerate(zip(out_j["H"], out_j["G"], out_j["S"])):
-        # Extract natural tensor component X = H T  (symmetric traceless)
-        X = torch.einsum(H["rule"], H["numerical"], T)
+for j, out_j in output.items():
+    for p, (extraction, embedding) in enumerate(
+        zip(out_j["extraction"], out_j["embedding"])
+    ):
+        # Extract the natural tensor of this weight and channel (symmetric traceless)
+        X = torch.einsum(extraction["rule"], extraction["numerical"], T)
 
-        # Embed back: T' = G X  (contribution to T from angular momentum j)
-        T_prime = torch.einsum(G["rule"], G["numerical"], X)
+        # Embed it back: the weight-j, channel-p part of T
+        T_prime = torch.einsum(embedding["rule"], embedding["numerical"], X)
         all_T_prime.append(T_prime)
 
         print('-'*10 + f"j={j}, p={p}"+'-'*10)

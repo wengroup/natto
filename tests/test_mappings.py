@@ -5,10 +5,10 @@ from typing import NamedTuple, Optional
 import pytest
 import torch
 
-import natto.GHS
+import natto.mappings
 from natto.EGH import get_gram_matrix
 from natto.evaluate import evaluate_tensors
-from natto.GHS import get_G_H_S, get_G_H_S_of_j
+from natto.mappings import get_G_H_S, get_G_H_S_of_j
 from natto.qr import find_independent_tensors
 from natto.sym import symmetrize
 
@@ -93,15 +93,15 @@ def get_tensor_class_params(
 
 @contextlib.contextmanager
 def selection_scheme(method: str):
-    """Make `GHS` select independent tensors with the given `natto.qr` scheme."""
-    original = natto.GHS.find_independent_tensors
-    natto.GHS.find_independent_tensors = functools.partial(
+    """Make `mappings` select independent tensors with the given `natto.qr` scheme."""
+    original = natto.mappings.find_independent_tensors
+    natto.mappings.find_independent_tensors = functools.partial(
         find_independent_tensors, method=method
     )
     try:
         yield
     finally:
-        natto.GHS.find_independent_tensors = original
+        natto.mappings.find_independent_tensors = original
 
 
 @functools.lru_cache(maxsize=None)

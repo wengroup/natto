@@ -13,10 +13,10 @@ symbolic form and run to hundreds of kilobytes per class; `golden.fingerprint`
 guards the evaluation instead.
 
 `S` is not snapshotted. It is the composition `G` and the extraction operator,
-carrying nothing they do not, and `test_GHS.test_get_G_H_S` already asserts
+carrying nothing they do not, and `test_mappings.test_get_G_H_S` already asserts
 `G (H T) == S T` for every class, so pinning the two pins `S` with them.
 
-The classes come from `test_GHS.PHYSICAL_TENSOR_CLASSES` rather than being
+The classes come from `test_mappings.PHYSICAL_TENSOR_CLASSES` rather than being
 restated here, so the table stays one statement about the physics.
 
 Rank six is snapshotted too, since it carries the paper's new result, but only
@@ -35,9 +35,10 @@ from pathlib import Path
 import pytest
 
 from natto.evaluate import evaluate_tensors
-from natto.GHS import get_G_H_of_j, get_G_H_S_of_j, get_orthonormal_Q
+from natto.mappings import get_G_H_of_j, get_G_H_S_of_j
 from natto.matrix import fraction_matrix
 from natto.ops import simplify_linear_combination
+from natto.orthonormal import get_orthonormal_Q
 from natto.utils import letter_index
 from tests.golden import (
     LOCAL_SNAPSHOT_DIR,
@@ -46,7 +47,7 @@ from tests.golden import (
     regolding,
     snapshot_path,
 )
-from tests.test_GHS import get_G_H_S_cached, get_tensor_class_params
+from tests.test_mappings import get_G_H_S_cached, get_tensor_class_params
 
 #: `LinearCombination.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "

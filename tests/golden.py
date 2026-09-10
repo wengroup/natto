@@ -1,6 +1,6 @@
 """Golden snapshots of operator content.
 
-The existing tests pin the *relations* the paper asserts: `test_GHS.py` checks
+The existing tests pin the *relations* the paper asserts: `test_mappings.py` checks
 multiplicities, exact Gram matrices and reconstruction, and `test_orthonormal.py`
 checks self-duality and orthonormality. None of them pins the *content* of the
 operators, meaning the entries themselves.
