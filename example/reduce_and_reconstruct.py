@@ -1,5 +1,18 @@
-"""
-Example to convert ordinary tensor and natural tensor back and forth.
+"""Reduce a Cartesian tensor into natural tensors, then rebuild it.
+
+This is the round trip the package exists for. For a Cartesian tensor `T` of
+some rank and intrinsic symmetry, the extraction operator of each weight and
+channel gives a natural tensor `X` -- symmetric and traceless -- and the
+embedding operator puts it back into the Cartesian space as `T'`, the part of
+`T` that this weight and channel accounts for. Summing those parts over every
+weight and channel returns `T`.
+
+The example also shows the third operator at work: `decomposition` is the
+composition of the other two, taking `T` straight to `T'` without forming `X`,
+which is what you want when the natural tensor itself is not of interest.
+
+Change the `rank` and `symmetry` arguments at the bottom to try other classes;
+`symmetry=None` means a tensor with no assumed symmetry.
 """
 
 import torch
@@ -9,17 +22,13 @@ from natto.sym import symmetrize
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 
-def convert(rank=3, symmetry: str = None):
-    """Converting between ordinary tensor and natural tensor.
-
-    For an ordinary tensor T, convert it to natural tensors X (which will be
-    symmetric traceless), embed each natural tensor X to be in the original space T' (
-    which is not symmetric traceless).
-    Or, T' can be directly obtained by applying S to T.
+def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
+    """Reduce a random tensor of this class, then rebuild it from the parts.
 
     Args:
-        rank: rank of the tensor T
-        symmetry: symmetry of the tensor T, e.g. "ij=ji" for a rank-2 tensor.
+        rank: rank of the tensor T.
+        symmetry: intrinsic symmetry of T, e.g. "ij=ji" for a symmetric rank-2
+            tensor. None for a tensor with no assumed symmetry.
     """
 
     torch.manual_seed(35)
@@ -67,6 +76,6 @@ def convert(rank=3, symmetry: str = None):
 
 
 if __name__ == "__main__":
-    convert(rank=2)
+    reduce_and_reconstruct(rank=2)
     print("=" * 40)
-    convert(rank=3)
+    reduce_and_reconstruct(rank=3)

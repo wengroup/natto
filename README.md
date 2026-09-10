@@ -15,50 +15,113 @@ pip install -e .
 
 ## Example
 
-The example below converts a rank-2 Cartesian tensor into its natural tensor components and reconstructs the original tensor.
+The operators depend only on a tensor's rank and its intrinsic symmetry, not on
+any particular tensor, so they are built once and then applied to every tensor
+of that class. Each arrives with the einsum rule that applies it.
 
 ```python
 import torch
+
 from natto.mappings import get_reduction
+from natto.sym import symmetrize
 
-# Create a rank-2 tensor
-T = torch.arange(9, dtype=torch.float).reshape(3, 3)
+# The elastic tensor: rank 4, minor and major symmetry.
+operators = get_reduction(rank=4, symmetry="ijkl=jikl=klij")
 
-# Get the operators for the reduction
-rank = 2
-symmetry=None # `None` means no additional symmetry; `ij=ji` means symmetric tensors...
-output = get_reduction(rank, symmetry)
+# {0: 2, 2: 2, 4: 1} -- two channels of weight 0, two of weight 2, one of weight 4
+print({weight: len(w["embedding"]) for weight, w in operators.items()})
 
-all_T_prime = []
-for j, out_j in output.items():
-    for p, (extraction, embedding) in enumerate(
-        zip(out_j["extraction"], out_j["embedding"])
-    ):
-        # Extract the natural tensor of this weight and channel (symmetric traceless)
+# a random tensor of that class; averaging by hand does not work, since each
+# averaging step breaks the symmetry the previous one established
+T = symmetrize(torch.randn(3, 3, 3, 3), "ijkl=jikl=klij")
+
+parts = []
+for weight, per_weight in operators.items():
+    for embedding, extraction in zip(per_weight["embedding"], per_weight["extraction"]):
+        # X is the natural tensor of this weight and channel: symmetric and traceless
         X = torch.einsum(extraction["rule"], extraction["numerical"], T)
 
-        # Embed it back: the weight-j, channel-p part of T
-        T_prime = torch.einsum(embedding["rule"], embedding["numerical"], X)
-        all_T_prime.append(T_prime)
+        # and this is the part of T that it accounts for
+        parts.append(torch.einsum(embedding["rule"], embedding["numerical"], X))
 
-        print('-'*10 + f"j={j}, p={p}"+'-'*10)
-        print(f"X=\n{X}")
-        print(f"T_prime=\n{T_prime}")
-
-# Sum of all embedded components should reconstruct the original tensor
-T_sum = torch.stack(all_T_prime).sum(dim=0)
-print(f"Original T=\n{T}")
-print(f"Sum of T_prime=\n{T_sum}")
-
-assert torch.allclose(T_sum, T, atol=1e-6)
+# the parts sum back to the tensor they came from
+assert torch.allclose(torch.stack(parts).sum(dim=0), T, atol=1e-5)
 ```
 
-See [`example/get_natural_tensor.py`](example/get_natural_tensor.py) for a complete working example.
+Every rule carries a leading ellipsis, so a batch of tensors of shape
+`(..., 3, 3, 3, 3)` works exactly as one does.
 
-## Generating projectors
+Each operator also carries its exact symbolic form under `"symbolic"`, as a
+combination of Kronecker deltas and Levi-Civita symbols with rational
+coefficients. Nothing in the construction is numerical until it is evaluated.
 
-`natto` can be used to generate three types of projectors: unit vector projectors, tensor product projectors, and decomposition/reconstruction projectors for physical Cartesian tensors.
-See the `generate_*.py` scripts in the [`example/`](example/) directory and [`example/README.md`](example/README.md) for details.
+See [`example/reduce_and_reconstruct.py`](example/reduce_and_reconstruct.py)
+for a complete working example.
+
+### An orthonormal basis
+
+`basis="orthonormal"` returns the mappings rotated so that they are orthonormal
+under the Cartesian inner product. Those are self-dual: one array both extracts
+and embeds, and only the einsum rule tells the two apart.
+
+```python
+operators = get_reduction(rank=2, symmetry="ij=ji", basis="orthonormal")
+
+per_weight = operators[2]
+embedding, extraction = per_weight["embedding"][0], per_weight["extraction"][0]
+assert embedding["numerical"] is extraction["numerical"]
+```
+
+The rotation is the inverse square root of the Gram matrix, which is generally
+irrational, so these operators have no symbolic form.
+
+### Coupling two natural tensors
+
+`get_coupling_operator` builds the Cartesian counterpart of a Clebsch-Gordan
+coefficient, taking natural tensors of weights `l1` and `l2` to the weight-`l3`
+part of their product.
+
+```python
+from natto.coupling import get_coupling_operator
+
+# two vectors are natural tensors of weight 1; couple them to weight 2
+K, rule = get_coupling_operator(l1=1, l2=1, l3=2)
+
+X, Y = torch.randn(3), torch.randn(3)
+Z = torch.einsum(rule, K, X, Y)  # shape (3, 3), symmetric and traceless
+
+assert torch.allclose(Z, Z.T, atol=1e-6)
+assert abs(Z.trace()) < 1e-6
+```
+
+### Cartesian harmonics
+
+`get_harmonic_operator` builds the operator taking the polyadic of a unit vector
+to the Cartesian harmonic of a given weight, the Cartesian counterpart of a
+spherical harmonic.
+
+```python
+from natto.harmonics import get_harmonic_operator
+
+H, rule = get_harmonic_operator(weight=2)
+
+a = torch.randn(3)
+a = a / a.norm()
+V = torch.einsum(rule, H, a, a)  # symmetric and traceless
+
+# contracting with a second direction gives the Legendre polynomial of the angle
+b = torch.randn(3)
+b = b / b.norm()
+value = torch.einsum("ab,a,b->", V, b, b)
+assert torch.allclose(value, torch.special.legendre_polynomial_p(a @ b, 2), atol=1e-6)
+```
+
+## Generating operator files
+
+`natto` can generate the coupling operators and the reduction operators for
+physical Cartesian tensors, as YAML files.
+See the `generate_*.py` scripts in the [`example/`](example/) directory and
+[`example/README.md`](example/README.md) for details.
 
 
 ## Citation

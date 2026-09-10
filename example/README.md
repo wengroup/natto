@@ -1,46 +1,47 @@
-# Generating Projector YAML Files
+# Generating Operator YAML Files
 
-`natto` can generate three types of projectors, each stored as a YAML file.
+`natto` can generate three sets of operators, each stored as a YAML file.
 The `generate_*.py` scripts in this directory generate the corresponding YAML files:
 
-- `generate_tensor_product_projector.py` generates `tensor_product_projector.yaml`
+- `generate_coupling_operators.py` generates `coupling_operators.yaml`
 - `generate_reduction_operators.py` generates `reduction_operators.yaml`
-- `generate_unit_vector_projector.py` generates `unit_vector_projector.yaml`
+- `generate_harmonic_operators.py` generates `harmonic_operators.yaml`
 
 Run a script directly to generate the corresponding YAML file, e.g.:
 
 ```bash
-python generate_tensor_product_projector.py
+python generate_coupling_operators.py
 ```
 
 Each script allows configuring which ranks or tensor types to include; edit the
 parameters at the top of the script before running.
 
-The three projector types are described below.
+The three are described below.
 
 
-# unit_vector_projector.yaml
+# harmonic_operators.yaml
 
-This projector `H` maps a unit vector to a natural tensor of a given rank, i.e. it
-extracts the rank-l irreducible component from the outer products of a unit vector.
-The file contains the symbolic and numerical values of `H` along with the einsum rule
-to apply it.
+The harmonic operator `H` takes the polyadic of a unit vector to the Cartesian
+harmonic of a given weight, the Cartesian counterpart of a spherical harmonic.
+The file contains the symbolic and numerical values of `H` along with the einsum
+rule to apply it.
 
 The data is organized in the following way:
 
-{rank-normalization:
-    {"H_symbolic": symbolic expression for the projector H,
-    "H_numerical": numerical values of the projector H,
-    "rule": einsum rule to apply the projector H to get the natural tensor from the unit vector
+{weight-normalization:
+    {"symbolic": symbolic expression for the harmonic operator H,
+    "numerical": numerical values of H,
+    "rule": einsum rule to apply H to the copies of a unit vector
     }
 }
 
-- In "rank-normalization", rank is a positive integer that indicates the rank of the
-  natural tensor to be constructed, and normalization can be `none` or `unity`,
-  indicating whether the projector H is normalized or not.
+- In "weight-normalization", weight is the weight of the harmonic, and
+  normalization can be `none` or `unity`. Under `unity` the weight-fold
+  contraction of the harmonic with a unit vector is the Legendre polynomial of
+  the angle between the two.
 
 
-# tensor_product_projector.yaml
+# coupling_operators.yaml
 
 The coupling operator `K` performs the Clebsch-Gordan-like coupling of two natural
 tensors of weights l1 and l2 into a new natural tensor of weight l3.
@@ -63,7 +64,7 @@ The data is organized in the following way:
 
 # reduction_operators.yaml
 
-These projectors decompose a physical Cartesian tensor (e.g. polarizability, elasticity)
+These operators decompose a physical Cartesian tensor (e.g. polarizability, elasticity)
 into its natural tensor components and reconstruct it back. Specifically:
 
 - `extraction` extracts a natural tensor component from the physical tensor.

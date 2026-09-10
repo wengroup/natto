@@ -32,6 +32,8 @@ the numerical rotation to a self-dual basis, in `orthonormal`.
 
 from fractions import Fraction
 
+import torch
+
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
 from natto.matrix import float_matrix, fraction_matrix, matrix_inverse
@@ -42,6 +44,7 @@ from natto.operators import (
     get_gram_matrix,
     get_S,
 )
+from natto.orthonormal import orthonormalize_mappings
 from natto.qr import find_independent_tensors
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_random_natural_tensor
@@ -49,8 +52,17 @@ from natto.symmetry_adapted import get_symmetry_adapted_mappings
 from natto.utils import letter_index
 
 
-def get_reduction(rank: int, symmetry: str = None, numerical: bool = True) -> dict:
+def get_reduction(
+    rank: int,
+    symmetry: str = None,
+    basis: str = "dual",
+    numerical: bool = True,
+    dtype: torch.dtype = None,
+) -> dict:
     """Reduce a Cartesian tensor space into its irreducible parts.
+
+    The operators depend only on the rank and the symmetry, not on any
+    particular tensor, so one call serves every tensor of that class.
 
     Args:
         rank: Rank of the Cartesian tensor.
@@ -65,14 +77,34 @@ def get_reduction(rank: int, symmetry: str = None, numerical: bool = True) -> di
               ij and kl), e.g. the elastic tensor.
             The number of distinct letters gives the rank; which letters are used
             does not matter.
+        basis: `dual` returns the mappings and the duals that extract through
+            them, exactly, with rational coefficients. `orthonormal` returns
+            the mappings of Eq. (26) instead, rotated by the inverse square root
+            of their Gram matrix. Those are self-dual, so `embedding` and
+            `extraction` carry the same array and differ only in the einsum rule
+            applying it; the rotation is irrational, so they have no symbolic
+            form.
         numerical: Whether to evaluate the operators as well as building them
-            symbolically.
+            symbolically. Ignored for `basis="orthonormal"`, which is numerical
+            by construction.
+        dtype: Floating-point dtype of the evaluated operators, the torch default
+            if not given. The orthonormal basis is computed in double precision
+            whatever this is, and cast at the end, since it rests on an
+            eigendecomposition.
 
     Returns:
         The embedding, extraction and decomposition operators keyed by weight,
-        with the Gram matrix and its inverse. A weight the symmetry extinguishes
-        is absent rather than empty.
+        each with the einsum rule that applies it. A weight the symmetry
+        extinguishes is absent rather than empty. The Gram matrix comes with its
+        inverse in the dual basis and with its inverse square root in the
+        orthonormal one.
+
+    Raises:
+        ValueError: If `basis` is neither `dual` nor `orthonormal`.
     """
+    if basis not in ("dual", "orthonormal"):
+        raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")
+
     out = {}
     for weight in range(rank + 1):
         G, G_tilde, S, gram, gram_inverse = get_reduction_of_weight(
@@ -83,20 +115,66 @@ def get_reduction(rank: int, symmetry: str = None, numerical: bool = True) -> di
         if len(G) == 0:
             continue
 
-        out[weight] = assemble_operator_entries(
-            weight,
-            rank,
-            G,
-            G_tilde,
-            S,
-            gram,
-            gram_inverse,
-            numerical,
-            include_gram=True,
-            include_gram_inverse=True,
-        )
+        if basis == "orthonormal":
+            out[weight] = _orthonormal_entries(weight, rank, G, dtype)
+        else:
+            out[weight] = assemble_operator_entries(
+                weight,
+                rank,
+                G,
+                G_tilde,
+                S,
+                gram,
+                gram_inverse,
+                numerical,
+                include_gram=True,
+                include_gram_inverse=True,
+                dtype=dtype,
+            )
 
     return out
+
+
+def _orthonormal_entries(
+    weight: int, rank: int, G: list[LinearCombination], dtype: torch.dtype = None
+) -> dict:
+    """Pack one weight's operators in the self-dual basis of Eq. (26).
+
+    One array both extracts and embeds, so it appears under both keys and only
+    the einsum rule tells them apart. There is no symbolic form: the inverse
+    square root of a rational Gram matrix is generally irrational.
+    """
+    _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, weight, rank)
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+    gram = gram.to(dtype)
+    gram_inverse_sqrt = gram_inverse_sqrt.to(dtype)
+    G_hat = G_hat.to(dtype)
+
+    lower = letter_index(weight)
+    upper = letter_index(rank, upper_case=True)
+    upper2 = letter_index(rank, start=rank, upper_case=True)
+
+    rules = {
+        "embedding": f"{upper}{lower},...{lower}->...{upper}",
+        "extraction": f"{upper}{lower},...{upper}->...{lower}",
+        # the decomposition is not a single array here; applying it means
+        # extracting and embedding back through the same operator
+        "decomposition": f"{upper}{lower},{upper2}{lower},...{upper2}->...{upper}",
+    }
+
+    # One array per channel, shared between the keys rather than copied into
+    # each: that it is the same operator is the point of this basis.
+    operators = list(G_hat)
+
+    entries = {"gram": gram, "gram_inverse_sqrt": gram_inverse_sqrt}
+    for key, rule in rules.items():
+        entries[key] = [
+            {"symbolic": None, "rule": rule, "numerical": operator}
+            for operator in operators
+        ]
+
+    return entries
 
 
 def get_reduction_of_weight(
@@ -211,6 +289,7 @@ def assemble_operator_entries(
     numerical: bool = True,
     include_gram: bool = True,
     include_gram_inverse: bool = True,
+    dtype: torch.dtype = None,
 ) -> dict:
     """Pack the operators of one weight into the form the package publishes.
 
@@ -230,6 +309,7 @@ def assemble_operator_entries(
             symbolically.
         include_gram: Whether to report the Gram matrix.
         include_gram_inverse: Whether to report its inverse.
+        dtype: Floating-point dtype of the evaluated operators.
 
     Returns:
         The operators under the keys `embedding`, `extraction` and
@@ -259,7 +339,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["embedding"][-1]["numerical"] = evaluate_tensors(
-                G_p, mode="embedding"
+                G_p, mode="embedding", dtype=dtype
             )
 
         out_weight["extraction"].append(
@@ -270,7 +350,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["extraction"][-1]["numerical"] = evaluate_tensors(
-                G_tilde_p, mode="extraction"
+                G_tilde_p, mode="extraction", dtype=dtype
             )
 
         out_weight["decomposition"].append(
@@ -278,7 +358,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["decomposition"][-1]["numerical"] = evaluate_tensors(
-                S_p, mode="decomposition"
+                S_p, mode="decomposition", dtype=dtype
             )
 
     return out_weight
