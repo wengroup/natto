@@ -1,3 +1,17 @@
+"""Precompute the reduction operators of named physical tensor classes.
+
+Writes `reduction_operators.yaml` holding, for each class below, the embedding,
+extraction and decomposition operators of every weight and channel: the exact
+symbolic form of each, the einsum rule that applies it, and its evaluated
+values. The operators depend only on rank and symmetry, so a consumer that
+always works with the same handful of physical tensors can build this file once
+and load it instead of constructing anything.
+
+Edit `physical_tensors` at the bottom to change which classes are written. The
+symbolic forms are written with `d` for the Kronecker delta and `e` for the
+Levi-Civita symbol, so the file stays plain ASCII.
+"""
+
 from pathlib import Path
 
 import torch
@@ -9,6 +23,11 @@ torch.set_default_dtype(torch.float64)
 
 
 def convert_to_list(tensor):
+    """Make one operator entry YAML-safe, recursively.
+
+    Tensors become nested lists, and a symbolic form becomes its string with the
+    delta and epsilon characters spelled out in ASCII.
+    """
     if isinstance(tensor, torch.Tensor):
         return tensor.tolist()
     elif isinstance(tensor, dict):

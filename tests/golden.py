@@ -11,7 +11,7 @@ should each leave every operator exactly where it was. A snapshot is the
 cheapest statement of that, and it is the only one that catches a silent change
 of basis, which the identity tests cannot see: a different basis of the same
 weight-l mapping space satisfies every identity just as well, while changing
-every stored projector downstream.
+every stored operator downstream.
 
 What is compared exactly: the shape of the tree, dictionary keys, symbolic
 strings, einsum rules, and exact `Fraction` entries. Those carry the content, so

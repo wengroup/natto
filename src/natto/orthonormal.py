@@ -13,7 +13,10 @@ the eigendecomposition here is irreducibly numerical; everything upstream of it
 is done over the rationals.
 
 The same construction serves the symmetry-adapted mappings $\mathbf{Q}$, as
-Section IV notes it must -- see docs/notation.md.
+Section IV notes it must -- see docs/notation.md. That is why this is a basis
+rather than a pair of entry points: `get_reduction(..., basis="orthonormal")`
+returns these in place of the mappings and their duals, whether or not a
+symmetry was asked for.
 """
 
 import torch
@@ -21,7 +24,6 @@ from torch import Tensor
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
-from natto.mappings import get_dual_pair_of_weight, get_reduction_of_weight
 from natto.symbolic import LinearCombination
 from natto.utils import letter_index
 
@@ -75,109 +77,6 @@ def orthonormalize_mappings(
     orthonormal = torch.einsum("pq,q...->p...", gram_inverse_sqrt, numerical)
 
     return numerical, gram, gram_inverse_sqrt, orthonormal
-
-
-def get_orthonormal_G(rank: int, dtype: torch.dtype = torch.float64) -> dict:
-    r"""Get orthonormal mapping tensors for an unrestricted Cartesian tensor.
-
-    Args:
-        rank: Rank of the Cartesian tensor.
-        dtype: Floating-point dtype used for evaluation and eigendecomposition.
-
-    Returns:
-        A dictionary keyed by weight, with the exact embedding operators, their
-        Gram matrix and its symmetric inverse square root, and the orthonormal
-        operators built from them.
-    """
-    out = {}
-    for weight in range(rank + 1):
-        G, _, _, _ = get_dual_pair_of_weight(weight, rank)
-        if not G:
-            continue
-
-        G_numerical, g, g_inverse_sqrt, G_hat = orthonormalize_mappings(
-            G, weight, rank, dtype
-        )
-        extraction_rule, embedding_rule = _orthonormal_mapping_rules(weight, rank)
-        out[weight] = {
-            "embedding": [
-                {"symbolic": str(G_p), "numerical": G_p_numerical}
-                for G_p, G_p_numerical in zip(G, G_numerical)
-            ],
-            "gram": g,
-            "gram_inverse_sqrt": g_inverse_sqrt,
-            "orthonormal": [
-                {
-                    "numerical": G_hat_p,
-                    "extraction_rule": extraction_rule,
-                    "embedding_rule": embedding_rule,
-                }
-                for G_hat_p in G_hat
-            ],
-        }
-
-    return out
-
-
-def get_orthonormal_Q(
-    rank: int, symmetry: str = None, dtype: torch.dtype = torch.float64
-) -> dict:
-    r"""Get symmetry-adapted orthonormal mapping tensors.
-
-    For each weight, the exact symmetry-adapted embedding tensors ``Q`` are
-    obtained from :func:`get_reduction_of_weight`. Their Gram matrix is evaluated as
-
-    $$
-    g_{pq} = \frac{\mathbf{Q}^p \odot^{n+\ell} \mathbf{Q}^q}{2\ell + 1}
-    $$
-
-    The returned $\widehat{\mathbf{Q}} = \mathbf{g}^{-1/2}\mathbf{Q}$ are orthonormal and can be used
-    for both extraction from and embedding into the target symmetry class.
-
-    Args:
-        rank: Rank of the Cartesian tensor.
-        symmetry: Internal index symmetry of the Cartesian tensor. See
-            :func:`get_reduction` for examples. If ``None``, the symmetry-free mapping
-            tensors are orthonormalized.
-        dtype: Floating-point dtype used for the eigendecomposition and returned
-            numerical tensors.
-
-    Returns:
-        A dictionary keyed by weight, with the exact symmetry-adapted operators,
-        their Gram matrix and its symmetric inverse square root, and the
-        orthonormal operators built from them. Each orthonormal entry carries an
-        einsum rule for extraction and one for embedding, since the same tensor
-        performs both.
-    """
-    out = {}
-    for weight in range(rank + 1):
-        Q, _, _, _, _ = get_reduction_of_weight(weight, rank, symmetry)
-        if len(Q) == 0:
-            continue
-
-        Q_numerical, g, g_inverse_sqrt, Q_hat = orthonormalize_mappings(
-            Q, weight, rank, dtype
-        )
-
-        extraction_rule, embedding_rule = _orthonormal_mapping_rules(weight, rank)
-        out[weight] = {
-            "embedding": [
-                {"symbolic": str(Q_p), "numerical": Q_p_numerical}
-                for Q_p, Q_p_numerical in zip(Q, Q_numerical)
-            ],
-            "gram": g,
-            "gram_inverse_sqrt": g_inverse_sqrt,
-            "orthonormal": [
-                {
-                    "numerical": Q_hat_p,
-                    "extraction_rule": extraction_rule,
-                    "embedding_rule": embedding_rule,
-                }
-                for Q_hat_p in Q_hat
-            ],
-        }
-
-    return out
 
 
 def _symmetric_inverse_square_root(

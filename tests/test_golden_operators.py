@@ -39,12 +39,16 @@ import functools
 from pathlib import Path
 
 import pytest
+import torch
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
-from natto.mappings import get_dual_pair_of_weight, get_reduction_of_weight
+from natto.mappings import (
+    get_dual_pair_of_weight,
+    get_reduction,
+    get_reduction_of_weight,
+)
 from natto.matrix import fraction_matrix
-from natto.orthonormal import get_orthonormal_Q
 from natto.utils import letter_index
 from tests.golden import (
     LOCAL_SNAPSHOT_DIR,
@@ -88,9 +92,9 @@ THIRD_ORDER_ELASTIC = "ijklmn=jiklmn=klijmn=ijmnkl"
 
 
 @functools.lru_cache(maxsize=None)
-def get_orthonormal_Q_cached(rank: int, symmetry: str | None) -> dict:
-    """`get_orthonormal_Q`, computed once per class; rank 4 takes a few seconds."""
-    return get_orthonormal_Q(rank, symmetry)
+def get_orthonormal_cached(rank: int, symmetry: str | None) -> dict:
+    """The reduction in the self-dual basis, once per class; rank 4 costs seconds."""
+    return get_reduction(rank, symmetry, basis="orthonormal", dtype=torch.float64)
 
 
 def dual_pair_content(rank: int, symmetry: str | None) -> dict:
@@ -124,6 +128,12 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     irrational -- so the Gram matrix and its inverse square root are stored in
     full, being small, and the operators themselves by fingerprint.
 
+    One array per channel now serves as both embedding and extraction, so the
+    rules could be recorded once for the weight instead of once per operator.
+    They are not: keeping the shape the stored snapshots already have is what
+    lets these files stay byte-identical across the move to a `basis` argument,
+    and unchanged files are the evidence that the move touched no numbers.
+
     Args:
         rank: Rank of the Cartesian tensor.
         symmetry: Intrinsic symmetry of the class, or None for a generic tensor.
@@ -131,7 +141,7 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     Returns:
         The operators keyed by weight.
     """
-    output = get_orthonormal_Q_cached(rank, symmetry)
+    output = get_orthonormal_cached(rank, symmetry)
 
     content = {}
     for weight, per_weight in output.items():
@@ -140,11 +150,13 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
             "gram_inverse_sqrt": per_weight["gram_inverse_sqrt"],
             "orthonormal": [
                 {
-                    "extraction_rule": entry["extraction_rule"],
-                    "embedding_rule": entry["embedding_rule"],
-                    "numerical": fingerprint(entry["numerical"]),
+                    "extraction_rule": extraction["rule"],
+                    "embedding_rule": embedding["rule"],
+                    "numerical": fingerprint(embedding["numerical"]),
                 }
-                for entry in per_weight["orthonormal"]
+                for embedding, extraction in zip(
+                    per_weight["embedding"], per_weight["extraction"]
+                )
             ],
         }
 

@@ -1,7 +1,19 @@
-r"""
-Generate the coupling operator K and its einsum rule, for Z = X \otimes Y.
+r"""Precompute the coupling operators of every admissible weight triple.
 
-Z_l3 can be calculated as Z = einsum(rule, K, X, Y).
+Writes `coupling_operators.yaml` holding, for each triple of weights and each
+normalization, the coupling operator K -- the Cartesian counterpart of a
+Clebsch-Gordan coefficient -- as its exact symbolic form and its evaluated
+values, with the einsum rule that applies it:
+
+    Z = einsum(rule, K, X, Y)
+
+taking natural tensors X and Y of weights l1 and l2 to the weight-l3 part of
+their product.
+
+Edit `max_l1`, `max_l2` and `max_l3` at the bottom to change how far the sweep
+runs; the cost grows quickly with the weights. The symbolic forms are written
+with `d` for the Kronecker delta and `e` for the Levi-Civita symbol, so the file
+stays plain ASCII.
 """
 
 from pathlib import Path
@@ -67,5 +79,5 @@ if __name__ == "__main__":
     all_K = generate_coupling_operators(max_l1=4, max_l2=4, max_l3=4)
 
     # Save to yaml
-    filename = Path("./tensor_product_projector.yaml")
+    filename = Path("./coupling_operators.yaml")
     yaml_dump(all_K, filename, compress=True)

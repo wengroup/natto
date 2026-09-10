@@ -1,8 +1,15 @@
 from math import factorial as factorial_math
 
+import pytest
 import torch
 
-from natto.utils import double_factorial, double_index, factorial, get_trace
+from natto.utils import (
+    double_factorial,
+    double_index,
+    factorial,
+    get_trace,
+    is_traceless,
+)
 
 
 def test_factorial():
@@ -47,3 +54,18 @@ def test_get_trace():
 
     trace = get_trace(T3, i=1, j=2)
     assert torch.allclose(trace, torch.tensor([12.0, 39.0, 66.0]))
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_traceless_check_accepts_any_float_dtype(dtype):
+    """`torch.allclose` raises on a dtype mismatch, so the zero must follow the input.
+
+    A zero built in the default dtype made `is_traceless` raise for every tensor
+    in another one, rather than report on its trace.
+    """
+    traceless = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -2.0]]).to(
+        dtype
+    )
+
+    assert is_traceless(traceless)
+    assert not is_traceless(torch.eye(3, dtype=dtype))

@@ -180,15 +180,13 @@ def is_traceless(T, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5) 
 
     if rank <= 1:
         return True
-    elif rank == 2:
-        zeros = torch.tensor(0.0)
-    else:
-        dims = [3] * (rank - 2)
-        zeros = torch.zeros(*dims)
 
     for i, j in itertools.combinations(range(start_dim, T.ndim), 2):
         trace = get_trace(T, i, j)
-        if not torch.allclose(trace, zeros, atol=atol, rtol=rtol):
+        # `zeros_like` rather than a fresh zero tensor: `torch.allclose` raises
+        # on a dtype mismatch, so a default-dtype zero rejects every tensor that
+        # is not in the default dtype rather than reporting on its trace.
+        if not torch.allclose(trace, torch.zeros_like(trace), atol=atol, rtol=rtol):
             return False
 
     return True
