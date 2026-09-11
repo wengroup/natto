@@ -27,9 +27,9 @@ def orthonormal(rank: int, symmetry: str = None, weight: int = None) -> dict:
     return output if weight is None else output[weight]
 
 
-def assert_orthonormal(per_weight: dict, weight: int):
+def assert_orthonormal(data: dict, weight: int):
     """Assert the mappings of one weight are orthonormal under Eq. (21)."""
-    stacked = np.stack([entry["numerical"] for entry in per_weight["embedding"]])
+    stacked = np.stack([entry["numerical"] for entry in data["embedding"]])
     flattened = stacked.reshape(len(stacked), -1)
     gram = flattened @ flattened.T / (2 * weight + 1)
 
@@ -41,10 +41,8 @@ def assert_orthonormal(per_weight: dict, weight: int):
 def reconstruct(output: dict, tensor: np.ndarray) -> list[np.ndarray]:
     """Extract and embed back through each channel, returning the parts."""
     parts = []
-    for per_weight in output.values():
-        for embedding, extraction in zip(
-            per_weight["embedding"], per_weight["extraction"]
-        ):
+    for data in output.values():
+        for embedding, extraction in zip(data["embedding"], data["extraction"]):
             natural = np.einsum(extraction["rule"], extraction["numerical"], tensor)
             parts.append(np.einsum(embedding["rule"], embedding["numerical"], natural))
 
@@ -53,20 +51,20 @@ def reconstruct(output: dict, tensor: np.ndarray) -> list[np.ndarray]:
 
 def test_the_same_array_extracts_and_embeds():
     """The self-duality that makes `basis="orthonormal"` one operator, not two."""
-    per_weight = orthonormal(3, "ijk=ikj", weight=1)
+    data = orthonormal(3, "ijk=ikj", weight=1)
 
-    for embedding, extraction in zip(per_weight["embedding"], per_weight["extraction"]):
+    for embedding, extraction in zip(data["embedding"], data["extraction"]):
         assert embedding["numerical"] is extraction["numerical"]
         assert embedding["rule"] != extraction["rule"]
 
 
 def test_piezoelectric_gram_matrix():
     """Pin the piezoelectric weight-1 Gram matrix, and its orthonormal mappings."""
-    per_weight = orthonormal(3, "ijk=ikj", weight=1)
+    data = orthonormal(3, "ijk=ikj", weight=1)
 
     expected_gram = np.array([[3.0, 2.0], [2.0, 8.0]], dtype=np.float64)
-    np.testing.assert_allclose(per_weight["gram"], expected_gram, atol=1e-12)
-    assert_orthonormal(per_weight, weight=1)
+    np.testing.assert_allclose(data["gram"], expected_gram, atol=1e-12)
+    assert_orthonormal(data, weight=1)
 
 
 @pytest.mark.parametrize("rank", [1, 2])
@@ -75,8 +73,8 @@ def test_reconstructs_a_general_tensor(rank: int):
     tensor = np.random.default_rng(35).standard_normal((3,) * rank)
     output = orthonormal(rank)
 
-    for weight, per_weight in output.items():
-        assert_orthonormal(per_weight, weight)
+    for weight, data in output.items():
+        assert_orthonormal(data, weight)
 
     reconstructed = np.stack(reconstruct(output, tensor)).sum(axis=0)
     np.testing.assert_allclose(

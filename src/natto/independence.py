@@ -22,8 +22,6 @@ cross-check the exact one. All three agree on every sector through rank six.
 
 from fractions import Fraction
 
-import numpy as np
-
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
 from natto.gram import get_gram_entry
@@ -75,14 +73,14 @@ def select_independent_mappings(
     kept: list[int] = []
     gram: list[list[Fraction]] = []
 
-    for index, candidate in enumerate(candidates):
-        border = [get_gram_entry(weight, rank, candidates[k], candidate) for k in kept]
-        diagonal = get_gram_entry(weight, rank, candidate, candidate)
+    for i, c in enumerate(candidates):
+        border = [get_gram_entry(weight, rank, candidates[k], c) for k in kept]
+        diagonal = get_gram_entry(weight, rank, c, c)
         bordered = [row + [b] for row, b in zip(gram, border)]
         bordered.append(border + [diagonal])
 
         if is_nonsingular(bordered):
-            kept.append(index)
+            kept.append(i)
             gram = bordered
 
     return kept, gram
@@ -127,18 +125,21 @@ def select_independent_mappings_components(
             `find_independent_tensors`.
     """
 
-    def evaluate(candidate: LinearCombination) -> np.ndarray:
-        array = evaluate_tensors(
-            simplify_linear_combination(candidate), mode="embedding"
-        )
+    if not candidates:
+        return []
+
+    evaluated = []
+    for c in candidates:
+        array = evaluate_tensors(simplify_linear_combination(c), mode="embedding")
         if array.ndim != rank + weight:
             raise ValueError(
                 f"Mapping tensor has rank {array.ndim}, expected {rank + weight}"
             )
+        evaluated.append(array)
 
-        return array
+    _, indices = find_independent_tensors(evaluated, tolerance=tolerance, method=method)
 
-    return _select_numerically(candidates, evaluate, tolerance, method)
+    return indices
 
 
 def select_independent_mappings_probe(
@@ -180,31 +181,12 @@ def select_independent_mappings_probe(
         ValueError: If `method` is not a known scheme, from
             `find_independent_tensors`.
     """
-    X = get_random_natural_tensor(weight)
-
-    return _select_numerically(
-        candidates, lambda candidate: embed(candidate, X), tolerance, method
-    )
-
-
-def _select_numerically(
-    candidates: list[LinearCombination],
-    to_array,
-    tolerance: float,
-    method: Method,
-) -> list[int]:
-    """Turn each candidate into an array with `to_array`, then test those.
-
-    The two numerical schemes differ only in what they turn a candidate into, so
-    everything after that is here.
-    """
     if not candidates:
         return []
 
-    _, independent_indices = find_independent_tensors(
-        [to_array(candidate) for candidate in candidates],
-        tolerance=tolerance,
-        method=method,
-    )
+    X = get_random_natural_tensor(weight)
+    embedded = [embed(c, X) for c in candidates]
 
-    return independent_indices
+    _, indices = find_independent_tensors(embedded, tolerance=tolerance, method=method)
+
+    return indices
