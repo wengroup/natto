@@ -6,15 +6,17 @@ kept is not a detail: it fixes which duals are the canonical ones, and so the ba
 every ICT downstream is expressed in. Three schemes are offered, differing in what
 they look at to decide:
 
-- `select_independent_mappings`: the exact one, and what the reduction uses. It
-  borders the rational Gram matrix of the kept mappings with each candidate in turn,
+- `select_independent_mappings_and_gram`: the exact one, and what the reduction
+  uses. It borders the rational Gram matrix of the kept mappings with each candidate in turn,
   so no tolerance enters the decision and nothing is evaluated numerically.
-- `select_independent_mappings_components`: evaluates each mapping in full, all
-  $3^{n+\ell}$ components of it, and tests those vectors.
-- `select_independent_mappings_probe`: contracts one fixed weight-$\ell$ ICT through
-  each mapping, which leaves rank-$n$ tensors rather than rank-$(n+\ell)$ ones, and
-  tests those. This is what the reduction used before the exact scheme; it is the
-  cheapest and the least direct.
+- `select_independent_mappings_via_components`: evaluates each mapping in full, all
+  $3^{n+\ell}$ components of it, and tests those vectors. It compares what the
+  mappings *are*.
+- `select_independent_mappings_via_embeddings`: contracts one fixed weight-$\ell$
+  ICT through each mapping and tests the rank-$n$ embeddings that come back, so
+  $3^n$ components rather than $3^{n+\ell}$. It compares what the mappings *do*,
+  which is why it is the cheapest and the least direct. This is what the reduction
+  used before the exact scheme.
 
 The two numerical schemes hand the actual independence test to `qr`, and are kept to
 cross-check the exact one. All three agree on every sector through rank six.
@@ -31,10 +33,10 @@ from natto.symbolic import LinearCombination
 from natto.symmetric_traceless import get_random_natural_tensor
 
 
-def select_independent_mappings(
+def select_independent_mappings_and_gram(
     weight: int, rank: int, candidates: list[LinearCombination]
 ) -> tuple[list[int], list[list[Fraction]]]:
-    r"""Select a maximal independent set of mapping tensors, exactly.
+    r"""Select a maximal independent set of mapping tensors, and their Gram matrix.
 
     The candidates of a weight are generally not independent: every choice
     $\mathcal{D}_p$ of which indices to contract gives one, and at rank five and
@@ -86,22 +88,22 @@ def select_independent_mappings(
     return kept, gram
 
 
-def select_independent_mappings_components(
+def select_independent_mappings_via_components(
     weight: int,
     rank: int,
     candidates: list[LinearCombination],
     tolerance: float = DEFAULT_TOLERANCE,
     method: Method = "gram_schmidt",
 ) -> list[int]:
-    r"""Select independent mapping tensors from their full numerical components.
+    r"""Select independent mapping tensors via their numerical components.
 
     Each candidate is evaluated in full -- a rank-$(n + \ell)$ array, so all
     $3^{n+\ell}$ components of it -- and those arrays are tested for linear
-    independence directly. Unlike `select_independent_mappings_probe` nothing is
-    contracted away first, so the vectors being compared carry the whole mapping and
+    independence directly. Unlike `select_independent_mappings_via_embeddings` nothing is contracted
+    away first, so the vectors being compared carry the whole mapping and
     no information can hide in the part that was dropped.
 
-    This is the numerical counterpart of `select_independent_mappings`, which settles
+    This is the numerical counterpart of `select_independent_mappings_and_gram`, which settles
     the same question exactly. It is kept as a cross-check: agreement between the two
     is evidence that the exact Gram matrix and the evaluated arrays describe the same
     mappings. Prefer the exact scheme for anything whose answer is recorded.
@@ -142,14 +144,14 @@ def select_independent_mappings_components(
     return indices
 
 
-def select_independent_mappings_probe(
+def select_independent_mappings_via_embeddings(
     weight: int,
     rank: int,
     candidates: list[LinearCombination],
     tolerance: float = DEFAULT_TOLERANCE,
     method: Method = "gram_schmidt",
 ) -> list[int]:
-    r"""Select independent mapping tensors by their action on one random ICT.
+    r"""Select independent mapping tensors via the embeddings they produce.
 
     One fixed-seed random weight-$\ell$ ICT is contracted through each candidate.
     That contracts away the $\ell$ Greek indices of the mapping and leaves a
@@ -163,8 +165,8 @@ def select_independent_mappings_probe(
     converse does not hold: the map $\mathbf{G} \mapsto \mathbf{G} \odot^\ell
     \mathbf{X}$ has a kernel in general, so for an unlucky probe two independent
     mappings can give dependent tensors, and a channel would be lost. That cannot
-    happen with `select_independent_mappings`, which looks at the mappings
-    themselves.
+    happen with `select_independent_mappings_and_gram`, which looks at the
+    mappings themselves.
 
     Args:
         weight: Weight of the ICT space.

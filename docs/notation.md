@@ -76,6 +76,10 @@ Names that meant something else, or several things, and must not come back.
 | `symmetrize` | module | `symmetric_traceless`; the numerical route to an ICT |
 | `symmetrize` | *two* functions of that name, in those two modules | `intrinsic_symmetry.impose_symmetry` and `symmetric_traceless.symmetrize` |
 | `matrix` | module | `rational`; it is exact arithmetic, not numpy |
+| `select_independent_mappings` | the exact selection, whose name hid that it also returns the Gram matrix | `select_independent_mappings_and_gram` |
+| `..._components`, `..._probe` | bare suffixes, naming a mechanism rather than what independence is judged on | `..._via_components` for what the mappings are, `..._via_embeddings` for what they do |
+| `selection="probe"` | the flag on `get_reduction` | `selection="embeddings"`, matching the function it dispatches to |
+| `selection="exact"` | the flag for the rational scheme | `selection="symbolic"`; "exact" read as if the others were approximating, and named a precision rather than what is examined |
 | `find_independent_tensors_qr_unpivoted` | the original independence test, reading an unpivoted QR diagonal | deleted; it was not rank-revealing and lost ICT channels |
 | `pivoting=False` | a flag on `find_independent_tensors_scipy_qr` | deleted; it reached the same bug by another name, so pivoting is unconditional |
 | `mappings` | module mixing the objects with the pipeline | `mapping_tensors` for building G, G~ and S; `reduction` for running them |

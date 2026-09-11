@@ -37,9 +37,9 @@ from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
 from natto.gram import get_gram_matrix
 from natto.independence import (
-    select_independent_mappings,
-    select_independent_mappings_components,
-    select_independent_mappings_probe,
+    select_independent_mappings_and_gram,
+    select_independent_mappings_via_components,
+    select_independent_mappings_via_embeddings,
 )
 from natto.indices import letter_index
 from natto.mapping_tensors import (
@@ -54,7 +54,7 @@ from natto.symbolic import LinearCombination
 from natto.symmetry_adaptation import get_symmetry_adapted_mappings
 
 #: How to decide which candidate mappings are independent; see `natto.qr`.
-Selection = Literal["exact", "components", "probe"]
+Selection = Literal["symbolic", "components", "embeddings"]
 
 
 def get_reduction(
@@ -62,7 +62,7 @@ def get_reduction(
     symmetry: str = None,
     basis: str = "dual",
     numerical: bool = True,
-    selection: Selection = "exact",
+    selection: Selection = "symbolic",
 ) -> dict:
     """Reduce a Cartesian tensor space into its irreducible parts.
 
@@ -92,12 +92,15 @@ def get_reduction(
         numerical: Whether to evaluate the operators as well as building them
             symbolically. Ignored for `basis="orthonormal"`, which is numerical
             by construction.
-        selection: How to decide which candidate mappings are independent.
-            `exact` settles it over the rationals and is the default, so the
-            result does not depend on a tolerance and is the same on every
-            machine. `components` and `probe` decide it numerically; see
-            `natto.qr` for what each looks at and why the exact one is preferred
-            for anything whose result is recorded.
+        selection: What to judge the independence of the candidate mappings on.
+            `symbolic` is the default: the mappings' Gram matrix is contracted
+            symbolically and the decision made over the rationals, so it is the
+            same on every machine. `components` uses the mappings evaluated in
+            full, `embeddings` their action on one probe tensor -- both
+            numerically, and so both against a tolerance; see
+            `natto.independence`. All three agree on every sector tested, but
+            only `symbolic` is free of a tolerance, which matters because the
+            choice fixes which duals are canonical.
 
     Returns:
         The embedding, extraction and decomposition operators keyed by weight,
@@ -108,7 +111,7 @@ def get_reduction(
 
     Raises:
         ValueError: If `basis` is neither `dual` nor `orthonormal`, or if
-            `selection` is not one of `exact`, `components` and `probe`.
+            `selection` is not one of `symbolic`, `components` and `embeddings`.
     """
     if basis not in ("dual", "orthonormal"):
         raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")
@@ -146,7 +149,7 @@ def get_independent_mappings(
     weight: int,
     rank: int,
     symmetry: str = None,
-    selection: Selection = "exact",
+    selection: Selection = "symbolic",
 ) -> tuple[list[LinearCombination], list[list[Fraction]]]:
     r"""The independent mapping tensors of one weight, and their exact Gram matrix.
 
@@ -184,19 +187,19 @@ def get_independent_mappings(
     else:
         candidates = get_mappings_odd(weight, rank)
 
-    if selection == "exact":
-        independent_indices, gram = select_independent_mappings(
+    if selection == "symbolic":
+        independent_indices, gram = select_independent_mappings_and_gram(
             weight, rank, candidates
         )
     elif selection == "components":
-        independent_indices = select_independent_mappings_components(
+        independent_indices = select_independent_mappings_via_components(
             weight, rank, candidates
         )
         gram = get_gram_matrix(
             weight, rank, [candidates[i] for i in independent_indices]
         )
-    elif selection == "probe":
-        independent_indices = select_independent_mappings_probe(
+    elif selection == "embeddings":
+        independent_indices = select_independent_mappings_via_embeddings(
             weight, rank, candidates
         )
         gram = get_gram_matrix(
@@ -204,7 +207,7 @@ def get_independent_mappings(
         )
     else:
         raise ValueError(
-            f"Unknown selection: {selection}. Supported are: exact, components, probe."
+            f"Unknown selection: {selection}. Supported are: symbolic, components, embeddings."
         )
 
     G = [candidates[i] for i in independent_indices]
