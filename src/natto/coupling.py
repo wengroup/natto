@@ -43,7 +43,6 @@ through the reduction of a rank-six tensor once $\ell_1 = \ell_2 = 3$.
 from fractions import Fraction
 
 import numpy as np
-from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -61,7 +60,7 @@ from natto.utils import (
 
 
 def get_coupling_operator(
-    l1: int, l2: int, l3: int, normalize: str = "unity", dtype: DTypeLike = None
+    l1: int, l2: int, l3: int, normalize: str = "unity"
 ) -> tuple[np.ndarray, str]:
     """Build the coupling operator `K` of one weight triple, evaluated.
 
@@ -72,17 +71,15 @@ def get_coupling_operator(
         normalize: `unity` applies the normalization constant `C` of the paper,
             fixing the scale by the condition for the parity of
             `L = l1 + l2 + l3`; `none` leaves the operator unscaled.
-        dtype: Floating-point dtype of the evaluated operator, double precision
-            if not given.
 
     Returns:
         The evaluated operator, and the einsum rule that applies it, so that
         `Z = numpy.einsum(rule, K, X, Y)`.
     """
     if (l1 + l2 - l3) % 2 == 0:
-        return _get_coupling_operator_even(l1, l2, l3, normalize, dtype)
+        return _get_coupling_operator_even(l1, l2, l3, normalize)
 
-    return _get_coupling_operator_odd(l1, l2, l3, normalize, dtype)
+    return _get_coupling_operator_odd(l1, l2, l3, normalize)
 
 
 def get_coupling_symbolic(
@@ -108,7 +105,7 @@ def get_coupling_symbolic(
 
 
 def _get_coupling_operator_even(
-    l1: int, l2: int, l3: int, normalize: str = "unity", dtype: DTypeLike = None
+    l1: int, l2: int, l3: int, normalize: str = "unity"
 ) -> tuple[np.ndarray, str]:
     """Evaluate `K` for even `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_even(l1, l2, l3)
@@ -127,7 +124,7 @@ def _get_coupling_operator_even(
     # Then, we can use this to do K:XY.
     #
     # TODO, create a new function like evaluate_tensors to deal with this case.
-    K_numerical = evaluate_tensors(K, mode="extraction", dtype=dtype)
+    K_numerical = evaluate_tensors(K, mode="extraction")
 
     if normalize == "unity":
         c = coeff_C_even(l1, l2, l3)
@@ -151,13 +148,12 @@ def _get_coupling_operator_odd(
     l2: int,
     l3: int,
     normalize: str = "unity",
-    dtype: DTypeLike = None,
 ) -> tuple[np.ndarray, str]:
     """Evaluate `K` for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_odd(l1, l2, l3)
     K = simplify_linear_combination(K)
 
-    K_numerical = evaluate_tensors(K, mode="extraction", dtype=dtype)
+    K_numerical = evaluate_tensors(K, mode="extraction")
 
     if normalize == "unity":
         c = coeff_C_odd(l1, l2, l3)
@@ -464,7 +460,6 @@ def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
     # l1-k-t remaining symmetric indices from x
     # l2-k-t remaining symmetric indices from y
     # 2t indices from all deltas. Each delta has 2 symmetric indices.
-    # TorchScript does not allow string multiplication, so we need to use `join`
     symmetry = (
         "".join(["a"] * len(x_remain))
         + "".join(["b"] * len(y_remain))

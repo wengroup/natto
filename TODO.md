@@ -28,8 +28,7 @@ Two places are irreducibly numerical:
   this exact would mean rank-revealing elimination over the rationals; it is
   open, and tracked below.
 
-Evaluated operators are float32 by default, following `torch.get_default_dtype`,
-and float64 where a caller asks. That is storage rather than construction: the
+Evaluated operators are float64. That is storage rather than construction: the
 symbolic form above is exact whatever it is later evaluated into.
 
 ## Open
@@ -42,7 +41,3 @@ symbolic form above is exact whatever it is later evaluated into.
    random probe, and whether the decision should be made over the rationals.
    Note that changing either changes which subset is canonical, and so changes
    every stored operator downstream.
-
-2. Establish accuracy criteria for float32 storage. The evaluated operators are
-   float32 unless a caller asks otherwise, which is enough for the reductions
-   but has never been checked against a stated bound.

@@ -25,7 +25,6 @@ rather than a sum over the terms of Eq. (41).
 import math
 
 import numpy as np
-from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -36,7 +35,7 @@ from natto.utils import double_factorial
 
 
 def get_harmonic_operator(
-    weight: int, normalize: str = "unity", dtype: DTypeLike = None
+    weight: int, normalize: str = "unity"
 ) -> tuple[np.ndarray, str]:
     """Build the harmonic operator `H` of one weight, evaluated.
 
@@ -46,8 +45,6 @@ def get_harmonic_operator(
             weight-fold contraction of the harmonic with a unit vector is the
             Legendre polynomial of the angle between the two, and is 1 when the
             two coincide. `none` leaves the natural projector unscaled.
-        dtype: Floating-point dtype of the evaluated operator, double precision
-            if not given.
 
     Returns:
         The evaluated operator, and the einsum rule that applies it, so that
@@ -60,7 +57,7 @@ def get_harmonic_operator(
         raise ValueError(f"Weight must be at least zero, got {weight}")
 
     H, upper, lower = get_harmonic_symbolic(weight)
-    H_numerical = evaluate_tensors(H, mode="extraction", dtype=dtype)
+    H_numerical = evaluate_tensors(H, mode="extraction")
 
     if normalize == "unity":
         H_numerical = H_numerical * coeff_harmonic(weight)

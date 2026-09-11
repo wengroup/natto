@@ -22,7 +22,7 @@ RECONSTRUCTION_TOL = 1e-10
 
 def orthonormal(rank: int, symmetry: str = None, weight: int = None) -> dict:
     """The reduction in the self-dual basis, in double precision."""
-    output = get_reduction(rank, symmetry, basis="orthonormal", dtype=np.float64)
+    output = get_reduction(rank, symmetry, basis="orthonormal")
 
     return output if weight is None else output[weight]
 

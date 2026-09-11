@@ -20,7 +20,6 @@ symmetry was asked for.
 """
 
 import numpy as np
-from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
@@ -32,7 +31,6 @@ def orthonormalize_mappings(
     mappings: list[LinearCombination],
     weight: int,
     rank: int,
-    dtype: DTypeLike = np.float64,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     r"""Orthonormalize mapping tensors with their Cartesian Gram matrix.
 
@@ -48,7 +46,6 @@ def orthonormalize_mappings(
             rank ``rank``.
         weight: Weight of the natural-tensor space.
         rank: Rank of the Cartesian tensor space.
-        dtype: Floating-point dtype used for evaluation and eigendecomposition.
 
     Returns:
         Numerical input mappings, their Gram matrix, its symmetric inverse square
@@ -63,9 +60,7 @@ def orthonormalize_mappings(
 
     numerical = np.stack(
         [
-            evaluate_tensors(
-                simplify_linear_combination(mapping), mode="embedding", dtype=dtype
-            )
+            evaluate_tensors(simplify_linear_combination(mapping), mode="embedding")
             for mapping in mappings
         ]
     )

@@ -26,7 +26,7 @@ from natto.utils import yaml_dump
 
 
 def generate_coupling_operators(
-    max_l1: int, max_l2: int, max_l3: int, dtype=np.float64
+    max_l1: int, max_l2: int, max_l3: int
 ) -> dict[str, dict[str, np.ndarray]]:
     """
     Generate coupling operators and the corresponding einsum rules.
@@ -35,7 +35,6 @@ def generate_coupling_operators(
         max_l1: Maximum weight of X.
         max_l2: Maximum weight of Y.
         max_l3: Maximum weight of Z.
-        dtype: The data type of the generated arrays.
 
     Return:
         Coupling operators and rules,
@@ -51,7 +50,7 @@ def generate_coupling_operators(
             for l3 in range(abs(l1 - l2), min(l1 + l2 + 1, max_l3 + 1)):
                 for normalize in ["unity", "none"]:
                     K_symbolic, _, _, _ = get_coupling_symbolic(l1, l2, l3)
-                    K, rule = get_coupling_operator(l1, l2, l3, normalize, dtype=dtype)
+                    K, rule = get_coupling_operator(l1, l2, l3, normalize)
 
                     K_symbolic = simplify_linear_combination(K_symbolic)
                     # replace δ (delta) by d

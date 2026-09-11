@@ -9,7 +9,6 @@ or `decomposition`.
 from functools import lru_cache
 
 import numpy as np
-from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.indices import letter_index
@@ -21,17 +20,15 @@ _MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
 
 @lru_cache(maxsize=512)
 def _cached_delta_epsilon_contraction(
-    rule: str, num_delta: int, num_epsilon: int, dtype: DTypeLike = None
+    rule: str, num_delta: int, num_epsilon: int
 ) -> np.ndarray:
     """Contract and cache a small product of delta and Levi-Civita tensors."""
-    data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
+    data = [dij()] * num_delta + [eijk()] * num_epsilon
 
     return np.einsum(rule, *data)
 
 
-def _contract_delta_epsilon(
-    rule: str, num_delta: int, num_epsilon: int, dtype: DTypeLike = None
-) -> np.ndarray:
+def _contract_delta_epsilon(rule: str, num_delta: int, num_epsilon: int) -> np.ndarray:
     """Contract a product of Kronecker deltas and Levi-Civita symbols.
 
     The operands are fixed constants whose multiplicities are given by ``num_delta``
@@ -44,22 +41,17 @@ def _contract_delta_epsilon(
 
     A cached result is shared; callers must not modify it in place.
     """
-    if dtype is None:
-        dtype = np.float64
-
     output_indices = rule.rsplit("->", maxsplit=1)[1]
     output_elements = 3 ** len(output_indices)
     if output_elements <= _MAX_CACHED_CONTRACTION_ELEMENTS:
-        return _cached_delta_epsilon_contraction(rule, num_delta, num_epsilon, dtype)
+        return _cached_delta_epsilon_contraction(rule, num_delta, num_epsilon)
 
-    data = [dij(dtype=dtype)] * num_delta + [eijk(dtype=dtype)] * num_epsilon
+    data = [dij()] * num_delta + [eijk()] * num_epsilon
 
     return np.einsum(rule, *data)
 
 
-def tp_delta_epsilon(
-    tp: TensorProduct, mode: str, dtype: DTypeLike = None
-) -> np.ndarray:
+def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
     Note, the order of the indices need to be taken care of.
@@ -81,7 +73,6 @@ def tp_delta_epsilon(
         tp: Tensor product of Kronecker delta and Levi-Civita tensors.
         mode: which mode to use, either `embedding`, `extraction` or
             `decomposition`. This determines how the output indices are ordered.
-        dtype: Floating-point dtype of the evaluated tensor.
 
     Returns:
         Tensor product of Kronecker delta and Levi-Civita tensors.
@@ -98,7 +89,7 @@ def tp_delta_epsilon(
 
     # The tensor product actually has no delta or epsilon tensors
     if not delta_rules and not epsilon_rules:
-        return np.asarray(float(tp.factor), dtype=dtype)
+        return np.asarray(float(tp.factor))
 
     left = ",".join(delta_rules + epsilon_rules)
 
@@ -128,9 +119,7 @@ def tp_delta_epsilon(
 
     rule = left + "->" + right
 
-    contracted = _contract_delta_epsilon(
-        rule, len(delta_rules), len(epsilon_rules), dtype
-    )
+    contracted = _contract_delta_epsilon(rule, len(delta_rules), len(epsilon_rules))
 
     # multiply factor; this is out of place, so the cached tensor is left untouched
     product = contracted * float(tp.factor)
@@ -138,9 +127,7 @@ def tp_delta_epsilon(
     return product
 
 
-def evaluate_tensors(
-    tensors: LinearCombination, mode: str, dtype: DTypeLike = None
-) -> np.ndarray:
+def evaluate_tensors(tensors: LinearCombination, mode: str) -> np.ndarray:
     """
     Evaluate the tensor product of Kronecker delta and Levi-Civita tensors to get
     numerical values.
@@ -150,7 +137,7 @@ def evaluate_tensors(
     output = 0
     for tp in tensors.components:
         if isinstance(tp, TensorProduct):
-            output += tp_delta_epsilon(tp, mode, dtype=dtype)
+            output += tp_delta_epsilon(tp, mode)
         else:
             raise ValueError(f"Unknown tensor type: {type(tp)}")
 

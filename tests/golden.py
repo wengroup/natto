@@ -20,8 +20,8 @@ nothing about them is approximate.
 Floats are compared with a tolerance, absolute and relative together, because a
 genuine change is O(1) relative while float arithmetic legitimately drifts:
 an eigendecomposition may differ in its last bits between BLAS builds, and
-re-associating a sum of a few thousand float32 terms moves the total by about
-1e-5 relative. Both tolerances are far below any real change and far above that
+re-associating a sum of a few thousand float64 terms moves the total in its last
+bits too. Both tolerances are far below any real change and far above that
 noise.
 
 Regenerating is deliberate: set `NATTO_REGOLD=1`. A missing snapshot is an error
@@ -61,10 +61,10 @@ DEFAULT_ATOL = 1e-12
 #: one, while a fingerprint of a rank-8 operator runs to 1e4. A flat absolute
 #: tolerance is meaningless across that range.
 #:
-#: Callers holding float32-derived quantities should pass a looser `rtol`. The
-#: package evaluates operators in float32 by default, so re-associating a sum of
-#: a few thousand terms moves the total by around 1e-5 relative, while any real
-#: change -- a different basis, a different coefficient -- is order one.
+#: Everything is evaluated in float64, so the only drift is in the last bits:
+#: a different BLAS, or a sum of a few thousand terms re-associated. Any real
+#: change -- a different basis, a different coefficient -- is order one, so this
+#: sits far from both.
 DEFAULT_RTOL = 1e-9
 
 #: Mismatches reported before the report is truncated.
