@@ -23,6 +23,7 @@ rather than a sum over the terms of Eq. (41).
 """
 
 import math
+from fractions import Fraction
 
 import numpy as np
 
@@ -60,7 +61,7 @@ def get_harmonic_operator(
     H_numerical = evaluate_tensors(H, mode="extraction")
 
     if normalize == "unity":
-        H_numerical = H_numerical * coeff_harmonic(weight)
+        H_numerical = H_numerical * float(coeff_harmonic(weight))
     elif normalize != "none":
         supported = ["none", "unity"]
         raise ValueError(
@@ -92,7 +93,7 @@ def get_harmonic_symbolic(weight: int) -> tuple[LinearCombination, str, str]:
     return H, letter_index(weight, upper_case=True), letter_index(weight)
 
 
-def coeff_harmonic(weight: int) -> float:
+def coeff_harmonic(weight: int) -> Fraction:
     """Normalization constant of the Cartesian harmonic, Eq. (41).
 
     Fixed by requiring that the weight-fold contraction of the harmonic with the
@@ -101,7 +102,11 @@ def coeff_harmonic(weight: int) -> float:
     Args:
         weight: Weight of the harmonic, at least zero.
 
+    The value is a ratio of factorials, so it is returned exactly. Multiplying a
+    float array by a `Fraction` would silently make it an object array, so the
+    conversion happens at that boundary rather than here.
+
     Returns:
         The normalization constant.
     """
-    return double_factorial(2 * weight - 1) / math.factorial(weight)
+    return Fraction(double_factorial(2 * weight - 1), math.factorial(weight))

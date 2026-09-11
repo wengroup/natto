@@ -79,7 +79,9 @@ def test_without_normalization_the_scale_is_the_only_difference(weight: int):
     """`normalize="none"` differs from `unity` by `coeff_harmonic` and nothing else."""
     a = unit_vector(0)
 
-    scaled = harmonic(a, weight, normalize="none") * coeff_harmonic(weight)
+    # `coeff_harmonic` is exact, and a float array times a Fraction would be an
+    # object array, so the conversion happens here as it does in the package.
+    scaled = harmonic(a, weight, normalize="none") * float(coeff_harmonic(weight))
 
     np.testing.assert_allclose(scaled, harmonic(a, weight), atol=1e-12)
 

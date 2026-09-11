@@ -128,7 +128,7 @@ def _get_coupling_operator_even(
 
     if normalize == "unity":
         c = coeff_C_even(l1, l2, l3)
-        K_numerical *= c
+        K_numerical = K_numerical * float(c)
     elif normalize == "none":
         pass
     else:
@@ -157,7 +157,7 @@ def _get_coupling_operator_odd(
 
     if normalize == "unity":
         c = coeff_C_odd(l1, l2, l3)
-        K_numerical *= c
+        K_numerical = K_numerical * float(c)
     elif normalize == "none":
         pass
     else:
@@ -528,7 +528,7 @@ def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
     return rule, symmetry, delta_indices
 
 
-def coeff_C_even(l1: int, l2: int, l3: int) -> float:
+def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
     """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
 
     The constant is fixed by requiring that the l3-fold contraction of the output
@@ -539,6 +539,10 @@ def coeff_C_even(l1: int, l2: int, l3: int) -> float:
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
 
+    The value is a ratio of factorials, so it is returned exactly. Multiplying a
+    float array by a `Fraction` would silently make it an object array, so the
+    conversion happens at that boundary rather than here.
+
     Returns:
         The normalization constant.
     """
@@ -547,21 +551,25 @@ def coeff_C_even(l1: int, l2: int, l3: int) -> float:
     L2 = L - 2 * l2 - 1
     L3 = L - 2 * l3 - 1
 
-    return (
+    numerator = (
         factorial(l1)
         * factorial(l2)
         * double_factorial(2 * l3 - 1)
         * factorial((L1 + 1) // 2)
         * factorial((L2 + 1) // 2)
-        / factorial(l3)
-        / double_factorial(L1)
-        / double_factorial(L2)
-        / double_factorial(L3)
-        / factorial(L // 2)
+    )
+    denominator = (
+        factorial(l3)
+        * double_factorial(L1)
+        * double_factorial(L2)
+        * double_factorial(L3)
+        * factorial(L // 2)
     )
 
+    return Fraction(numerator, denominator)
 
-def coeff_C_odd(l1: int, l2: int, l3: int) -> float:
+
+def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
     r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
 
     The condition differs from the one behind `coeff_C_even`. For odd `L` the
@@ -581,6 +589,10 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> float:
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
 
+    The value is a ratio of factorials, so it is returned exactly. Multiplying a
+    float array by a `Fraction` would silently make it an object array, so the
+    conversion happens at that boundary rather than here.
+
     Returns:
         The normalization constant.
     """
@@ -589,16 +601,20 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> float:
     L2 = L - 2 * l2 - 1
     L3 = L - 2 * l3 - 1
 
-    return (
+    numerator = (
         2
         * factorial(l1)
         * factorial(l2)
         * double_factorial(2 * l3 - 1)
         * factorial(L1 // 2)
         * factorial(L2 // 2)
-        / factorial(l3 - 1)
-        / double_factorial(L1 + 1)
-        / double_factorial(L2 + 1)
-        / double_factorial(L3 + 1)
-        / factorial((L + 1) // 2)
     )
+    denominator = (
+        factorial(l3 - 1)
+        * double_factorial(L1 + 1)
+        * double_factorial(L2 + 1)
+        * double_factorial(L3 + 1)
+        * factorial((L + 1) // 2)
+    )
+
+    return Fraction(numerator, denominator)
