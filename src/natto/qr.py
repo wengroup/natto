@@ -1,4 +1,4 @@
-"""
+r"""
 Find linearly independent tensors using QR decomposition.
 
 Three implementations are provided, all with the same signature and return values:
@@ -28,12 +28,37 @@ answer on every machine, forever. Pivoted QR instead orders the columns by resid
 norm, and how LAPACK breaks ties between columns of equal norm can differ between
 LAPACK builds and versions, so the canonical dual could silently change under an
 unrelated BLAS upgrade.
+
+Those three decide independence for a list of arrays. Above them sit three ways to
+decide it for the *mapping tensors* of a weight, which differ in what they look at:
+
+- `select_independent_mappings`: the exact one, and what the reduction uses. It
+  works on the rational Gram matrix of the mappings, so there is no tolerance and
+  nothing numerical anywhere in the decision.
+- `select_independent_mappings_components`: evaluates each mapping in full, all
+  $3^{n+\ell}$ components of it, and tests those vectors for independence.
+- `select_independent_mappings_probe`: contracts one fixed random ICT through each
+  mapping and tests the much smaller rank-$\ell$ results. This is what the
+  reduction used before the exact scheme; it is the cheapest and the least direct,
+  since a probe can in principle land where two independent mappings agree.
+
+All three agree on every sector through rank six. The numerical two are kept to
+cross-check the exact one, which is the only one whose answer does not depend on a
+tolerance.
 """
 
+from fractions import Fraction
 from typing import Literal
 
 import numpy as np
 import scipy.linalg
+
+from natto.algebra import simplify_linear_combination
+from natto.evaluate import embed, evaluate_tensors
+from natto.gram import get_gram_entry
+from natto.rational import is_nonsingular
+from natto.symbolic import LinearCombination
+from natto.symmetric_traceless import get_random_natural_tensor
 
 Method = Literal["gram_schmidt", "scipy_qr", "qr_unpivoted"]
 
@@ -215,3 +240,157 @@ def find_independent_tensors_qr_unpivoted(
     independent_tensors = [tensors[i] for i in independent_indices]
 
     return independent_tensors, independent_indices
+
+
+def select_independent_mappings(
+    weight: int, rank: int, candidates: list[LinearCombination]
+) -> tuple[list[int], list[list[Fraction]]]:
+    r"""Select a maximal independent set of mapping tensors, exactly.
+
+    The candidates of a weight are generally not independent: every choice
+    $\mathcal{D}_p$ of which indices to contract gives one, and at rank five and
+    above some are combinations of the others. Which subset is kept has lasting
+    consequences, since it fixes which duals are canonical and hence the basis every
+    downstream ICT is expressed in.
+
+    The candidates are visited in order and each is kept when it is independent of
+    those already kept. Independence is decided on the Gram matrix: appending a
+    candidate borders the kept set's Gram matrix with its contractions against them,
+
+    $$
+    \begin{pmatrix} \mathbf{g} & \mathbf{b} \\ \mathbf{b}^{\mathsf T} & d
+    \end{pmatrix},
+    $$
+
+    and that bordered matrix is nonsingular exactly when the candidate lies outside
+    their span. Its Schur complement $d - \mathbf{b}^{\mathsf T} \mathbf{g}^{-1}
+    \mathbf{b}$ is the squared norm of the candidate's residual, so this is the
+    residual test of Gram-Schmidt carried out over the rationals: no tolerance, and
+    no random tensor to probe the mappings with. The selection is therefore a pure
+    function of `weight` and `rank` -- the same on every machine, in every version.
+
+    Only the contractions against the kept set are needed, not the full
+    candidate-by-candidate matrix, and the kept set's own Gram matrix accumulates as
+    a by-product rather than needing a second pass.
+
+    Args:
+        weight: Weight of the ICT space.
+        rank: Rank of the Cartesian tensor space.
+        candidates: Candidate mapping tensors, in the order they are preferred.
+
+    Returns:
+        The indices of the kept candidates, and their exact Gram matrix.
+    """
+    kept: list[int] = []
+    gram: list[list[Fraction]] = []
+
+    for index, candidate in enumerate(candidates):
+        border = [get_gram_entry(weight, rank, candidates[k], candidate) for k in kept]
+        diagonal = get_gram_entry(weight, rank, candidate, candidate)
+        bordered = [row + [b] for row, b in zip(gram, border)]
+        bordered.append(border + [diagonal])
+
+        if is_nonsingular(bordered):
+            kept.append(index)
+            gram = bordered
+
+    return kept, gram
+
+
+def select_independent_mappings_components(
+    weight: int,
+    rank: int,
+    candidates: list[LinearCombination],
+    tolerance: float = 1e-4,
+    method: Method = "gram_schmidt",
+) -> list[int]:
+    r"""Select independent mapping tensors from their full numerical components.
+
+    Each candidate is evaluated in full -- a rank-$(n + \ell)$ array, so all
+    $3^{n+\ell}$ components of it -- and those arrays are tested for linear
+    independence directly. Unlike `select_independent_mappings_probe` nothing is
+    contracted away first, so the vectors being compared carry the whole mapping and
+    no information can hide in the part that was dropped.
+
+    This is the numerical counterpart of `select_independent_mappings`, which settles
+    the same question exactly. It is kept as a cross-check: agreement between the two
+    is evidence that the exact Gram matrix and the evaluated arrays describe the same
+    mappings. Prefer the exact scheme for anything whose answer is recorded.
+
+    The arrays grow as $3^{n+\ell}$, which at rank six and weight six is $3^{12}$
+    components per candidate, so this costs real memory and time at high rank.
+
+    Args:
+        weight: Weight of the ICT space.
+        rank: Rank of the Cartesian tensor space.
+        candidates: Candidate mapping tensors, in the order they are preferred.
+        tolerance: Residual norm below which a candidate is taken as dependent.
+        method: Which array-level scheme decides independence; see
+            `find_independent_tensors`.
+
+    Returns:
+        The indices of the independent candidates.
+    """
+    if not candidates:
+        return []
+
+    evaluated = [
+        evaluate_tensors(simplify_linear_combination(candidate), mode="embedding")
+        for candidate in candidates
+    ]
+    for array in evaluated:
+        if array.ndim != rank + weight:
+            raise ValueError(
+                f"Mapping tensor has rank {array.ndim}, expected {rank + weight}"
+            )
+
+    _, independent_indices = find_independent_tensors(
+        evaluated, tolerance=tolerance, method=method
+    )
+
+    return independent_indices
+
+
+def select_independent_mappings_probe(
+    weight: int,
+    rank: int,
+    candidates: list[LinearCombination],
+    tolerance: float = 1e-4,
+    method: Method = "gram_schmidt",
+) -> list[int]:
+    r"""Select independent mapping tensors by their action on one random ICT.
+
+    One fixed-seed random ICT of the weight is contracted through each candidate,
+    leaving a rank-$\ell$ tensor rather than a rank-$(n + \ell)$ one, and those are
+    tested for independence. This is what the reduction used before the exact scheme,
+    and it is much the cheapest of the three.
+
+    It is also the least direct. Embedding is linear in the mapping, so dependent
+    mappings always give dependent results and a dependence is never missed. The
+    converse does not hold: the map $\mathbf{G} \mapsto \mathbf{G} \odot^\ell
+    \mathbf{X}$ has a kernel in general, so for an unlucky probe two independent
+    mappings can give dependent tensors, and a channel would be lost. That cannot
+    happen with `select_independent_mappings`, which looks at the mappings
+    themselves.
+
+    Args:
+        weight: Weight of the ICT space.
+        rank: Rank of the Cartesian tensor space.
+        candidates: Candidate mapping tensors, in the order they are preferred.
+        tolerance: Residual norm below which a candidate is taken as dependent.
+        method: Which array-level scheme decides independence; see
+            `find_independent_tensors`.
+
+    Returns:
+        The indices of the independent candidates.
+    """
+    if not candidates:
+        return []
+
+    X = get_random_natural_tensor(weight)
+    embedded = [embed(candidate, X) for candidate in candidates]
+    _, independent_indices = find_independent_tensors(
+        embedded, tolerance=tolerance, method=method
+    )
+
+    return independent_indices

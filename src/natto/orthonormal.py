@@ -91,11 +91,44 @@ def _symmetric_inverse_square_root(
     return inverse_sqrt
 
 
-def _orthonormal_mapping_rules(weight: int, rank: int) -> tuple[str, str]:
-    """Build extraction and embedding rules for a self-dual numerical mapping."""
+def get_orthonormal_entries(weight: int, rank: int, G: list[LinearCombination]) -> dict:
+    """Pack one weight's operators in the self-dual basis of Eq. (26).
+
+    One array both extracts and embeds, so it appears under both keys and only the
+    einsum rule tells them apart. There is no symbolic form: the inverse square root
+    of a rational Gram matrix is generally irrational.
+
+    Args:
+        weight: Weight of the ICT space.
+        rank: Rank of the Cartesian tensor.
+        G: The independent mappings of this weight.
+
+    Returns:
+        The operators of this weight, in the form the package publishes.
+    """
+    _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, weight, rank)
+
     lower = letter_index(weight)
     upper = letter_index(rank, upper_case=True)
-    extraction_rule = f"{upper}{lower},...{upper}->...{lower}"
-    embedding_rule = f"{upper}{lower},...{lower}->...{upper}"
+    upper2 = letter_index(rank, start=rank, upper_case=True)
 
-    return extraction_rule, embedding_rule
+    rules = {
+        "embedding": f"{upper}{lower},...{lower}->...{upper}",
+        "extraction": f"{upper}{lower},...{upper}->...{lower}",
+        # the decomposition is not a single array here; applying it means
+        # extracting and embedding back through the same operator
+        "decomposition": f"{upper}{lower},{upper2}{lower},...{upper2}->...{upper}",
+    }
+
+    # One array per channel, shared between the keys rather than copied into
+    # each: that it is the same operator is the point of this basis.
+    operators = list(G_hat)
+
+    entries = {"gram": gram, "gram_inverse_sqrt": gram_inverse_sqrt}
+    for key, rule in rules.items():
+        entries[key] = [
+            {"symbolic": None, "rule": rule, "numerical": operator}
+            for operator in operators
+        ]
+
+    return entries

@@ -1,5 +1,5 @@
 from natto.gram import get_gram_matrix
-from natto.mappings import get_mappings_even, get_mappings_odd
+from natto.mapping_tensors import get_mappings_even, get_mappings_odd
 from natto.natural_projector import get_natural_projector
 
 

@@ -43,12 +43,8 @@ import pytest
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
 from natto.indices import letter_index
-from natto.mappings import (
-    get_dual_pair_of_weight,
-    get_reduction,
-    get_reduction_of_weight,
-)
 from natto.rational import fraction_matrix
+from natto.reduction import get_dual_pair, get_independent_mappings, get_reduction
 from tests.golden import (
     LOCAL_SNAPSHOT_DIR,
     assert_snapshot,
@@ -56,7 +52,7 @@ from tests.golden import (
     regolding,
     snapshot_path,
 )
-from tests.test_mappings import get_reduction_cached, get_tensor_class_params
+from tests.test_reduction import get_reduction_cached, get_tensor_class_params
 
 #: `LinearCombination.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "
@@ -183,14 +179,9 @@ def rank_six_content(symmetry: str | None) -> dict:
 
     content = {}
     for weight in RANK_SIX_WEIGHTS:
-        if symmetry is None:
-            embedding, extraction, gram, gram_inverse = get_dual_pair_of_weight(
-                weight, RANK_SIX
-            )
-        else:
-            embedding, extraction, _, gram, gram_inverse = get_reduction_of_weight(
-                weight, RANK_SIX, symmetry
-            )
+        embedding, gram = get_independent_mappings(weight, RANK_SIX, symmetry)
+        if embedding:
+            _, extraction, _, gram_inverse = get_dual_pair(embedding, gram, RANK_SIX)
 
         if not embedding:
             content[weight] = {"multiplicity": 0}

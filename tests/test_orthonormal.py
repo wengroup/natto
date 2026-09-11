@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from natto.intrinsic_symmetry import check_symmetry, impose_symmetry
-from natto.mappings import get_reduction
+from natto.reduction import get_reduction
 
 #: The operators are built in double precision and the identity they satisfy is
 #: exact, so what is left is rounding in the eigendecomposition.

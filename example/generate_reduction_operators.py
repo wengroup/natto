@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from natto.mappings import get_reduction
+from natto.reduction import get_reduction
 from natto.utils import yaml_dump
 
 

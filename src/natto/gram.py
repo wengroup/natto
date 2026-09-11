@@ -126,6 +126,10 @@ def get_gram_matrix(
         all_G: Rank-``n + j`` symbolic mapping tensors spanning the weight-``j``
             sector.
 
+    Only the lower triangle is contracted; the rest is mirrored. The Gram matrix of
+    real tensors is symmetric, and each entry costs a symbolic contraction, so
+    computing both halves would double the work for nothing.
+
     Returns:
         Symmetric matrix whose entries are exact :class:`fractions.Fraction` values.
     """
@@ -133,7 +137,9 @@ def get_gram_matrix(
 
     matrix = [[None] * num for _ in range(num)]
     for p in range(num):
-        for q in range(num):
-            matrix[p][q] = get_gram_entry(j, n, all_G[p], all_G[q])
+        for q in range(p + 1):
+            entry = get_gram_entry(j, n, all_G[p], all_G[q])
+            matrix[p][q] = entry
+            matrix[q][p] = entry
 
     return matrix
