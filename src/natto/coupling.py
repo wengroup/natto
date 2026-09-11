@@ -104,6 +104,209 @@ def get_coupling_symbolic(
     return _get_coupling_symbolic_odd(l1, l2, l3)
 
 
+def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
+    r"""
+    Get the einsum rule when l1 + l2 - l3 is even.
+
+    x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^m}
+
+    After contraction, the resultant tensor will have l1-k-t indices from x, and these
+    indices are still symmetric. Similarly, the resultant tensor will have l2-k-t
+    symmetric indices from y. It will have 2*t indices from I. Each two indices from I
+    are symmetric.
+
+    In total, the resultant tensor will have l3 = l1 + l2 - 2(k + t) tensor indices.
+
+    Returns:
+        rule: The einsum rule for the tensor product
+        symmetry: The symmetry information of the resultant tensor after the tensor.
+            product. e.g. `xxxyyyaa` means the first three indices are symmetric, the
+            next three indices are symmetric, and the last two indices are symmetric.
+        delta_indices: The indices for the delta tensors.
+    """
+
+    # indices that are contracted
+    xy_contracted = letter_index(k + t)
+
+    # indices that are not contracted
+    x_remain = letter_index(l1 - k - t, k + t)
+    y_remain = letter_index(l2 - k - t, l1)
+
+    # indices for contracting t of I
+    delta = double_index(t, upper_case=True)
+    delta_left = "," + ",".join(delta) if delta else ""
+    delta_right = "".join(delta)
+
+    rule = (
+        f"...{xy_contracted}{x_remain},"
+        f"...{xy_contracted}{y_remain}"
+        f"{delta_left}"
+        f"->...{x_remain}{y_remain}{delta_right}"
+    )
+
+    # l1-k-t remaining symmetric indices from x
+    # l2-k-t remaining symmetric indices from y
+    # 2t indices from all deltas. Each delta has 2 symmetric indices.
+    symmetry = (
+        "".join(["a"] * len(x_remain))
+        + "".join(["b"] * len(y_remain))
+        + "".join(repeat_double_index(t, upper_case=True))
+    )
+    delta_indices = letter_index(t, upper_case=True)
+
+    return rule, symmetry, delta_indices
+
+
+def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
+    r"""
+    Get the einsum rule when l1 + l2 - l3 is odd.
+
+    epsilon : x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^t}
+
+    epsilon is the Levi-Civita symbol. It contracts away one index from x and one index
+    from y. So, after contraction, the resultant tensor will have 1 index from epsilon.
+    After contraction, the resultant tensor will have l1-1-k-t indices from x, and these
+    indices are still symmetric. Similarly, the resultant tensor will have l2-1-k-t
+    symmetric indices from y. It will have 2*m indices from I. Each two indices from I
+    are symmetric.
+
+    In total, the resultant tensor will have l3 = l1 + l2 - 1 - 2(k + t) indices.
+
+
+    Returns:
+        rule: The einsum rule for the tensor product
+        symmetry: The symmetry information of the resultant tensor after the tensor
+            product. e.g. `aabb` means the first two indices are symmetric, and the last
+            two indices are symmetric.
+        delta_indices: The indices for the delta tensors.
+    """
+    # example: epsilon_Uvw x_vabc  y_wabd I_AB -> UcdAB
+
+    xy_contracted = letter_index(k + t)
+    x_remain = letter_index(l1 - 1 - k - t, k + t)
+    y_remain = letter_index(l2 - 1 - k - t, l1 - 1)
+
+    # indices for contracting t of I
+    delta = double_index(t, upper_case=True)
+    delta_left = "," + ",".join(delta) if delta else ""
+    delta_right = "".join(delta)
+
+    # The ... are for the batch dimensions
+    rule = (
+        f"uvw,"  # indices for epsilon
+        f"...v{xy_contracted}{x_remain},"
+        f"...w{xy_contracted}{y_remain}"
+        f"{delta_left}"
+        f"->...u{x_remain}{y_remain}{delta_right}"
+    )
+
+    # 1 index from epsilon
+    # l1-1-k-t remaining symmetric indices from x
+    # l2-1-k-t remaining symmetric indices from y
+    # 2t indices from all deltas. Each delta has 2 symmetric indices.
+    symmetry = (
+        "a"
+        + "".join(["b"] * len(x_remain))
+        + "".join(["c"] * len(y_remain))
+        + "".join(repeat_double_index(t, upper_case=True))
+    )
+    delta_indices = letter_index(t, upper_case=True)
+
+    return rule, symmetry, delta_indices
+
+
+def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
+    """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
+
+    The constant is fixed by requiring that the l3-fold contraction of the output
+    tensor with a unit vector yields 1.
+
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+
+    The value is a ratio of factorials, so it is returned exactly. Multiplying a
+    float array by a `Fraction` would silently make it an object array, so the
+    conversion happens at that boundary rather than here.
+
+    Returns:
+        The normalization constant.
+    """
+    L = l1 + l2 + l3
+    L1 = L - 2 * l1 - 1
+    L2 = L - 2 * l2 - 1
+    L3 = L - 2 * l3 - 1
+
+    numerator = (
+        factorial(l1)
+        * factorial(l2)
+        * double_factorial(2 * l3 - 1)
+        * factorial((L1 + 1) // 2)
+        * factorial((L2 + 1) // 2)
+    )
+    denominator = (
+        factorial(l3)
+        * double_factorial(L1)
+        * double_factorial(L2)
+        * double_factorial(L3)
+        * factorial(L // 2)
+    )
+
+    return Fraction(numerator, denominator)
+
+
+def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
+    r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
+
+    The condition differs from the one behind `coeff_C_even`. For odd `L` the
+    coupling operator carries a Levi-Civita symbol, so contracting the output
+    l3 times with a single unit vector vanishes identically by antisymmetry and
+    cannot fix the scale. The constant is fixed instead by the rate of that
+    vanishing: with $\mathbf{X}^{\ell_1}$ built from a unit vector $\mathbf{r}$
+    and $\mathbf{Y}^{\ell_2}$ from a unit vector $\mathbf{b}$,
+
+    $$\lim_{\mathbf{b} \to \mathbf{r}}
+    \frac{\lVert \mathbf{Z}^{\ell_3} \odot^{\ell_3 - 1}
+    \mathbf{r}^{\otimes(\ell_3 - 1)} \rVert}
+    {\lVert \mathbf{r} \times \mathbf{b} \rVert} = 1.$$
+
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+
+    The value is a ratio of factorials, so it is returned exactly. Multiplying a
+    float array by a `Fraction` would silently make it an object array, so the
+    conversion happens at that boundary rather than here.
+
+    Returns:
+        The normalization constant.
+    """
+    L = l1 + l2 + l3
+    L1 = L - 2 * l1 - 1
+    L2 = L - 2 * l2 - 1
+    L3 = L - 2 * l3 - 1
+
+    numerator = (
+        2
+        * factorial(l1)
+        * factorial(l2)
+        * double_factorial(2 * l3 - 1)
+        * factorial(L1 // 2)
+        * factorial(L2 // 2)
+    )
+    denominator = (
+        factorial(l3 - 1)
+        * double_factorial(L1 + 1)
+        * double_factorial(L2 + 1)
+        * double_factorial(L3 + 1)
+        * factorial((L + 1) // 2)
+    )
+
+    return Fraction(numerator, denominator)
+
+
 def _get_coupling_operator_even(
     l1: int, l2: int, l3: int, normalize: str = "unity"
 ) -> tuple[np.ndarray, str]:
@@ -415,206 +618,3 @@ def _get_coupling_rules_odd(
         )
 
     return all_rules
-
-
-def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    r"""
-    Get the einsum rule when l1 + l2 - l3 is even.
-
-    x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^m}
-
-    After contraction, the resultant tensor will have l1-k-t indices from x, and these
-    indices are still symmetric. Similarly, the resultant tensor will have l2-k-t
-    symmetric indices from y. It will have 2*t indices from I. Each two indices from I
-    are symmetric.
-
-    In total, the resultant tensor will have l3 = l1 + l2 - 2(k + t) tensor indices.
-
-    Returns:
-        rule: The einsum rule for the tensor product
-        symmetry: The symmetry information of the resultant tensor after the tensor.
-            product. e.g. `xxxyyyaa` means the first three indices are symmetric, the
-            next three indices are symmetric, and the last two indices are symmetric.
-        delta_indices: The indices for the delta tensors.
-    """
-
-    # indices that are contracted
-    xy_contracted = letter_index(k + t)
-
-    # indices that are not contracted
-    x_remain = letter_index(l1 - k - t, k + t)
-    y_remain = letter_index(l2 - k - t, l1)
-
-    # indices for contracting t of I
-    delta = double_index(t, upper_case=True)
-    delta_left = "," + ",".join(delta) if delta else ""
-    delta_right = "".join(delta)
-
-    rule = (
-        f"...{xy_contracted}{x_remain},"
-        f"...{xy_contracted}{y_remain}"
-        f"{delta_left}"
-        f"->...{x_remain}{y_remain}{delta_right}"
-    )
-
-    # l1-k-t remaining symmetric indices from x
-    # l2-k-t remaining symmetric indices from y
-    # 2t indices from all deltas. Each delta has 2 symmetric indices.
-    symmetry = (
-        "".join(["a"] * len(x_remain))
-        + "".join(["b"] * len(y_remain))
-        + "".join(repeat_double_index(t, upper_case=True))
-    )
-    delta_indices = letter_index(t, upper_case=True)
-
-    return rule, symmetry, delta_indices
-
-
-def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    r"""
-    Get the einsum rule when l1 + l2 - l3 is odd.
-
-    epsilon : x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^t}
-
-    epsilon is the Levi-Civita symbol. It contracts away one index from x and one index
-    from y. So, after contraction, the resultant tensor will have 1 index from epsilon.
-    After contraction, the resultant tensor will have l1-1-k-t indices from x, and these
-    indices are still symmetric. Similarly, the resultant tensor will have l2-1-k-t
-    symmetric indices from y. It will have 2*m indices from I. Each two indices from I
-    are symmetric.
-
-    In total, the resultant tensor will have l3 = l1 + l2 - 1 - 2(k + t) indices.
-
-
-    Returns:
-        rule: The einsum rule for the tensor product
-        symmetry: The symmetry information of the resultant tensor after the tensor
-            product. e.g. `aabb` means the first two indices are symmetric, and the last
-            two indices are symmetric.
-        delta_indices: The indices for the delta tensors.
-    """
-    # example: epsilon_Uvw x_vabc  y_wabd I_AB -> UcdAB
-
-    xy_contracted = letter_index(k + t)
-    x_remain = letter_index(l1 - 1 - k - t, k + t)
-    y_remain = letter_index(l2 - 1 - k - t, l1 - 1)
-
-    # indices for contracting t of I
-    delta = double_index(t, upper_case=True)
-    delta_left = "," + ",".join(delta) if delta else ""
-    delta_right = "".join(delta)
-
-    # The ... are for the batch dimensions
-    rule = (
-        f"uvw,"  # indices for epsilon
-        f"...v{xy_contracted}{x_remain},"
-        f"...w{xy_contracted}{y_remain}"
-        f"{delta_left}"
-        f"->...u{x_remain}{y_remain}{delta_right}"
-    )
-
-    # 1 index from epsilon
-    # l1-1-k-t remaining symmetric indices from x
-    # l2-1-k-t remaining symmetric indices from y
-    # 2t indices from all deltas. Each delta has 2 symmetric indices.
-    symmetry = (
-        "a"
-        + "".join(["b"] * len(x_remain))
-        + "".join(["c"] * len(y_remain))
-        + "".join(repeat_double_index(t, upper_case=True))
-    )
-    delta_indices = letter_index(t, upper_case=True)
-
-    return rule, symmetry, delta_indices
-
-
-def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
-    """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
-
-    The constant is fixed by requiring that the l3-fold contraction of the output
-    tensor with a unit vector yields 1.
-
-    Args:
-        l1: Weight of the first natural tensor X.
-        l2: Weight of the second natural tensor Y.
-        l3: Weight of the output natural tensor Z.
-
-    The value is a ratio of factorials, so it is returned exactly. Multiplying a
-    float array by a `Fraction` would silently make it an object array, so the
-    conversion happens at that boundary rather than here.
-
-    Returns:
-        The normalization constant.
-    """
-    L = l1 + l2 + l3
-    L1 = L - 2 * l1 - 1
-    L2 = L - 2 * l2 - 1
-    L3 = L - 2 * l3 - 1
-
-    numerator = (
-        factorial(l1)
-        * factorial(l2)
-        * double_factorial(2 * l3 - 1)
-        * factorial((L1 + 1) // 2)
-        * factorial((L2 + 1) // 2)
-    )
-    denominator = (
-        factorial(l3)
-        * double_factorial(L1)
-        * double_factorial(L2)
-        * double_factorial(L3)
-        * factorial(L // 2)
-    )
-
-    return Fraction(numerator, denominator)
-
-
-def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
-    r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
-
-    The condition differs from the one behind `coeff_C_even`. For odd `L` the
-    coupling operator carries a Levi-Civita symbol, so contracting the output
-    l3 times with a single unit vector vanishes identically by antisymmetry and
-    cannot fix the scale. The constant is fixed instead by the rate of that
-    vanishing: with $\mathbf{X}^{\ell_1}$ built from a unit vector $\mathbf{r}$
-    and $\mathbf{Y}^{\ell_2}$ from a unit vector $\mathbf{b}$,
-
-    $$\lim_{\mathbf{b} \to \mathbf{r}}
-    \frac{\lVert \mathbf{Z}^{\ell_3} \odot^{\ell_3 - 1}
-    \mathbf{r}^{\otimes(\ell_3 - 1)} \rVert}
-    {\lVert \mathbf{r} \times \mathbf{b} \rVert} = 1.$$
-
-    Args:
-        l1: Weight of the first natural tensor X.
-        l2: Weight of the second natural tensor Y.
-        l3: Weight of the output natural tensor Z.
-
-    The value is a ratio of factorials, so it is returned exactly. Multiplying a
-    float array by a `Fraction` would silently make it an object array, so the
-    conversion happens at that boundary rather than here.
-
-    Returns:
-        The normalization constant.
-    """
-    L = l1 + l2 + l3
-    L1 = L - 2 * l1 - 1
-    L2 = L - 2 * l2 - 1
-    L3 = L - 2 * l3 - 1
-
-    numerator = (
-        2
-        * factorial(l1)
-        * factorial(l2)
-        * double_factorial(2 * l3 - 1)
-        * factorial(L1 // 2)
-        * factorial(L2 // 2)
-    )
-    denominator = (
-        factorial(l3 - 1)
-        * double_factorial(L1 + 1)
-        * double_factorial(L2 + 1)
-        * double_factorial(L3 + 1)
-        * factorial((L + 1) // 2)
-    )
-
-    return Fraction(numerator, denominator)

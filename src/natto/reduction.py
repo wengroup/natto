@@ -36,6 +36,11 @@ from typing import Literal
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
 from natto.gram import get_gram_matrix
+from natto.independence import (
+    select_independent_mappings,
+    select_independent_mappings_components,
+    select_independent_mappings_probe,
+)
 from natto.indices import letter_index
 from natto.mapping_tensors import (
     get_decomposition_operators,
@@ -44,11 +49,6 @@ from natto.mapping_tensors import (
     get_mappings_odd,
 )
 from natto.orthonormal import get_orthonormal_entries
-from natto.qr import (
-    select_independent_mappings,
-    select_independent_mappings_components,
-    select_independent_mappings_probe,
-)
 from natto.rational import float_matrix, fraction_matrix, matrix_inverse
 from natto.symbolic import LinearCombination
 from natto.symmetry_adaptation import get_symmetry_adapted_mappings

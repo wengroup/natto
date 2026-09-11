@@ -370,28 +370,6 @@ def get_permutations_delta(
     return unique_perms
 
 
-def _canonize(ps: str, di: str) -> str:
-    """
-    Convert a permutation string to its canonical form, such that equivalent
-    permutation strings have the same representation.
-
-    Major symmetry is based on first occurrence positions of each letter in the
-    string. For example, `baba` and `fefe` are equivalent permutation strings, and
-    both will be converted to `0101`.
-
-    Args:
-        ps: The permutation string to convert
-        di: `delta_indices`
-
-    Returns:
-        The canonical form of the permutation string
-    """
-    # Do not need to canonize indices not in `delta_indices`.
-    # For example, in `symmetry = xxyyaabb` and `delta_indices = ab`,
-    # xxyy and yyxx are different.
-    return "".join(str(ps.index(c)) if c in di else c for c in ps)
-
-
 def remove_trace_rule(m: int, d: int) -> str:
     """
     Get the contraction rule to remove the trace of a symmetric tensor.
@@ -413,3 +391,25 @@ def remove_trace_rule(m: int, d: int) -> str:
     return (
         f"...{u_contracted}{u_remain},{','.join(delta)}->...{u_remain}{''.join(delta)}"
     )
+
+
+def _canonize(ps: str, di: str) -> str:
+    """
+    Convert a permutation string to its canonical form, such that equivalent
+    permutation strings have the same representation.
+
+    Major symmetry is based on first occurrence positions of each letter in the
+    string. For example, `baba` and `fefe` are equivalent permutation strings, and
+    both will be converted to `0101`.
+
+    Args:
+        ps: The permutation string to convert
+        di: `delta_indices`
+
+    Returns:
+        The canonical form of the permutation string
+    """
+    # Do not need to canonize indices not in `delta_indices`.
+    # For example, in `symmetry = xxyyaabb` and `delta_indices = ab`,
+    # xxyy and yyxx are different.
+    return "".join(str(ps.index(c)) if c in di else c for c in ps)

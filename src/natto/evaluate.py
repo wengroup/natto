@@ -18,39 +18,6 @@ from natto.utils import dij, eijk
 _MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
 
 
-@lru_cache(maxsize=512)
-def _cached_delta_epsilon_contraction(
-    rule: str, num_delta: int, num_epsilon: int
-) -> np.ndarray:
-    """Contract and cache a small product of delta and Levi-Civita tensors."""
-    data = [dij()] * num_delta + [eijk()] * num_epsilon
-
-    return np.einsum(rule, *data)
-
-
-def _contract_delta_epsilon(rule: str, num_delta: int, num_epsilon: int) -> np.ndarray:
-    """Contract a product of Kronecker deltas and Levi-Civita symbols.
-
-    The operands are fixed constants whose multiplicities are given by ``num_delta``
-    and ``num_epsilon``, so small results depend only on the arguments and are cached.
-    A tensor expansion contains many terms sharing the same index pattern -- for the
-    rank-six weight-two mappings, 11358 contractions use only 190 distinct rules --
-    and ``numpy.einsum`` spends most of its time searching for a contraction path
-    rather than contracting, so caching removes the bulk of that cost. Results larger
-    than ``3**8`` elements bypass the cache to keep its memory use bounded.
-
-    A cached result is shared; callers must not modify it in place.
-    """
-    output_indices = rule.rsplit("->", maxsplit=1)[1]
-    output_elements = 3 ** len(output_indices)
-    if output_elements <= _MAX_CACHED_CONTRACTION_ELEMENTS:
-        return _cached_delta_epsilon_contraction(rule, num_delta, num_epsilon)
-
-    data = [dij()] * num_delta + [eijk()] * num_epsilon
-
-    return np.einsum(rule, *data)
-
-
 def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
@@ -208,3 +175,36 @@ def embed(G: LinearCombination, X: np.ndarray) -> np.ndarray:
     out = np.einsum(rule, G_num, X)
 
     return out
+
+
+@lru_cache(maxsize=512)
+def _cached_delta_epsilon_contraction(
+    rule: str, num_delta: int, num_epsilon: int
+) -> np.ndarray:
+    """Contract and cache a small product of delta and Levi-Civita tensors."""
+    data = [dij()] * num_delta + [eijk()] * num_epsilon
+
+    return np.einsum(rule, *data)
+
+
+def _contract_delta_epsilon(rule: str, num_delta: int, num_epsilon: int) -> np.ndarray:
+    """Contract a product of Kronecker deltas and Levi-Civita symbols.
+
+    The operands are fixed constants whose multiplicities are given by ``num_delta``
+    and ``num_epsilon``, so small results depend only on the arguments and are cached.
+    A tensor expansion contains many terms sharing the same index pattern -- for the
+    rank-six weight-two mappings, 11358 contractions use only 190 distinct rules --
+    and ``numpy.einsum`` spends most of its time searching for a contraction path
+    rather than contracting, so caching removes the bulk of that cost. Results larger
+    than ``3**8`` elements bypass the cache to keep its memory use bounded.
+
+    A cached result is shared; callers must not modify it in place.
+    """
+    output_indices = rule.rsplit("->", maxsplit=1)[1]
+    output_elements = 3 ** len(output_indices)
+    if output_elements <= _MAX_CACHED_CONTRACTION_ELEMENTS:
+        return _cached_delta_epsilon_contraction(rule, num_delta, num_epsilon)
+
+    data = [dij()] * num_delta + [eijk()] * num_epsilon
+
+    return np.einsum(rule, *data)
