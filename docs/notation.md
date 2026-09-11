@@ -76,6 +76,8 @@ Names that meant something else, or several things, and must not come back.
 | `symmetrize` | module | `symmetric_traceless`; the numerical route to an ICT |
 | `symmetrize` | *two* functions of that name, in those two modules | `intrinsic_symmetry.impose_symmetry` and `symmetric_traceless.symmetrize` |
 | `matrix` | module | `rational`; it is exact arithmetic, not numpy |
+| `find_independent_tensors_qr_unpivoted` | the original independence test, reading an unpivoted QR diagonal | deleted; it was not rank-revealing and lost ICT channels |
+| `pivoting=False` | a flag on `find_independent_tensors_scipy_qr` | deleted; it reached the same bug by another name, so pivoting is unconditional |
 | `mappings` | module mixing the objects with the pipeline | `mapping_tensors` for building G, G~ and S; `reduction` for running them |
 | `get_reduction_of_weight`, `get_dual_pair_of_weight` | one function per stage pair | `get_independent_mappings` then `get_dual_pair`, so the orthonormal basis can stop after the first |
 | `get_E_rules` | index patterns of the natural projector | `get_projector_rules` |

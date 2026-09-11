@@ -74,23 +74,6 @@ def orthonormalize_mappings(
     return numerical, gram, gram_inverse_sqrt, orthonormal
 
 
-def _symmetric_inverse_square_root(
-    matrix: np.ndarray, rtol: float = 1e-10, atol: float = 1e-12
-) -> np.ndarray:
-    """Compute the symmetric inverse square root of a positive-definite matrix."""
-    if not np.allclose(matrix, matrix.T, rtol=rtol, atol=atol):
-        raise ValueError("Gram matrix must be symmetric")
-
-    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
-    threshold = atol + rtol * np.max(np.abs(eigenvalues))
-    if np.any(eigenvalues <= threshold):
-        raise ValueError("Gram matrix must be positive definite")
-
-    inverse_sqrt = eigenvectors @ np.diag(1 / np.sqrt(eigenvalues)) @ eigenvectors.T
-
-    return inverse_sqrt
-
-
 def get_orthonormal_entries(weight: int, rank: int, G: list[LinearCombination]) -> dict:
     """Pack one weight's operators in the self-dual basis of Eq. (26).
 
@@ -132,3 +115,20 @@ def get_orthonormal_entries(weight: int, rank: int, G: list[LinearCombination]) 
         ]
 
     return entries
+
+
+def _symmetric_inverse_square_root(
+    matrix: np.ndarray, rtol: float = 1e-10, atol: float = 1e-12
+) -> np.ndarray:
+    """Compute the symmetric inverse square root of a positive-definite matrix."""
+    if not np.allclose(matrix, matrix.T, rtol=rtol, atol=atol):
+        raise ValueError("Gram matrix must be symmetric")
+
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    threshold = atol + rtol * np.max(np.abs(eigenvalues))
+    if np.any(eigenvalues <= threshold):
+        raise ValueError("Gram matrix must be positive definite")
+
+    inverse_sqrt = eigenvectors @ np.diag(1 / np.sqrt(eigenvalues)) @ eigenvectors.T
+
+    return inverse_sqrt
