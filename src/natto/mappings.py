@@ -25,9 +25,13 @@ returns $\mathbf{T}$ (Eq. 30).
 They are returned under the keys `embedding`, `extraction` and `decomposition`;
 see docs/notation.md for the correspondence with the paper throughout.
 
-Two steps of the construction live in their own modules: the exact null space
-that adapts the mappings to an intrinsic symmetry, in `symmetry_adapted`, and
-the numerical rotation to a self-dual basis, in `orthonormal`.
+A mapping tensor is a rank-lowering tensor followed by the natural projector
+(Eq. 19), so the candidates of a weight are assembled here out of `lowering` and
+`natural_projector`. Which of them are independent, and how the embedding
+operators turn into their extraction duals, is settled by the exact Gram matrix
+in `gram`. Two further steps have their own modules: the exact null space that
+adapts the mappings to an intrinsic symmetry, in `symmetry_adaptation`, and the
+numerical rotation to a self-dual basis, in `orthonormal`.
 """
 
 from fractions import Fraction
@@ -35,22 +39,23 @@ from fractions import Fraction
 import numpy as np
 from numpy.typing import DTypeLike
 
-from natto.algebra import simplify_linear_combination
+from natto.algebra import multiply_2, simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
-from natto.indices import letter_index
-from natto.operators import (
-    get_extraction_operators,
-    get_G_even,
-    get_G_odd,
-    get_gram_matrix,
-    get_S,
-)
+from natto.gram import get_gram_matrix
+from natto.indices import letter_index, shift_index_2
+from natto.lowering import get_lowering_rules_even, get_lowering_rules_odd
+from natto.natural_projector import get_natural_projector
 from natto.orthonormal import orthonormalize_mappings
 from natto.qr import find_independent_tensors
 from natto.rational import float_matrix, fraction_matrix, matrix_inverse
-from natto.symbolic import LinearCombination
-from natto.symmetrize import get_random_natural_tensor
-from natto.symmetry_adapted import get_symmetry_adapted_mappings
+from natto.symbolic import (
+    Epsilon,
+    LinearCombination,
+    Scalar,
+    create_delta_epsilon_tensors,
+)
+from natto.symmetric_traceless import get_random_natural_tensor
+from natto.symmetry_adaptation import get_symmetry_adapted_mappings
 
 
 def get_reduction(
@@ -226,7 +231,7 @@ def get_reduction_of_weight(
 
     G = [simplify_linear_combination(G_p) for G_p in ind_G]
     G_tilde = [simplify_linear_combination(G_tilde_p) for G_tilde_p in ind_G_tilde]
-    S = get_S(G, G_tilde, rank)
+    S = get_decomposition_operators(G, G_tilde, rank)
 
     return G, G_tilde, S, gram, gram_inverse
 
@@ -258,9 +263,9 @@ def get_dual_pair_of_weight(
         return [], [], [], []
 
     if (rank - weight) % 2 == 0:
-        candidates = get_G_even(weight, rank)
+        candidates = get_mappings_even(weight, rank)
     else:
-        candidates = get_G_odd(weight, rank)
+        candidates = get_mappings_odd(weight, rank)
 
     # WARNING, the candidates must not be simplified here: `get_gram_matrix` below
     # is set up to work with the mappings in their original form.
@@ -363,3 +368,130 @@ def assemble_operator_entries(
             )
 
     return out_weight
+
+
+def get_mappings_even(j: int, n: int) -> list[LinearCombination]:
+    r"""
+    Mapping operator G to map minimal rank tensor subspaces j onto the space n.
+
+    G(n|j)^q = E_j \otimes^{n-j} f_{n-j}^q.
+
+    This is for even n-j.
+
+    Reference: Eq. 2.4 of [AG82].
+
+    Args:
+        j: the minimal tensor subspace
+        n: the space to map to
+
+    Returns:
+        A list of Tensors objects, each corresponding to a q in f_{n-j}^q.
+    """
+
+    assert (n - j) % 2 == 0, f"n-j must be even, got n={n}, j={j}"
+
+    E_s_letters, delta_rules = get_lowering_rules_even(j, n)
+
+    all_G = []
+    for si, rule in zip(E_s_letters, delta_rules):
+        E_j = get_natural_projector(j, s_letters=si)
+        f_q = create_delta_epsilon_tensors(rule)
+        G = multiply_2(E_j, f_q)
+        all_G.append(G)
+
+    return all_G
+
+
+def get_mappings_odd(j: int, n: int) -> list[LinearCombination]:
+    r"""
+    Mapping operator G to map minimal rank tensor subspaces j onto the space n.
+
+
+    G(n|j)^q = E_j \otimes^{n-j} f_{n-j}^q.
+
+    This is for odd n-j.
+
+    Reference: Eq. 2.5 of [AG82].
+
+    Args:
+        j: the minimal tensor subspace
+        n: the space to map to
+
+    Returns:
+        A list of Tensors objects, each corresponding to a q in f_{n-j}^q.
+    """
+    assert (n - j) % 2 == 1, f"n-j must be odd, got n={n}, j={j}"
+
+    E_s_letters, f_epsilon_rules, f_delta_rules = get_lowering_rules_odd(j, n)
+
+    all_G = []
+    for si, e_rule, d_rule in zip(E_s_letters, f_epsilon_rules, f_delta_rules):
+        E_j = get_natural_projector(j, s_letters=si)
+        f_q_epsilon = Epsilon(e_rule)
+        f_q_delta = create_delta_epsilon_tensors(d_rule)
+        G = multiply_2(E_j, f_q_epsilon, f_q_delta)
+        all_G.append(G)
+
+    return all_G
+
+
+def get_extraction_operators(
+    gram_inverse: list[list[Fraction]], embedding: list[LinearCombination]
+) -> list[LinearCombination]:
+    r"""Build the extraction operators dual to a set of embedding operators.
+
+    The paper's Eq. (22),
+
+    $$
+    \widetilde{\mathbf{G}}^p_{(\ell|n)}
+        = \sum_q (\mathbf{g}^{-1})_{pq} \mathbf{G}^q_{(\ell|n)}
+    $$
+
+    Contracted with a Cartesian tensor, each returns the natural tensor of its
+    weight and channel.
+
+    Args:
+        gram_inverse: Exact inverse of the embedding operators' Gram matrix.
+        embedding: The embedding operators, in the order the matrix indexes.
+
+    Returns:
+        One extraction operator per row of `gram_inverse`.
+    """
+    extraction = []
+    for row in gram_inverse:
+        terms = []
+        for c, G in zip(row, embedding):
+            if c:
+                terms.extend(multiply_2(Scalar(c), G))
+        extraction.append(LinearCombination(*terms))
+
+    return extraction
+
+
+def get_decomposition_operators(
+    G: list[LinearCombination], G_tilde: list[LinearCombination], n: int
+) -> list[LinearCombination]:
+    r"""
+    Get the decomposition operators of a mapping and its dual.
+
+    S = G \odot^j G~
+
+    Args:
+        G: mapping tensors
+        G_tilde: the duals, in the order of the mappings they correspond to.
+        n: rank of the Cartesian tensor.
+
+    Returns:
+        S: one decomposition operator per channel
+    """
+    S = []
+    for G_i, dual_i in zip(G, G_tilde):
+        # Shift upper letters of the dual to distinguish them from those of G
+        dual_i = shift_index_2(dual_i, n, letter_index(24, upper_case=True))
+
+        S_i = multiply_2(G_i, dual_i)
+        S_i = simplify_linear_combination(S_i)
+
+        S.append(S_i)
+
+    return S

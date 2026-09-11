@@ -47,10 +47,13 @@ from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
-from natto.indices import double_index, letter_index, repeat_double_index
-from natto.operators import create_delta_epsilon_tensors
-from natto.symbolic import LinearCombination
-from natto.symmetrize import get_permutations_delta
+from natto.indices import (
+    double_index,
+    get_permutations_delta,
+    letter_index,
+    repeat_double_index,
+)
+from natto.symbolic import LinearCombination, create_delta_epsilon_tensors
 from natto.utils import (
     double_factorial,
     factorial,
@@ -309,7 +312,7 @@ def _get_coupling_rules_even(
         #
         # The below is the same as
         # indices = [letters[perm.index(i)] for i in range(n)]
-        # in get_G_rules_odd() and get_G_rules_even()
+        # in get_lowering_rules_odd() and get_lowering_rules_even()
         p_a = [x for _, x in sorted(zip(perm, a_idx))]
 
         # a indices in d_ra, d_sa and d_aa
@@ -390,7 +393,7 @@ def _get_coupling_rules_odd(
         #
         # The below is the same as
         # indices = [letters[perm.index(i)] for i in range(n)]
-        # in get_G_rules_odd() and get_G_rules_even()
+        # in get_lowering_rules_odd() and get_lowering_rules_even()
         p_a = [x for _, x in sorted(zip(perm, a_idx))]
 
         # a indices in epsilon, d_ra, d_sa and d_aa

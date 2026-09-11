@@ -7,10 +7,10 @@ import pytest
 
 import natto.mappings
 from natto.evaluate import evaluate_tensors
+from natto.gram import get_gram_matrix
+from natto.intrinsic_symmetry import impose_symmetry
 from natto.mappings import get_reduction, get_reduction_of_weight
-from natto.operators import get_gram_matrix
 from natto.qr import find_independent_tensors
-from natto.sym import symmetrize
 
 
 class TensorClass(NamedTuple):
@@ -212,7 +212,7 @@ def test_reduction_round_trip(tensor_class: TensorClass):
 
     # symmetrize the tensor if `symmetry` is not None
     if symmetry is not None:
-        T = symmetrize(T, symmetry)
+        T = impose_symmetry(T, symmetry)
 
     output = get_reduction_cached(rank, symmetry)
 

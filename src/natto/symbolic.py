@@ -461,3 +461,31 @@ class LinearCombination:
         str_rep = self.to_str_list(including_zero=False)
 
         return "  ".join(str_rep)
+
+
+def create_delta_epsilon_tensors(
+    rule: list[str], epsilon: str = None, factor: int | Fraction = 1
+) -> TensorProduct:
+    """Create a TensorProduct of deltas and epsilons.
+
+    Currently, we only support a single epsilon tensor in the product, because it is
+    all needed to create the E, G, H tensors.
+
+    Args:
+        rule: Each string contains a pair of indices for a delta tensor.
+        epsilon: A three letter string for the epsilon tensor.
+        factor: additional factor to multiply with the tensor product
+
+    Returns:
+        List of TensorProduct objects.
+    """
+
+    tensors = [Delta(pair) for pair in rule]
+
+    if epsilon is not None:
+        e = Epsilon(epsilon)
+        tensors.append(e)
+
+    tp = TensorProduct(*tensors, factor=factor)
+
+    return tp

@@ -24,7 +24,7 @@ import pytest
 import scipy.special
 
 from natto.coupling import get_coupling_operator
-from natto.symmetrize import remove_trace
+from natto.symmetric_traceless import remove_trace
 
 #: Weights the conditions are checked at. The operator is closed form, so this
 #: is cheap; the ceiling is only to keep the parametrization readable.

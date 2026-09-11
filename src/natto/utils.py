@@ -1,3 +1,11 @@
+r"""Small helpers shared across the package.
+
+The two isotropic tensors $\bm\delta$ and $\bm\epsilon$ as numpy arrays, the
+exact factorials that appear in the operator coefficients, predicates for
+checking that a tensor really is symmetric and traceless, and writing a set of
+operators out to YAML.
+"""
+
 import gzip
 import itertools
 import math

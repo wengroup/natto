@@ -2,11 +2,11 @@ import itertools
 
 import numpy as np
 
-from natto.sym import (
+from natto.intrinsic_symmetry import (
     check_symmetry,
     generate_permutations,
+    impose_symmetry,
     parse_symmetry_generators,
-    symmetrize,
 )
 
 
@@ -54,30 +54,30 @@ def test_generate_permutations():
     assert perms == set(itertools.permutations([0, 1, 2, 3]))
 
 
-def test_symmetrize():
+def test_impose_symmetry():
     rng = np.random.default_rng(35)
 
     t = rng.standard_normal((3, 3))
     symmetry = "ij=ji"
-    out = symmetrize(t, symmetry)
+    out = impose_symmetry(t, symmetry)
     assert check_symmetry(out, symmetry)
 
     t = rng.standard_normal((3, 3, 3))
     symmetry = "ijk=ikj"
-    out = symmetrize(t, symmetry)
+    out = impose_symmetry(t, symmetry)
     assert check_symmetry(out, symmetry)
 
     symmetry = "ijk=jik=ikj"
-    out = symmetrize(t, symmetry)
+    out = impose_symmetry(t, symmetry)
     assert check_symmetry(out, symmetry)
 
     t = rng.standard_normal((3, 3, 3, 3))
     symmetry = "ijkl=jikl=klij"
-    out = symmetrize(t, symmetry)
+    out = impose_symmetry(t, symmetry)
     assert check_symmetry(out, symmetry)
 
     symmetry = "ijkl=jikl=kjil=ljki"
-    out = symmetrize(t, symmetry)
+    out = impose_symmetry(t, symmetry)
     assert check_symmetry(out, symmetry)
 
 
@@ -91,7 +91,7 @@ def test_antisymmetric_rank_two():
     }
 
     tensor = np.random.default_rng(35).standard_normal((3, 3))
-    output = symmetrize(tensor, symmetry)
+    output = impose_symmetry(tensor, symmetry)
     assert check_symmetry(output, symmetry)
     assert np.allclose(output, (tensor - tensor.T) / 2)
 
@@ -99,6 +99,8 @@ def test_antisymmetric_rank_two():
 def test_fully_antisymmetric_rank_three():
     """Check float32 projection onto the fully antisymmetric rank-three space."""
     symmetry = "ijk=-jik=-ikj"
-    output = symmetrize(np.random.default_rng(35).standard_normal((3, 3, 3)), symmetry)
+    output = impose_symmetry(
+        np.random.default_rng(35).standard_normal((3, 3, 3)), symmetry
+    )
 
     assert check_symmetry(output, symmetry)
