@@ -97,7 +97,7 @@ def test_antisymmetric_rank_two():
 
 
 def test_fully_antisymmetric_rank_three():
-    """Check float32 projection onto the fully antisymmetric rank-three space."""
+    """Check projection onto the fully antisymmetric rank-three space."""
     symmetry = "ijk=-jik=-ikj"
     output = impose_symmetry(
         np.random.default_rng(35).standard_normal((3, 3, 3)), symmetry

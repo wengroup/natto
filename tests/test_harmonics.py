@@ -33,7 +33,7 @@ def unit_vector(seed: int) -> np.ndarray:
 
 def harmonic(direction: np.ndarray, weight: int, normalize: str = "unity"):
     """The Cartesian harmonic of `direction`, through the operator."""
-    operator, rule = get_harmonic_operator(weight, normalize, dtype=np.float64)
+    operator, rule = get_harmonic_operator(weight, normalize)
 
     return np.einsum(rule, operator, *[direction] * weight)
 

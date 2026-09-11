@@ -24,21 +24,3 @@ def test_large_delta_epsilon_contractions_bypass_cache():
     np.testing.assert_allclose(first, second, atol=1e-12)
     assert _cached_delta_epsilon_contraction.cache_info() == small_cache_info
     _cached_delta_epsilon_contraction.cache_clear()
-
-
-def test_cache_distinguishes_dtypes():
-    """The dtype is part of the cache key, so one dtype cannot serve another."""
-    _cached_delta_epsilon_contraction.cache_clear()
-    try:
-        float32_result = _contract_delta_epsilon(
-            "ab->ab", num_delta=1, num_epsilon=0, dtype=np.float32
-        )
-        float64_result = _contract_delta_epsilon(
-            "ab->ab", num_delta=1, num_epsilon=0, dtype=np.float64
-        )
-
-        assert float32_result.dtype == np.float32
-        assert float64_result.dtype == np.float64
-        assert _cached_delta_epsilon_contraction.cache_info().currsize == 2
-    finally:
-        _cached_delta_epsilon_contraction.cache_clear()

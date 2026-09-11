@@ -14,19 +14,18 @@ from typing import Optional
 
 import numpy as np
 import yaml
-from numpy.typing import DTypeLike
 
 from natto.indices import letter_index
 
 
-def dij(dtype: DTypeLike = None) -> np.ndarray:
+def dij() -> np.ndarray:
     """Kronecker delta tensor."""
-    return np.eye(3, dtype=dtype)
+    return np.eye(3)
 
 
-def eijk(dtype: DTypeLike = None) -> np.ndarray:
+def eijk() -> np.ndarray:
     """Levi-Civita tensor."""
-    e = np.zeros((3, 3, 3), dtype=dtype)
+    e = np.zeros((3, 3, 3))
     e[0, 1, 2] = 1.0
     e[1, 2, 0] = 1.0
     e[2, 0, 1] = 1.0

@@ -26,15 +26,12 @@ from natto.harmonics import get_harmonic_operator, get_harmonic_symbolic
 from natto.utils import yaml_dump
 
 
-def generate_harmonic_operators(
-    max_weight: int, dtype=np.float64
-) -> dict[str, dict[str, np.ndarray]]:
+def generate_harmonic_operators(max_weight: int) -> dict[str, dict[str, np.ndarray]]:
     """
     Generate harmonic operators and the corresponding einsum rules.
 
     Args:
         max_weight: Maximum weight of the harmonic.
-        dtype: The data type of the generated arrays.
 
     Return:
         Harmonic operators and rules,
@@ -44,7 +41,7 @@ def generate_harmonic_operators(
     for weight in range(max_weight + 1):
         for normalize in ["unity", "none"]:
             H_symbolic, _, _ = get_harmonic_symbolic(weight)
-            H, rule = get_harmonic_operator(weight, normalize, dtype=dtype)
+            H, rule = get_harmonic_operator(weight, normalize)
 
             H_symbolic = simplify_linear_combination(H_symbolic)
             # replace δ (delta) by d and ε (epsilon) by e

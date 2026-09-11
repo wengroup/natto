@@ -38,7 +38,6 @@ it; a fresh clone gets the rank-four coverage and a skip.
 import functools
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from natto.algebra import simplify_linear_combination
@@ -62,12 +61,12 @@ from tests.test_mappings import get_reduction_cached, get_tensor_class_params
 #: `LinearCombination.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "
 
-#: The package evaluates operators in float32 by default, so the fingerprint of a
-#: rank-8 operator sums a few thousand such entries and re-associating that sum
-#: moves the total by around 1e-5 relative. The symbolic form is what pins the
-#: content exactly; this tolerance only has to be tight enough to notice a
-#: different basis, which is order one.
-FINGERPRINT_RTOL = 1e-5
+#: The fingerprint of a rank-8 operator sums a few thousand float64 entries, and
+#: re-associating that sum -- between BLAS builds, say -- moves the total in its
+#: last bits. The suite passes at 1e-12; this leaves two orders on that. The
+#: symbolic form is what pins the content exactly, so this only has to be tight
+#: enough to notice a different basis, which is order one.
+FINGERPRINT_RTOL = 1e-10
 
 #: Rank six is where the paper's new result lives, so it is snapshotted even
 #: though no rank-six row is in `PHYSICAL_TENSOR_CLASSES`.
@@ -94,7 +93,7 @@ THIRD_ORDER_ELASTIC = "ijklmn=jiklmn=klijmn=ijmnkl"
 @functools.lru_cache(maxsize=None)
 def get_orthonormal_cached(rank: int, symmetry: str | None) -> dict:
     """The reduction in the self-dual basis, once per class; rank 4 costs seconds."""
-    return get_reduction(rank, symmetry, basis="orthonormal", dtype=np.float64)
+    return get_reduction(rank, symmetry, basis="orthonormal")
 
 
 def dual_pair_content(rank: int, symmetry: str | None) -> dict:

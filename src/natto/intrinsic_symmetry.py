@@ -59,8 +59,10 @@ def check_symmetry(
         t: The input tensor to be checked.
         symmetry: The target symmetry of the output tensor. e.g. 'ijk=ikj=jik'.
         rtol: Relative tolerance used for numerical comparison.
-        atol: Absolute tolerance used for numerical comparison. The default is loose
-            enough for float32 tensors; tighten it for float64 ones.
+        atol: Absolute tolerance used for numerical comparison. The default is
+            deliberately loose, since the tensor being checked is the caller's own
+            and may carry error from wherever it came from; tighten it for a
+            tensor built exactly.
 
     Returns:
         True if the tensor has the specified symmetry, False otherwise.

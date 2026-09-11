@@ -36,9 +36,6 @@ numerical rotation to a self-dual basis, in `orthonormal`.
 
 from fractions import Fraction
 
-import numpy as np
-from numpy.typing import DTypeLike
-
 from natto.algebra import multiply_2, simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
 from natto.gram import get_gram_matrix
@@ -63,7 +60,6 @@ def get_reduction(
     symmetry: str = None,
     basis: str = "dual",
     numerical: bool = True,
-    dtype: DTypeLike = None,
 ) -> dict:
     """Reduce a Cartesian tensor space into its irreducible parts.
 
@@ -93,10 +89,6 @@ def get_reduction(
         numerical: Whether to evaluate the operators as well as building them
             symbolically. Ignored for `basis="orthonormal"`, which is numerical
             by construction.
-        dtype: Floating-point dtype of the evaluated operators, double precision
-            if not given. The orthonormal basis is computed in double precision
-            whatever this is, and cast at the end, since it rests on an
-            eigendecomposition.
 
     Returns:
         The embedding, extraction and decomposition operators keyed by weight,
@@ -122,7 +114,7 @@ def get_reduction(
             continue
 
         if basis == "orthonormal":
-            out[weight] = _orthonormal_entries(weight, rank, G, dtype)
+            out[weight] = _orthonormal_entries(weight, rank, G)
         else:
             out[weight] = assemble_operator_entries(
                 weight,
@@ -135,15 +127,12 @@ def get_reduction(
                 numerical,
                 include_gram=True,
                 include_gram_inverse=True,
-                dtype=dtype,
             )
 
     return out
 
 
-def _orthonormal_entries(
-    weight: int, rank: int, G: list[LinearCombination], dtype: DTypeLike = None
-) -> dict:
+def _orthonormal_entries(weight: int, rank: int, G: list[LinearCombination]) -> dict:
     """Pack one weight's operators in the self-dual basis of Eq. (26).
 
     One array both extracts and embeds, so it appears under both keys and only
@@ -151,11 +140,6 @@ def _orthonormal_entries(
     square root of a rational Gram matrix is generally irrational.
     """
     _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, weight, rank)
-    if dtype is None:
-        dtype = np.float64
-    gram = gram.astype(dtype)
-    gram_inverse_sqrt = gram_inverse_sqrt.astype(dtype)
-    G_hat = G_hat.astype(dtype)
 
     lower = letter_index(weight)
     upper = letter_index(rank, upper_case=True)
@@ -295,7 +279,6 @@ def assemble_operator_entries(
     numerical: bool = True,
     include_gram: bool = True,
     include_gram_inverse: bool = True,
-    dtype: DTypeLike = None,
 ) -> dict:
     """Pack the operators of one weight into the form the package publishes.
 
@@ -315,7 +298,6 @@ def assemble_operator_entries(
             symbolically.
         include_gram: Whether to report the Gram matrix.
         include_gram_inverse: Whether to report its inverse.
-        dtype: Floating-point dtype of the evaluated operators.
 
     Returns:
         The operators under the keys `embedding`, `extraction` and
@@ -345,7 +327,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["embedding"][-1]["numerical"] = evaluate_tensors(
-                G_p, mode="embedding", dtype=dtype
+                G_p, mode="embedding"
             )
 
         out_weight["extraction"].append(
@@ -356,7 +338,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["extraction"][-1]["numerical"] = evaluate_tensors(
-                G_tilde_p, mode="extraction", dtype=dtype
+                G_tilde_p, mode="extraction"
             )
 
         out_weight["decomposition"].append(
@@ -364,7 +346,7 @@ def assemble_operator_entries(
         )
         if numerical:
             out_weight["decomposition"][-1]["numerical"] = evaluate_tensors(
-                S_p, mode="decomposition", dtype=dtype
+                S_p, mode="decomposition"
             )
 
     return out_weight

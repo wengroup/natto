@@ -178,7 +178,7 @@ def remove_trace(u: np.ndarray, start_dim: int = 0) -> np.ndarray:
     m = u.ndim - start_dim
     D = m // 2
 
-    delta = dij(u.dtype)
+    delta = dij()
     coeff = 1
     out = u
     for d in range(1, D + 1):

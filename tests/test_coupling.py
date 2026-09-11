@@ -36,11 +36,11 @@ MAX_WEIGHT = 3
 LIMIT_SEPARATION = 1e-4
 LIMIT_RTOL = 1e-3
 
-#: The package evaluates the coupling operator in float32, so a triple like
-#: (3, 3, 6), whose operator carries many terms, agrees to about 1e-6 relative
-#: rather than to float64 precision. A wrong normalization constant would be off
-#: by a factor of order one, so this stays far from anything it needs to catch.
-OPERATOR_RTOL = 1e-5
+#: Everything here is float64, and the worst triple -- (3, 3, 6), whose operator
+#: carries the most terms -- agrees to about 1e-13 relative. This leaves two
+#: orders of margin on that. A wrong normalization constant would be off by a
+#: factor of order one, so it stays far from anything the check needs to catch.
+OPERATOR_RTOL = 1e-11
 
 
 def double_factorial(n: int) -> float:
@@ -159,7 +159,7 @@ def test_even_parity_normalization(l1: int, l2: int, l3: int):
     )
 
     np.testing.assert_allclose(
-        coupled, cartesian_harmonic(a, l3), rtol=OPERATOR_RTOL, atol=1e-7
+        coupled, cartesian_harmonic(a, l3), rtol=OPERATOR_RTOL, atol=0
     )
 
 

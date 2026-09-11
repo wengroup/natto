@@ -70,7 +70,7 @@ def get_T(rank: int):
     """Create a tensor of rank `rank` for testing."""
     if rank == 0:
         return np.array(1.0)
-    t = np.arange(3**rank).reshape([3] * rank).astype(np.float32)
+    t = np.arange(3**rank).reshape([3] * rank).astype(np.float64)
     return t / t.mean()
 
 

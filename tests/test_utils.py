@@ -1,7 +1,6 @@
 from math import factorial as factorial_math
 
 import numpy as np
-import pytest
 
 from natto.utils import (
     double_factorial,
@@ -50,16 +49,8 @@ def test_get_trace():
     assert np.allclose(trace, np.array([12.0, 39.0, 66.0]))
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_traceless_check_accepts_any_float_dtype(dtype):
-    """`np.allclose` raises on a dtype mismatch, so the zero must follow the input.
-
-    A zero built in the default dtype made `is_traceless` raise for every tensor
-    in another one, rather than report on its trace.
-    """
-    traceless = np.array(
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -2.0]], dtype=dtype
-    )
+def test_traceless_check():
+    traceless = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -2.0]])
 
     assert is_traceless(traceless)
-    assert not is_traceless(np.eye(3, dtype=dtype))
+    assert not is_traceless(np.eye(3))
