@@ -41,7 +41,7 @@ T = np.array([
 ])
 
 # the operators of every rank-2 tensor, keyed by weight
-operators = get_reduction(rank=2)
+operators = get_reduction(n=2)
 
 for weight, data in operators.items():
     # a weight can occur more than once; each occurrence is a channel, and at
@@ -86,7 +86,7 @@ rank-2 tensor has no antisymmetric part, so weight 1 is gone, leaving two ICTs:
 # a symmetric tensor of the same class
 T = (T + T.T) / 2
 
-operators = get_reduction(rank=2, symmetry="ij=ji")
+operators = get_reduction(n=2, symmetry="ij=ji")
 
 for weight, data in operators.items():
     for extraction in data["extraction"]:

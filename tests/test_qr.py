@@ -1,12 +1,17 @@
-"""Tests for the linear-independence selection schemes in `natto.qr`.
+"""Tests for the linear-independence schemes in `natto.qr`.
 
-Two situations broke the original unpivoted-QR diagonal test, and both are covered
-here for every implementation:
+A rank test that reads the diagonal of a QR factor is only valid while no
+degenerate column precedes an independent one, and only for as many columns as the
+factorization produces. Two situations therefore break it, and every scheme here
+must survive both:
 
-1. A zero (or dependent) tensor early in the list, which makes the later diagonal
-   entries of an unpivoted QR factor meaningless.
-2. More tensors than components, where the unpivoted loop never even considers the
-   trailing tensors as candidates.
+1. A zero or dependent tensor early in the list, which leaves the later diagonal
+   entries meaningless rather than residual distances.
+2. More tensors than components, where the trailing tensors fall past the
+   `min(matrix.shape)` cutoff and would never be considered at all.
+
+Both once went wrong in this package, so the third case below is the real
+coefficient matrix that exposed them.
 """
 
 import numpy as np
@@ -63,10 +68,10 @@ def assert_valid_selection(tensors, selected, indices, expected_rank: int):
 def test_valid_regime(scheme):
     """Every scheme finds the rank when the leading tensors are independent.
 
-    This is the regime where the unpivoted diagonal test is valid: no degenerate
-    column precedes an independent one, and there are no more tensors than
-    components. It is the regime all the existing natto results were computed in,
-    so no scheme may disagree about the rank here.
+    Neither of the two breaking situations is present here: no degenerate column
+    precedes an independent one, and there are no more tensors than components. It
+    is the regime all the existing natto results were computed in, so no scheme may
+    disagree about the rank.
     """
     e = get_e(4)
     tensors = [e[0], e[1], e[2], e[0] + e[1], 2 * e[2]]
@@ -80,8 +85,9 @@ def test_valid_regime(scheme):
 def test_valid_regime_selects_the_leading_tensors(scheme):
     """In that same regime, the order-preferring schemes select the same tensors.
 
-    This pins the claim that replacing the unpivoted scheme changes nothing where
-    it used to work.
+    Pinned because the subset, not just its size, is what fixes the canonical
+    duals downstream; changing scheme must not quietly change which tensors come
+    back.
     """
     e = get_e(4)
     tensors = [e[0], e[1], e[2], e[0] + e[1], 2 * e[2]]
@@ -163,8 +169,7 @@ def test_more_tensors_than_components(scheme):
     """Tensors beyond the `min(matrix.shape)` cutoff must still be considered.
 
     Here the leading tensors are *not* independent, so a rank-3 subset can only be
-    formed by reaching past index 2 -- into the range the unpivoted loop never
-    examines.
+    formed by reaching past index 2 -- beyond where a diagonal scan would stop.
     """
     e = get_e(3)
     tensors = [e[0], 2 * e[0], 3 * e[0], e[1], e[2], e[0] + e[1]]

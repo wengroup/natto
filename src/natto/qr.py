@@ -1,4 +1,4 @@
-r"""
+"""
 Find linearly independent tensors using QR decomposition.
 
 Two implementations are provided, with the same signature and return values:

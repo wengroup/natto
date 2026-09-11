@@ -1,19 +1,19 @@
 """Index letters, and the renaming of them.
 
-Every operator in this package is built as a symbolic expression over named
-indices, and then contracted through an ``einsum`` rule written in those same
-letters. Two kinds of bookkeeping recur often enough to live together here:
+Every operator in this package is built as a symbolic expression over named indices,
+and then contracted through an `einsum` rule written in those same letters. Two kinds
+of bookkeeping recur often enough to live together here:
 
-- naming a fresh run of letters for a tensor of a given rank, where Roman
-  letters carry the indices of the generic tensor :math:`\\mathbf T_n` and Greek
-  ones -- spelled upper case here -- the indices of the ICT;
-- renaming the letters of an expression already built, either by a shift or by
-  an explicit map, so that two expressions can be contracted without their
-  indices colliding.
+- naming a fresh run of letters for a tensor of a given rank, where lower-case
+  letters carry the indices of the generic Cartesian tensor and upper-case ones the
+  indices of the ICT;
+- renaming the letters of an expression already built, either by a shift or by an
+  explicit map, so that two expressions can be contracted without their indices
+  colliding.
 
 A third kind joins them: enumerating the index *permutations* that symmetrize a
 tensor, or that pair its indices off against deltas, and writing those out as
-``einsum`` rules.
+`einsum` rules.
 
 Nothing here knows what the operators mean; it is the plumbing they share.
 """
@@ -238,21 +238,21 @@ def get_permutations(symmetry: str, start_dim: int = 0) -> list[list[int]]:
 
 
 def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[int]]:
-    r"""
+    """
 
     Get the unique permutations of the tensor product of a symmetric tensor and deltas.
 
     For example, we know
-    {U_rrss \delta_ij \delta_kl}
-    = U_rrss \delta_ij \delta_kl
-    + U_rsrs \delta_ij \delta_kl
-    + U_rssr \delta_ij \delta_kl
+    {U_rrss delta_ij delta_kl}
+    = U_rrss delta_ij delta_kl
+    + U_rsrs delta_ij delta_kl
+    + U_rssr delta_ij delta_kl
 
     This is equivalent to
-    1. First get V_ijkl = U_rrss \delta_ij \delta_kl
+    1. First get V_ijkl = U_rrss delta_ij delta_kl
     2. Then permute V_ijkl to get V_ikjl and V_iklj
     3. Sum them up to get the result, i.e.
-        {U_rrss \delta_ij \delta_kl} = V_ijkl + V_ikjl + V_iklj
+        {U_rrss delta_ij delta_kl} = V_ijkl + V_ikjl + V_iklj
 
 
     This function find the permutations of the indices in V.
@@ -263,7 +263,7 @@ def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[
        V_ijkl = V_klij
 
     In addition, we consider another symmetry:
-    c. The symmetry of the remaining indices of the tensor, e.g. in U_rrst\delta_ij,
+    c. The symmetry of the remaining indices of the tensor, e.g. in U_rrstdelta_ij,
         the indices r and s are symmetric.
 
     Args:
@@ -302,9 +302,8 @@ def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[
 def get_permutations_delta(
     symmetry: str, delta_indices: str, start_dim: int = 0
 ) -> list[list[int]]:
-    r"""
-    Get the unique permutations of the indices to fully symmetrize a tensor.
-    that is obtained by tensor product with delta tensors.
+    """
+    Get the permutations that symmetrize a tensor built with delta tensors.
 
     For example, `symmetry = xxyyaabb`, and `delta_indices = ab` means:
         1. indices 1 and 2 are symmetric (both associated with `x`), and indices 3 and
@@ -324,18 +323,18 @@ def get_permutations_delta(
     So, we have both minor and major symmetries in delta tensors.
 
     The above example can be though as symmetrizing a tensor Z obtained as:
-        Z = X \otimes Y \otimes \delta \otimes \delta
-    where `X` and `Y` are rank-2 symmetric tensors, and `\delta` are delta tensors.
+        Z = X (x) Y (x) delta (x) delta
+    where `X` and `Y` are rank-2 symmetric tensors, and `delta` are delta tensors.
 
     As another example, consider `symmetry = xxxxaabb` and `delta_indices = ab`, then
     it can be thought as symmetrizing a tensor Z obtained as:
-        Z = X \otimes \delta \otimes \delta \otimes \delta
-    where `X` is a rank-4 symmetric tensor, and `\delta` are delta tensors.
+        Z = X (x) delta (x) delta (x) delta
+    where `X` is a rank-4 symmetric tensor, and `delta` are delta tensors.
 
     As can be seen, `delta_indices` does not necessarily need to be associated with
     deltas. It can be indices of the same symmetric tensor. For example, the permutation
     of
-        Z = X \otimes X \otimes Y \otimes Y
+        Z = X (x) X (x) Y (x) Y
     where `X` and `Y` are rank-2 symmetric tensors,
     can be obtained using `symmetry = xxaabb` and `delta_indices = ab`.
 
@@ -394,20 +393,18 @@ def remove_trace_rule(m: int, d: int) -> str:
 
 
 def _canonize(ps: str, di: str) -> str:
-    """
-    Convert a permutation string to its canonical form, such that equivalent
-    permutation strings have the same representation.
+    """Convert a permutation string to its canonical form.
 
-    Major symmetry is based on first occurrence positions of each letter in the
-    string. For example, `baba` and `fefe` are equivalent permutation strings, and
-    both will be converted to `0101`.
+    Equivalent permutation strings get the same representation. Major symmetry is
+    based on the first occurrence of each letter, so `baba` and `fefe` are equivalent
+    and both become `0101`.
 
     Args:
-        ps: The permutation string to convert
-        di: `delta_indices`
+        ps: The permutation string to convert.
+        di: `delta_indices`.
 
     Returns:
-        The canonical form of the permutation string
+        The canonical form of the permutation string.
     """
     # Do not need to canonize indices not in `delta_indices`.
     # For example, in `symmetry = xxyyaabb` and `delta_indices = ab`,

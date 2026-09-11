@@ -1,8 +1,8 @@
-r"""Small helpers shared across the package.
+"""Small helpers shared across the package.
 
-The two isotropic tensors $\bm\delta$ and $\bm\epsilon$ as numpy arrays, the
-exact factorials that appear in the operator coefficients, predicates for
-checking that a tensor really is symmetric and traceless, and writing a set of
+The two isotropic tensors, the Kronecker delta and the Levi-Civita symbol, as numpy
+arrays; the exact factorials that appear in the operator coefficients; predicates
+for checking that a tensor really is symmetric and traceless; and writing a set of
 operators out to YAML.
 """
 
@@ -107,12 +107,16 @@ def get_trace(T: np.ndarray, i: int, j: int) -> np.ndarray:
 def is_symmetric(
     T: np.ndarray, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5
 ) -> bool:
-    """
-    Check if a tensor is fully symmetric.
+    """Check if a tensor is fully symmetric.
 
     Args:
-        T: input tensor
-        start_dim: the starting dimension to check symmetry
+        T: Input tensor.
+        start_dim: The starting dimension to check symmetry.
+        atol: Absolute tolerance for the comparison.
+        rtol: Relative tolerance for the comparison.
+
+    Returns:
+        True when the tensor is symmetric in every index from `start_dim` on.
     """
 
     if T.ndim - start_dim <= 1:
@@ -131,8 +135,13 @@ def is_traceless(T, start_dim: int = 0, atol: float = 1e-6, rtol: float = 1e-5) 
     """Check if a tensor is traceless.
 
     Args:
-        T: input tensor
-        start_dim: the starting dimension to check tracelessness
+        T: Input tensor.
+        start_dim: The starting dimension to check tracelessness.
+        atol: Absolute tolerance for the comparison.
+        rtol: Relative tolerance for the comparison.
+
+    Returns:
+        True when every trace of the tensor vanishes.
     """
 
     rank = T.ndim - start_dim

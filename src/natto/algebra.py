@@ -21,12 +21,12 @@ from natto.symbolic import (
 
 
 def contract_with_delta(delta: Delta, tensor: CartesianTensor) -> CartesianTensor:
-    r"""
+    """
     Contract a tensor with a delta tensor.
 
     For example,
-    \delta_ij T_ijk -> T_iik
-    \delta_ai T_ijk -> T_ajk
+    delta_ij T_ijk -> T_iik
+    delta_ai T_ijk -> T_ajk
 
     Args:
         delta: The delta tensor.
@@ -50,12 +50,12 @@ def contract_with_delta(delta: Delta, tensor: CartesianTensor) -> CartesianTenso
 
 
 def contract_with_epsilon(epsilon: Epsilon, tensor: CartesianTensor) -> TensorProduct:
-    r"""
+    """
     Contract a tensor with an epsilon tensor.
 
     For example,
-    \epsilon_aij T_ijk...n
-    \epsilon_abi T_ijk...n
+    epsilon_aij T_ijk...n
+    epsilon_abi T_ijk...n
 
     Args:
         epsilon: The epsilon tensor.
@@ -71,12 +71,12 @@ def contract_with_epsilon(epsilon: Epsilon, tensor: CartesianTensor) -> TensorPr
 
 
 def contract_epsilon_delta(epsilon: Epsilon, delta: Delta) -> Zero | CartesianTensor:
-    r"""
+    """
     Contract an epsilon tensor with a delta tensor.
 
     For example,
-    \epsilon_ijk \delta_ij = \epsilon_iik = 0
-    \epsilon_ijk \delta_il = \epsilon_ljk
+    epsilon_ijk delta_ij = epsilon_iik = 0
+    epsilon_ijk delta_il = epsilon_ljk
 
     The two tensors should share at least one common index.
 

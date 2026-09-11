@@ -1,58 +1,61 @@
-r"""The natural projector $\mathbf{E}_{(\ell|\ell)}$, Eq. (12) of the paper.
+"""The natural projector.
 
 A rank-lowered tensor has the right rank but is in general neither symmetric nor
-traceless. The natural projector is what makes it so: acting on any rank-$\ell$
-tensor it returns the symmetric traceless part, and acting on one already
+traceless. The natural projector is what makes it so: acting on any tensor of the
+weight's rank it returns the symmetric traceless part, and acting on one already
 symmetric and traceless it returns it unchanged.
 
-It is built here symbolically and exactly, as a sum over $t$ of averaged products
-of $\bm\delta$'s with rational coefficients; `get_projector_rules` enumerates the
+It is built here symbolically and exactly, as a sum of averaged products of
+Kronecker deltas with rational coefficients; `get_projector_rules` enumerates the
 index patterns of each term. Being isotropic, it is the only building block the
-reduction needs beyond $\bm\epsilon$.
+reduction needs beyond the Levi-Civita symbol.
 
 References:
-1. [CS70] Irreducible Cartesian Tensors. II. General Formulation, http://dx.doi.org/10.1063/1.1665190
+    Eq. 7 of [Wen2026], with the coefficients of Eq. 8 and the recursion that
+    builds them in Eq. S27.
+
+    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
+    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import itertools
 from fractions import Fraction
 
-from natto.indices import letter_index
+from natto.indices import get_permutations_2, letter_index
 from natto.symbolic import LinearCombination, create_delta_epsilon_tensors
-from natto.symmetric_traceless import get_permutations_2
 
 
 def get_natural_projector(
-    j: int, s_letters: str = None, verbose: int = 0
+    ell: int, s_letters: str = None, verbose: int = 0
 ) -> LinearCombination:
-    """
-    Invariant tensors of rank j: E(j | j).
-
-    References:
-        Eq 19 and Eq 21 of [CS70].
+    """The natural projector of one weight.
 
     Args:
-        j: rank of the projection operator
-        s_letters: letters for the upper case indices, if None, use the default:
+        ell: Weight of the ICT the projector belongs to.
+        s_letters: Letters for the upper case indices. If None, use the default:
             A, B, C, etc.
-        verbose: verbosity level for debugging
+        verbose: Verbosity level for debugging.
 
     Returns:
-        Tensor operations with delta tensors. We use lower case letters `a`, `b`, `c`,
-        etc. for indices `r`, and upper case letters `A`, `B`, `C`, etc. for indices `s`.
+        A linear combination of delta products. Lower case letters a, b, c, etc. carry
+        the r indices and upper case A, B, C, etc. the s indices.
+
+    References:
+        Eq. 7 of [Wen2026], with the coefficients built by the recursion of Eq. S27.
     """
-    k = j // 2
+    k = ell // 2
 
     out = []
     c = Fraction(1, 1)  # c for t = 0
     for t in range(k + 1):
         if t > 0:
             c *= -Fraction(
-                (j - 2 * t + 2) * (j - 2 * t + 1), 2 * t * (2 * j - 2 * t + 1)
+                (ell - 2 * t + 2) * (ell - 2 * t + 1),
+                2 * t * (2 * ell - 2 * t + 1),
             )
 
         # get all rules
-        all_rules = get_projector_rules(j, t, s_letters)
+        all_rules = get_projector_rules(ell, t, s_letters)
 
         # Total factor: c / len(all_rules), where len(all_rules) averages over all
         # the rules.
@@ -72,7 +75,7 @@ def get_natural_projector(
             tmp = []
             tmp.extend(delta_tensors)
             print(
-                f"@ debug E_j: j={j}, t={t}, c={c}, "
+                f"@ debug E: ell={ell}, t={t}, c={c}, "
                 f"num terms: {len(tmp)}, terms: {LinearCombination(*tmp)}"
             )
 
@@ -80,18 +83,22 @@ def get_natural_projector(
 
 
 def get_projector_rules(
-    j: int, t: int, s_letters: str = None
+    ell: int, t: int, s_letters: str = None
 ) -> list[dict[str, list[str]]]:
-    """
-    Rules for E(j|j): d_{rs}^{j-2t} d_{rr}^t d_{ss}^t.
+    """Index rules for one term of the natural projector.
 
-    This is in Eq. 19 of the paper.
+    The term is a product of Kronecker deltas: l - 2t of them pairing an r index with
+    an s index, t pairing r with r, and t pairing s with s.
 
     Args:
-        j: rank of the projection operator
-        t: number of d_rr and d_ss
-        s_letters: letters for the upper case indices, if None, use the default:
+        ell: Weight of the ICT the projector belongs to.
+        t: Number of d_rr and d_ss.
+        s_letters: Letters for the upper case indices. If None, use the default:
             A, B, C, etc.
+
+    Returns:
+        One dict per term, {'d_rs': list_rs, 'd_rr': list_rr, 'd_ss': list_ss}, holding
+        the indices for constructing the deltas.
 
     Examples:
         get_projector_rules(3, 1)
@@ -106,47 +113,45 @@ def get_projector_rules(
          {'d_rs': ['aA'], 'd_rr': ['bc'], 'd_ss': ['BC']},
         ]
 
-    Returns:
-        Each dict {'d_rs': list_rs, 'd_rr': list_rr, 'd_ss': list_ss} contains the
-        indices for constructing the deltas.
-
+    References:
+        Eq. 7 of [Wen2026].
     """
-    assert j >= 2 * t, f"j must be greater than or equal to 2*t, got j={j}, t={t}"
+    assert ell >= 2 * t, f"weight (ell) must be at least 2*t, got ell={ell}, t={t}"
 
-    r_letters = letter_index(j, upper_case=False)
+    r_letters = letter_index(ell, upper_case=False)
 
     if s_letters is None:
-        s_letters = letter_index(j, upper_case=True)
+        s_letters = letter_index(ell, upper_case=True)
 
-    perms = get_permutations_2(j, num_delta=t)
+    perms = get_permutations_2(ell, num_delta=t)
 
     # TODO, this depends on the order of the indices get_permutations_2 returns, where
     #   we put the remaining indices of t at the front, and the contracted indices at
     #   the end.
-    start = j - 2 * t
+    start = ell - 2 * t
 
     all_indices = []
     for p_r in perms:
-        r_indices = [r_letters[p_r.index(i)] for i in range(j)]
+        r_indices = [r_letters[p_r.index(i)] for i in range(ell)]
 
         # indices for d_{rr}^t
-        rr_pairs = [r_indices[i] + r_indices[i + 1] for i in range(start, j, 2)]
+        rr_pairs = [r_indices[i] + r_indices[i + 1] for i in range(start, ell, 2)]
 
-        # permute the remaining r indices that will be used for d_{rs}^{j-2t}
+        # permute the remaining r indices that will be used for d_{rs}^{ell-2t}
         r_remaining = r_indices[:start]
         r_remaining_perms = list(itertools.permutations(r_remaining))
 
         for p_s in perms:
-            s_indices = [s_letters[p_s.index(i)] for i in range(j)]
+            s_indices = [s_letters[p_s.index(i)] for i in range(ell)]
 
             # indices for d_{ss}^t
-            ss_pairs = [s_indices[i] + s_indices[i + 1] for i in range(start, j, 2)]
+            ss_pairs = [s_indices[i] + s_indices[i + 1] for i in range(start, ell, 2)]
 
-            # get the remaining s indices that will be used for d_{rs}^{j-2t}
+            # get the remaining s indices that will be used for d_{rs}^{ell-2t}
             # no need to permute it, since it is to be combined with r_remaining
             s_remaining = s_indices[:start]
 
-            # Create indices permutations for d_{rs}^{j-2t}
+            # Create indices permutations for d_{rs}^{ell-2t}
             for r_remaining_p in r_remaining_perms:
                 rs_pairs = [f"{r}{s}" for r, s in zip(r_remaining_p, s_remaining)]
 

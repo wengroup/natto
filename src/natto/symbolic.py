@@ -140,8 +140,8 @@ class Zero(Scalar):
 
 
 class Delta(CartesianTensor):
-    r"""
-    The Kronecker delta tensor \delta.
+    """
+    The Kronecker delta tensor.
 
     Args:
         indices: The indices of the delta tensor.
@@ -168,8 +168,8 @@ class Delta(CartesianTensor):
 
 
 class Epsilon(CartesianTensor):
-    r"""
-    The Levi-Civita tensor \epsilon.
+    """
+    The Levi-Civita tensor.
 
     Args:
         indices: The indices of the epsilon tensor.
@@ -328,11 +328,9 @@ class TensorProduct:
 
         # canonize epsilons
         def sort_circular(s: str):
-            """
-            Shift the three indices of the epsilon tensor such that the first index is
-            the smallest one.
+            """Shift the indices so the smallest comes first.
 
-            E.g. kij -> ijk
+            For example, kij -> ijk.
             """
             # Find the index of the smallest character
             min_index = s.index(min(s))
