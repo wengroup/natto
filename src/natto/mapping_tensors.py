@@ -21,22 +21,24 @@ from fractions import Fraction
 
 from natto.algebra import multiply_2, simplify_linear_combination
 from natto.indices import letter_index, shift_index_2
-from natto.lowering import get_lowering_rules_even, get_lowering_rules_odd
+from natto.lowering import get_lowering_tensors
 from natto.natural_projector import get_natural_projector
 from natto.symbolic import (
-    Epsilon,
     LinearCombination,
     Scalar,
-    create_delta_epsilon_tensors,
 )
 
 
-def get_mappings_even(ell: int, n: int) -> list[LinearCombination]:
-    """The candidate mapping tensors of a weight, for even n - ell.
+def get_mappings(ell: int, n: int) -> list[LinearCombination]:
+    """The candidate mapping tensors of a weight.
 
     A mapping tensor is a rank-lowering tensor followed by the natural projector, so
     there is one candidate per choice of which indices the rank lowering contracts
-    away.
+    away. The projector takes the letters that choice leaves unused.
+
+    The parity of n - ell decides what the rank lowering looks like -- deltas alone,
+    or deltas with one Levi-Civita symbol -- but that is `lowering`'s concern, and a
+    caller supplies only the weight and rank.
 
     Args:
         ell: Weight of the ICT.
@@ -48,58 +50,12 @@ def get_mappings_even(ell: int, n: int) -> list[LinearCombination]:
     References:
         Eq. 13 of [Wen2026].
     """
+    tensors, remaining_letters = get_lowering_tensors(ell, n)
 
-    if (n - ell) % 2 != 0:
-        raise ValueError(
-            f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
-        )
-
-    E_s_letters, delta_rules = get_lowering_rules_even(ell, n)
-
-    all_G = []
-    for si, rule in zip(E_s_letters, delta_rules):
-        E = get_natural_projector(ell, s_letters=si)
-        f_q = create_delta_epsilon_tensors(rule)
-        G = multiply_2(E, f_q)
-        all_G.append(G)
-
-    return all_G
-
-
-def get_mappings_odd(ell: int, n: int) -> list[LinearCombination]:
-    """The candidate mapping tensors of a weight, for odd n - ell.
-
-    A mapping tensor is a rank-lowering tensor followed by the natural projector, so
-    there is one candidate per choice of which indices the rank lowering contracts
-    away. The odd parity means the rank lowering carries one Levi-Civita
-    symbol as well as its Kronecker deltas.
-
-    Args:
-        ell: Weight of the ICT.
-        n: Rank of the Cartesian tensor to map onto.
-
-    Returns:
-        One mapping tensor per choice of contracted indices.
-
-    References:
-        Eq. 13 of [Wen2026].
-    """
-    if (n - ell) % 2 != 1:
-        raise ValueError(
-            f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
-        )
-
-    E_s_letters, f_epsilon_rules, f_delta_rules = get_lowering_rules_odd(ell, n)
-
-    all_G = []
-    for si, e_rule, d_rule in zip(E_s_letters, f_epsilon_rules, f_delta_rules):
-        E = get_natural_projector(ell, s_letters=si)
-        f_q_epsilon = Epsilon(e_rule)
-        f_q_delta = create_delta_epsilon_tensors(d_rule)
-        G = multiply_2(E, f_q_epsilon, f_q_delta)
-        all_G.append(G)
-
-    return all_G
+    return [
+        multiply_2(get_natural_projector(ell, s_letters=letters), F)
+        for F, letters in zip(tensors, remaining_letters)
+    ]
 
 
 def get_extraction_operators(

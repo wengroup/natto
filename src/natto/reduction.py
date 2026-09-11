@@ -49,8 +49,7 @@ from natto.indices import letter_index
 from natto.mapping_tensors import (
     get_decomposition_operators,
     get_extraction_operators,
-    get_mappings_even,
-    get_mappings_odd,
+    get_mappings,
 )
 from natto.orthonormal import get_orthonormal_entries
 from natto.rational import float_matrix, fraction_matrix, matrix_inverse
@@ -188,10 +187,7 @@ def get_independent_mappings(
     if n == 1 and ell == 0:
         return [], []
 
-    if (n - ell) % 2 == 0:
-        candidates = get_mappings_even(ell, n)
-    else:
-        candidates = get_mappings_odd(ell, n)
+    candidates = get_mappings(ell, n)
 
     if selection == "symbolic":
         independent_indices, gram = select_independent_mappings_and_gram(
