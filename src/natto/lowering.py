@@ -6,9 +6,10 @@ the parity of n - ell requires it, one Levi-Civita symbol. Which indices
 are paired is a choice, and each choice leaves different information behind -- which
 is exactly why a single tensor can carry several ICTs of the same weight.
 
-What this module returns is not the tensor itself but the index assignments that
-define it: the delta pairs, the epsilon triple when there is one, and the letters
-left over for the natural projector to act on. `mapping_tensors` composes the two.
+Each function returns the tensors themselves, paired with the letters that tensor
+leaves unused. Those letters are not part of the rank-lowering tensor; they are what
+is left of the rank once it has taken the indices it contracts, and `mapping_tensors`
+is where they are put to work.
 
 References:
     Eq. 2 of [Wen2026] for the rank lowering, Eq. 3 for even n - ell and Eq. 5 for
@@ -21,10 +22,37 @@ References:
 import itertools
 
 from natto.indices import get_permutations_2, letter_index
+from natto.symbolic import TensorProduct, create_delta_epsilon_tensors
 
 
-def get_lowering_rules_even(ell: int, n: int) -> tuple[list[str], list[list[str]]]:
-    """Index rules for the rank-lowering tensors of even n - ell.
+def get_lowering_tensors(ell: int, n: int) -> tuple[list[TensorProduct], list[str]]:
+    """The rank-lowering tensors of a weight, whichever parity applies.
+
+    Which form the rank-lowering tensor takes depends on the parity of n - ell:
+    deltas alone when it is even, and one Levi-Civita symbol alongside them when it
+    is odd. This dispatches on that, so a caller supplies only the weight and rank.
+
+    Args:
+        ell: Weight of the ICT.
+        n: Rank of the Cartesian tensor.
+
+    Returns:
+        The rank-lowering tensors, one per choice of contracted indices, and the
+        letters each one leaves unused.
+
+    References:
+        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd.
+    """
+    if (n - ell) % 2 == 0:
+        return get_lowering_tensors_even(ell, n)
+
+    return get_lowering_tensors_odd(ell, n)
+
+
+def get_lowering_tensors_even(
+    ell: int, n: int
+) -> tuple[list[TensorProduct], list[str]]:
+    """The rank-lowering tensors of even n - ell.
 
     With the parity even the rank-lowering tensor is built from Kronecker deltas alone,
     (n - ell) / 2 of them, pairing off the surplus indices.
@@ -34,17 +62,12 @@ def get_lowering_rules_even(ell: int, n: int) -> tuple[list[str], list[list[str]
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The letters left over for the natural projector to act on, and the delta index
-        pairs of each rank-lowering tensor, one entry per choice.
+        The rank-lowering tensors, one per choice of contracted indices, and the
+        letters each one leaves unused.
 
     References:
         Eq. 3 of [Wen2026].
     """
-    if (n - ell) % 2 != 0:
-        raise ValueError(
-            f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
-        )
-
     letters = letter_index(n, upper_case=True)
 
     all_perms = get_permutations_2(n, num_delta=(n - ell) // 2)
@@ -54,26 +77,23 @@ def get_lowering_rules_even(ell: int, n: int) -> tuple[list[str], list[list[str]
     #   the end.
     start = ell
 
-    f_rules = []
-    E_s_letters = []
-    for perm in all_perms:  # each perm for a q in f_q
+    tensors = []
+    remaining_letters = []
+    for perm in all_perms:  # each perm for a choice of contracted indices
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # indices for F^p, the rank-lowering tensor
+        # the delta pairs of F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
-        f_rules.append(delta_pairs)
+        tensors.append(create_delta_epsilon_tensors(delta_pairs))
 
-        # s indices for the natural projector
-        s_remaining = "".join(indices[:start])
-        E_s_letters.append(s_remaining)
+        # the letters this tensor does not use
+        remaining_letters.append("".join(indices[:start]))
 
-    return E_s_letters, f_rules
+    return tensors, remaining_letters
 
 
-def get_lowering_rules_odd(
-    ell: int, n: int
-) -> tuple[list[str], list[str], list[list[str]]]:
-    """Index rules for the rank-lowering tensors of odd n - ell.
+def get_lowering_tensors_odd(ell: int, n: int) -> tuple[list[TensorProduct], list[str]]:
+    """The rank-lowering tensors of odd n - ell.
 
     With the parity odd, one Levi-Civita symbol is needed alongside the Kronecker deltas.
     Upper-case letter n + 1 is the index of that symbol which contracts with the
@@ -84,19 +104,14 @@ def get_lowering_rules_odd(
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The letters left over for the natural projector, the epsilon index triple, and
-        the delta index pairs, one entry each per choice.
+        The rank-lowering tensors, one per choice of contracted indices, and the
+        letters each one leaves unused.
 
     References:
         Eq. 5 of [Wen2026].
     """
-    if (n - ell) % 2 != 1:
-        raise ValueError(
-            f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
-        )
-
     if ell == 0:
-        return get_lowering_rules_odd_weight_zero(ell, n)
+        return get_lowering_tensors_odd_weight_zero(ell, n)
 
     # All s letters
     letters = letter_index(n, upper_case=True)
@@ -113,34 +128,34 @@ def get_lowering_rules_odd(
     #   the end.
     start = ell + 1
 
-    f_delta_rules = []
-    f_epsilon_rules = []
-    E_s_letters = []
-    for perm in all_perms:  # each perm for a q in f_q
+    tensors = []
+    remaining_letters = []
+    for perm in all_perms:  # each perm for a choice of contracted indices
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # delta indices for F^p, the rank-lowering tensor
+        # the delta pairs of F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
 
-        # remaining indices for epsilon and the natural projector
+        # remaining indices, shared out between epsilon and the natural projector
         s_remaining = indices[:start]
         s_remaining_set = set(s_remaining)
 
         for comb in itertools.combinations(s_remaining, 2):
-            f_delta_rules.append(delta_pairs)
+            # two of them go to epsilon, along with tau
+            epsilon = tau_letter + "".join(sorted(comb))
+            tensors.append(create_delta_epsilon_tensors(delta_pairs, epsilon=epsilon))
 
-            # choose two indices for epsilon
-            f_epsilon_rules.append(tau_letter + "".join(sorted(comb)))
-
-            # the remaining indices and also tau for the natural projector
-            E_s_letters.append(
+            # the rest, plus tau again, are left unused
+            remaining_letters.append(
                 "".join(sorted(s_remaining_set - set(comb))) + tau_letter
             )
 
-    return E_s_letters, f_epsilon_rules, f_delta_rules
+    return tensors, remaining_letters
 
 
-def get_lowering_rules_odd_weight_zero(ell, n):
+def get_lowering_tensors_odd_weight_zero(
+    ell: int, n: int
+) -> tuple[list[TensorProduct], list[str]]:
     """
     For j = 0, and odd n, the rules for G(n|0) are different from the general case.
 
@@ -164,20 +179,17 @@ def get_lowering_rules_odd_weight_zero(ell, n):
     #   the end.
     start = 3
 
-    f_delta_rules = []
-    f_epsilon_rules = []
-    E_s_letters = []
-
-    for perm in all_perms:  # each perm for a q in f_q
+    tensors = []
+    remaining_letters = []
+    for perm in all_perms:  # each perm for a choice of contracted indices
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # delta indices for F^p, the rank-lowering tensor
+        # the delta pairs of F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
-        f_delta_rules.append(delta_pairs)
 
-        # remaining indices for epsilon (the natural projector gets none)
-        s_remaining = indices[:start]
-        f_epsilon_rules.append("".join(sorted(s_remaining)))
-        E_s_letters.append("")
+        # every remaining index goes to epsilon, so nothing is left unused
+        epsilon = "".join(sorted(indices[:start]))
+        tensors.append(create_delta_epsilon_tensors(delta_pairs, epsilon=epsilon))
+        remaining_letters.append("")
 
-    return E_s_letters, f_epsilon_rules, f_delta_rules
+    return tensors, remaining_letters

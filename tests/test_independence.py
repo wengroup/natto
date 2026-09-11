@@ -14,14 +14,12 @@ from natto.independence import (
     select_independent_mappings_via_components,
     select_independent_mappings_via_embeddings,
 )
-from natto.mapping_tensors import get_mappings_even, get_mappings_odd
+from natto.mapping_tensors import get_mappings
 from natto.rational import is_nonsingular
 
 
 def get_candidates(weight: int, rank: int):
-    if (rank - weight) % 2 == 0:
-        return get_mappings_even(weight, rank)
-    return get_mappings_odd(weight, rank)
+    return get_mappings(weight, rank)
 
 
 #: (rank, weight, candidates, kept) for sectors that exercise both the full-rank
