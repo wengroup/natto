@@ -1,6 +1,6 @@
 from fractions import Fraction
 
-from natto.matrix import matrix_null_space
+from natto.rational import matrix_null_space
 
 
 def test_matrix_null_space_exact_relations():

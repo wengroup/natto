@@ -1,4 +1,14 @@
-"""Matrix operations on Fraction objects."""
+"""Exact linear algebra over the rationals.
+
+The mapping tensors, and the mixing matrices that adapt them to a symmetry,
+carry coefficients that are exact rationals. Inverting a Gram matrix or taking
+a null space in floating point would turn those into approximations, and the
+null-space dimension -- which counts how many ICTs of a weight survive the
+symmetry -- would then depend on a tolerance. So the matrices here are plain
+nested lists of :class:`fractions.Fraction`, and every operation on them is
+exact. ``float_matrix`` and ``fraction_matrix`` are the deliberate exits, used
+only once a result is being handed out for numerical work or printing.
+"""
 
 from fractions import Fraction
 
