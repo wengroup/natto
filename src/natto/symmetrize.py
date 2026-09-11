@@ -10,7 +10,8 @@ import itertools
 
 import numpy as np
 
-from natto.utils import dij, double_index, letter_index, repeat_double_index
+from natto.indices import double_index, letter_index, repeat_double_index
+from natto.utils import dij
 
 
 def symmetrize_via_permutation(

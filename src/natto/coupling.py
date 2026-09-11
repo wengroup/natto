@@ -47,15 +47,13 @@ from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
+from natto.indices import double_index, letter_index, repeat_double_index
 from natto.operators import create_delta_epsilon_tensors
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_permutations_delta
 from natto.utils import (
     double_factorial,
-    double_index,
     factorial,
-    letter_index,
-    repeat_double_index,
 )
 
 

@@ -5,7 +5,6 @@ import pytest
 
 from natto.utils import (
     double_factorial,
-    double_index,
     factorial,
     get_trace,
     is_traceless,
@@ -35,11 +34,6 @@ def test_double_factorial():
         assert double_factorial(i) // double_factorial(i - 4) == double_factorial(
             i, lower_bound=i - 4 + 2
         )
-
-
-def test_multi_double_index():
-    assert double_index(2) == ["ab", "cd"]
-    assert double_index(3, start=1) == ["bc", "de", "fg"]
 
 
 def test_get_trace():

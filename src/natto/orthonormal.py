@@ -24,8 +24,8 @@ from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
+from natto.indices import letter_index
 from natto.symbolic import LinearCombination
-from natto.utils import letter_index
 
 
 def orthonormalize_mappings(

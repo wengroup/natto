@@ -43,13 +43,13 @@ import pytest
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
+from natto.indices import letter_index
 from natto.mappings import (
     get_dual_pair_of_weight,
     get_reduction,
     get_reduction_of_weight,
 )
-from natto.matrix import fraction_matrix
-from natto.utils import letter_index
+from natto.rational import fraction_matrix
 from tests.golden import (
     LOCAL_SNAPSHOT_DIR,
     assert_snapshot,

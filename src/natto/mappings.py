@@ -37,7 +37,7 @@ from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import embed, evaluate_tensors
-from natto.matrix import float_matrix, fraction_matrix, matrix_inverse
+from natto.indices import letter_index
 from natto.operators import (
     get_extraction_operators,
     get_G_even,
@@ -47,10 +47,10 @@ from natto.operators import (
 )
 from natto.orthonormal import orthonormalize_mappings
 from natto.qr import find_independent_tensors
+from natto.rational import float_matrix, fraction_matrix, matrix_inverse
 from natto.symbolic import LinearCombination
 from natto.symmetrize import get_random_natural_tensor
 from natto.symmetry_adapted import get_symmetry_adapted_mappings
-from natto.utils import letter_index
 
 
 def get_reduction(

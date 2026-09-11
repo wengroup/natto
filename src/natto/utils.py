@@ -1,7 +1,6 @@
 import gzip
 import itertools
 import math
-import string
 from pathlib import Path
 from typing import Optional
 
@@ -9,59 +8,7 @@ import numpy as np
 import yaml
 from numpy.typing import DTypeLike
 
-
-def letter_index(n: int, start: int = 0, upper_case: bool = False) -> str:
-    """
-    Get a list of letters 'abc...' of length n.
-
-    Args:
-        n: the length of the letters
-        start: the starting index
-        upper_case: whether to use upper case letters
-    """
-    if upper_case:
-        return string.ascii_uppercase[start : start + n]
-    else:
-        return string.ascii_lowercase[start : start + n]
-
-
-def double_index(n: int, start: int = 0, upper_case: bool = False) -> list[str]:
-    """
-    Get multiple double indices, like ['ab', 'cd', 'ef'].
-
-    Args:
-        n: the number of double indices
-        start: the starting index
-        upper_case: whether to use upper case letters
-
-    Examples:
-        >>> double_index(2)
-        ['ab', 'cd']
-        >>> double_index(3, start=1)
-        ['bc', 'cd', 'de']
-    """
-    indices = letter_index(2 * n, start, upper_case)
-    return [indices[i : i + 2] for i in range(0, 2 * n, 2)]
-
-
-def repeat_double_index(n: int, start: int = 0, upper_case: bool = False) -> list[str]:
-    """
-    Get multiple repeated double indices, like ['aa', 'bb', 'cc'].
-
-    Args:
-        n: the number of double indices
-        start: the starting index
-        upper_case: whether to use upper case letters
-
-    Examples:
-        >>> repeat_double_index(2)
-        ['aa', 'bb']
-        >>> repeat_double_index(3, start=1)
-        ['bb', 'cc', 'dd']
-    """
-    indices = letter_index(n, start, upper_case)
-
-    return [s + s for s in indices]
+from natto.indices import letter_index
 
 
 def dij(dtype: DTypeLike = None) -> np.ndarray:

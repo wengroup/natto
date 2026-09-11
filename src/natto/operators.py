@@ -20,8 +20,8 @@ from functools import reduce
 from math import gcd
 
 from natto.algebra import multiply_2, simplify_linear_combination
+from natto.indices import letter_index, shift_index_2
 from natto.symbolic import (
-    CartesianTensor,
     Delta,
     Epsilon,
     LinearCombination,
@@ -29,7 +29,6 @@ from natto.symbolic import (
     TensorProduct,
 )
 from natto.symmetrize import get_permutations_2
-from natto.utils import letter_index
 
 
 def get_natural_projector(
@@ -467,114 +466,6 @@ def get_G_rules_odd_j0(j, n):
         E_s_letters.append("")
 
     return E_s_letters, f_epsilon_rules, f_delta_rules
-
-
-def shift_index(
-    tensor: CartesianTensor | TensorProduct, shift: int, letters: str = None
-) -> CartesianTensor | TensorProduct:
-    """
-    Shift the index of a tensor by a certain amount.
-
-    For example, for T_ijk, and shift=1, the new tensor is T_jkl.
-
-    Args:
-        tensor: The tensor to shift the index.
-        shift: The amount to shift the index.
-        letters: The letters signifying the indices to shift. If None, shift all the
-            indices. For example, if T_ijAB, and letters = 'AB', then the new tensor
-            would be T_ijCD, where C and D are the new letters.
-
-    Returns:
-        The new tensor with the shifted index.
-    """
-
-    # The zero tensor has no meaningful indices to shift. In particular, a zero
-    # TensorProduct stores a Zero component whose constructor does not accept the
-    # general CartesianTensor arguments used below.
-    if tensor.factor == 0:
-        return tensor
-
-    def _shift(t: CartesianTensor):
-        if letters is None:
-            indices = "".join([chr(ord(i) + shift) for i in t.indices])
-        else:
-            indices = "".join(
-                [chr(ord(i) + shift) if i in letters else i for i in t.indices]
-            )
-        return t.__class__(indices, factor=t.factor, symbol=t.symbol)
-
-    if isinstance(tensor, CartesianTensor):
-        return _shift(tensor)
-
-    elif isinstance(tensor, TensorProduct):
-        components = [_shift(t) for t in tensor]
-        return tensor.__class__(*components, factor=tensor.factor)
-
-    else:
-        raise ValueError(f"Unknown tensor type: {type(tensor)}")
-
-
-def relabel_indices(
-    tensor: CartesianTensor | TensorProduct, mapping: dict[str, str]
-) -> CartesianTensor | TensorProduct:
-    """Rename the indices of a tensor according to `mapping`.
-
-    The substitution is simultaneous, so a mapping may permute letters among
-    themselves. Applying it one letter at a time would chain the replacements,
-    turning a transposition into a collapse.
-
-    Args:
-        tensor: The tensor whose indices to rename.
-        mapping: Old index letter to new. Letters absent from it are left alone.
-
-    Returns:
-        The tensor with its indices renamed.
-    """
-    # A zero tensor carries no meaningful indices, and a zero TensorProduct holds
-    # a component whose constructor does not take the arguments used below.
-    if tensor.factor == 0:
-        return tensor
-
-    def _relabel(t: CartesianTensor):
-        indices = "".join(mapping.get(index, index) for index in t.indices)
-
-        return t.__class__(indices, factor=t.factor, symbol=t.symbol)
-
-    if isinstance(tensor, CartesianTensor):
-        return _relabel(tensor)
-
-    if isinstance(tensor, TensorProduct):
-        return tensor.__class__(*[_relabel(t) for t in tensor], factor=tensor.factor)
-
-    raise ValueError(f"Unknown tensor type: {type(tensor)}")
-
-
-def relabel_indices_2(
-    tensor: LinearCombination, mapping: dict[str, str]
-) -> LinearCombination:
-    """Rename the indices of every term of a linear combination.
-
-    Args:
-        tensor: The linear combination whose indices to rename.
-        mapping: Old index letter to new, applied simultaneously.
-
-    Returns:
-        The linear combination with its indices renamed.
-    """
-    return LinearCombination(*[relabel_indices(t, mapping) for t in tensor])
-
-
-def shift_index_2(
-    tensor: LinearCombination, shift: int, letters: str = None
-) -> LinearCombination:
-    """
-    Shift all the index of a Tensors object by a certain amount.
-
-    Returns:
-        The new tensor with the shifted index.
-    """
-    components = [shift_index(t, shift, letters) for t in tensor]
-    return LinearCombination(*components)
 
 
 def contract_G(

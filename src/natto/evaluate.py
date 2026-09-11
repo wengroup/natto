@@ -12,8 +12,9 @@ import numpy as np
 from numpy.typing import DTypeLike
 
 from natto.algebra import simplify_linear_combination
+from natto.indices import letter_index
 from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
-from natto.utils import dij, eijk, letter_index
+from natto.utils import dij, eijk
 
 _MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
 
