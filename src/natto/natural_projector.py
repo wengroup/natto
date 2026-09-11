@@ -72,8 +72,8 @@ def get_natural_projector(
             tmp = []
             tmp.extend(delta_tensors)
             print(
-                f"@ debug E_j: j={j}, t={t}, c={c}, num terms: {len(tmp)}, Terms: ",
-                "{LinearCombination(*tmp)}",
+                f"@ debug E_j: j={j}, t={t}, c={c}, "
+                f"num terms: {len(tmp)}, terms: {LinearCombination(*tmp)}"
             )
 
     return LinearCombination(*out)
