@@ -1,16 +1,13 @@
-import contextlib
 import functools
 from typing import NamedTuple, Optional
 
 import numpy as np
 import pytest
 
-import natto.mappings
 from natto.evaluate import evaluate_tensors
 from natto.gram import get_gram_matrix
 from natto.intrinsic_symmetry import impose_symmetry
-from natto.mappings import get_reduction, get_reduction_of_weight
-from natto.qr import find_independent_tensors
+from natto.reduction import get_independent_mappings, get_reduction
 
 
 class TensorClass(NamedTuple):
@@ -106,48 +103,26 @@ def get_tensor_class_params(
     return params
 
 
-@contextlib.contextmanager
-def selection_scheme(method: str):
-    """Make `mappings` select independent tensors with the given `natto.qr` scheme."""
-    original = natto.mappings.find_independent_tensors
-    natto.mappings.find_independent_tensors = functools.partial(
-        find_independent_tensors, method=method
-    )
-    try:
-        yield
-    finally:
-        natto.mappings.find_independent_tensors = original
-
-
 @functools.lru_cache(maxsize=None)
-def get_reduction_cached(
-    rank: int, symmetry: str, method: str = "gram_schmidt"
-) -> dict:
-    """`get_reduction`, computed once per class and scheme; rank 4 costs seconds."""
-    with selection_scheme(method):
-        return get_reduction(rank, symmetry)
+def get_reduction_cached(rank: int, symmetry: str) -> dict:
+    """`get_reduction`, computed once per class; rank 4 costs seconds."""
+    return get_reduction(rank, symmetry)
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["gram_schmidt", pytest.param("scipy_qr", marks=pytest.mark.slow)],
-)
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
-def test_weight_multiplicity(tensor_class: TensorClass, method: str):
+def test_weight_multiplicity(tensor_class: TensorClass):
     """Check the weight decomposition of each physical tensor class in Table 1.
 
     Each weight-m sector appears N_m times, and the multiplicities account for all
     N_ind independent components: N_ind = sum_m N_m (2m + 1).
 
     The multiplicities are the ranks found when selecting independent mappings, so
-    this is also where a non-rank-revealing selection scheme shows up; it is checked
-    for both schemes of `natto.qr` since either may be used.
+    this is where a selection that found the wrong rank would show up.
 
     Args:
         tensor_class: physical tensor class to check
-        method: `natto.qr` scheme used to select the independent mappings
     """
-    output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry, method)
+    output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry)
 
     found = {
         m: len(out_m["extraction"])
@@ -168,7 +143,7 @@ def test_weight_multiplicity(tensor_class: TensorClass, method: str):
 def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     """Check exact Gram matrices for every internally symmetric weight sector."""
     for weight in tensor_class.multiplicity:
-        Q, _, _, _, _ = get_reduction_of_weight(
+        Q, _ = get_independent_mappings(
             weight, tensor_class.rank, tensor_class.symmetry
         )
         Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]

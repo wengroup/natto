@@ -9,6 +9,13 @@ Everything that can be exact is, and is:
 - the mapping tensors, which are built from Kronecker deltas and Levi-Civita
   symbols with `Fraction` coefficients;
 - the Gram matrix and its inverse, contracted and inverted over the rationals;
+- the selection of an independent set of mappings, by
+  `qr.select_independent_mappings`: it borders the kept set's Gram matrix with each
+  candidate in turn and asks whether the result is singular. That is the residual
+  test of Gram-Schmidt made exact, so the selection is a pure function of the
+  weight and the rank -- no tolerance, and no random tensor to probe the mappings
+  with. `qr` keeps two numerical schemes alongside it, one on the mappings' full
+  components and one on their action on a probe, as cross-checks;
 - the dual mapping tensors, being rational combinations of the mappings;
 - the mixing matrices of the intrinsic-symmetry generators, contracted
   symbolically;
@@ -18,26 +25,15 @@ Everything that can be exact is, and is:
 So the whole reduction, up to and including the symmetry adaptation, carries no
 numerical tolerance.
 
-Two places are irreducibly numerical:
+One place is irreducibly numerical:
 
 - **The orthonormal mapping tensors.** They are `g^(-1/2) G`, and an inverse
   square root is irrational in general, so no exact representation exists.
   Computed in float64 by eigendecomposition.
-- **The selection of an independent set.** `qr` decides linear independence by a
-  residual norm against a tolerance, on tensors evaluated numerically. Making
-  this exact would mean rank-revealing elimination over the rationals; it is
-  open, and tracked below.
 
 Evaluated operators are float64. That is storage rather than construction: the
 symbolic form above is exact whatever it is later evaluated into.
 
 ## Open
 
-1. Make the selection of an independent set exact, or decide deliberately not
-   to. It is the last tolerance in the construction: `qr.find_independent_tensors`
-   applies a residual-norm threshold to the embeddings of one fixed-seed random
-   natural tensor. Two questions, in order: whether independence should be
-   decided on the mapping tensors themselves rather than on their action on a
-   random probe, and whether the decision should be made over the rationals.
-   Note that changing either changes which subset is canonical, and so changes
-   every stored operator downstream.
+Nothing outstanding.

@@ -109,6 +109,44 @@ def matrix_transpose(m: list[list[Fraction]]) -> list[list[Fraction]]:
     return [[m[j][i] for j in range(len(m))] for i in range(len(m[0]))]
 
 
+def is_nonsingular(matrix: list[list[Fraction]]) -> bool:
+    """Whether a square rational matrix has full rank, decided exactly.
+
+    Gaussian elimination over :class:`fractions.Fraction`, so the answer is a fact
+    about the matrix rather than a statement about a tolerance. A singular matrix is
+    found the moment a column has no nonzero entry left to pivot on.
+
+    Args:
+        matrix: Square matrix with exact rational entries.
+
+    Returns:
+        True when the matrix has full rank.
+    """
+    rows = [row.copy() for row in matrix]
+    size = len(rows)
+    if any(len(row) != size for row in rows):
+        raise ValueError("Matrix is not square")
+
+    for column in range(size):
+        pivot_row = next(
+            (row for row in range(column, size) if rows[row][column] != 0), None
+        )
+        if pivot_row is None:
+            return False
+
+        rows[column], rows[pivot_row] = rows[pivot_row], rows[column]
+        pivot = rows[column][column]
+        for row in range(column + 1, size):
+            if rows[row][column] != 0:
+                factor = rows[row][column] / pivot
+                rows[row] = [
+                    value - factor * pivot_value
+                    for value, pivot_value in zip(rows[row], rows[column])
+                ]
+
+    return True
+
+
 def matrix_null_space(
     matrix: list[list[Fraction]], n_columns: int
 ) -> list[list[Fraction]]:

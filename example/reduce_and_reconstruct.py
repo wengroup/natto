@@ -19,7 +19,7 @@ Change the `rank` and `symmetry` arguments at the bottom to try other classes;
 import numpy as np
 
 from natto.intrinsic_symmetry import impose_symmetry
-from natto.mappings import get_reduction
+from natto.reduction import get_reduction
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 

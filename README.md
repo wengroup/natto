@@ -32,7 +32,7 @@ import textwrap
 
 import numpy as np
 
-from natto.mappings import get_reduction
+from natto.reduction import get_reduction
 
 T = np.array([
     [1.0, 2.0, 3.0],
