@@ -1,60 +1,68 @@
-r"""Rank-lowering tensors $\mathbf{F}^p_{n \to \ell}$, Sec. III A of the paper.
+"""Rank-lowering tensors.
 
-To reach a weight-$\ell$ ICT from a generic tensor $\mathbf{T}_n$ of higher rank
-$n \geq \ell$, the surplus indices must first be contracted away in pairs against
-$\bm\delta$ and, when the parity of $n - \ell$ requires it, one $\bm\epsilon$.
-Which indices are paired is a choice, and each choice $\mathcal{D}_p$ leaves
-different information behind -- which is exactly why a single rank-$n$ tensor can
-carry several ICTs of the same weight.
+To reach an ICT of some weight from a generic tensor of higher rank, the surplus
+indices must first be contracted away in pairs against Kronecker deltas and, when
+the parity of n - ell requires it, one Levi-Civita symbol. Which indices
+are paired is a choice, and each choice leaves different information behind -- which
+is exactly why a single tensor can carry several ICTs of the same weight.
 
 What this module returns is not the tensor itself but the index assignments that
-define it: the $\bm\delta$ pairs, the $\bm\epsilon$ triple when there is one, and
-the letters left over for the natural projector to act on. `mappings` composes the
-two into $\mathbf{G}^p_{(\ell|n)}$.
+define it: the delta pairs, the epsilon triple when there is one, and the letters
+left over for the natural projector to act on. `mapping_tensors` composes the two.
 
 References:
-1. [AG82] Irreducible fourth-rank Cartesian tensors, https://doi.org/10.1103/PhysRevA.25.2647
+    Eq. 2 of [Wen2026] for the rank lowering, Eq. 3 for even n - ell and Eq. 5 for
+    odd. Sec. III A for the discussion.
+
+    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
+    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import itertools
 
-from natto.indices import letter_index
-from natto.symmetric_traceless import get_permutations_2
+from natto.indices import get_permutations_2, letter_index
 
 
-def get_lowering_rules_even(j: int, n: int) -> tuple[list[str], list[list[str]]]:
-    """
-    Rules for G(n|j) for even n-j.
+def get_lowering_rules_even(ell: int, n: int) -> tuple[list[str], list[list[str]]]:
+    """Index rules for the rank-lowering tensors of even n - ell.
+
+    With the parity even the rank-lowering tensor is built from Kronecker deltas alone,
+    (n - ell) / 2 of them, pairing off the surplus indices.
 
     Args:
-        j:
-        n:
+        ell: Weight of the ICT.
+        n: Rank of the Cartesian tensor.
 
     Returns:
-        E_s_indices: s letters to use for E_j
-        f_rules: rules to create deltas for for f_{n-j}^q
+        The letters left over for the natural projector to act on, and the delta index
+        pairs of each rank-lowering tensor, one entry per choice.
+
+    References:
+        Eq. 3 of [Wen2026].
     """
-    assert (n - j) % 2 == 0, f"n-j must be even, got n={n}, j={j}"
+    assert (n - ell) % 2 == 0, (
+        f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
+    )
 
     letters = letter_index(n, upper_case=True)
 
-    all_perms = get_permutations_2(n, num_delta=(n - j) // 2)
+    all_perms = get_permutations_2(n, num_delta=(n - ell) // 2)
 
     # TODO, this depends on the order of the indices get_permutations_2 returns, where
     #   we put the remaining indices of t at the front, and the contracted indices at
     #   the end.
-    start = j
+    start = ell
 
     f_rules = []
     E_s_letters = []
     for perm in all_perms:  # each perm for a q in f_q
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # indices for f_{n-j}^q
+        # indices for F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
         f_rules.append(delta_pairs)
 
-        # s indices for E_j
+        # s indices for the natural projector
         s_remaining = "".join(indices[:start])
         E_s_letters.append(s_remaining)
 
@@ -62,43 +70,46 @@ def get_lowering_rules_even(j: int, n: int) -> tuple[list[str], list[list[str]]]
 
 
 def get_lowering_rules_odd(
-    j: int, n: int
+    ell: int, n: int
 ) -> tuple[list[str], list[str], list[list[str]]]:
-    """
-    Rules for G(n|j) for odd n-j.
+    """Index rules for the rank-lowering tensors of odd n - ell.
 
-
-    # NOTE,
-    Upper case letter n+1 will be used as the index in epsilon to contract with E(j|j).
-    In other words, it is the tau index.
-    For example, if n = 3, then the letter D will be used as the tau index.
+    With the parity odd, one Levi-Civita symbol is needed alongside the Kronecker deltas.
+    Upper-case letter n + 1 is the index of that symbol which contracts with the
+    natural projector -- the tau index. For n = 3, that is the letter D.
 
     Args:
-        j:
-        n:
+        ell: Weight of the ICT.
+        n: Rank of the Cartesian tensor.
 
     Returns:
-        E_s_indices: s letters to use for E_j
-        f_epsilon_rules: rules to create epsilons for f_{n-j}^q
-        f_delta_rules: rules to create deltas for f_{n-j}^q
-    """
-    assert (n - j) % 2 == 1, f"n-j must be odd, got n={n}, j={j}"
+        The letters left over for the natural projector, the epsilon index triple, and
+        the delta index pairs, one entry each per choice.
 
-    if j == 0:
-        return get_lowering_rules_odd_weight_zero(j, n)
+    References:
+        Eq. 5 of [Wen2026].
+    """
+    assert (n - ell) % 2 == 1, (
+        f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
+    )
+
+    if ell == 0:
+        return get_lowering_rules_odd_weight_zero(ell, n)
 
     # All s letters
     letters = letter_index(n, upper_case=True)
 
-    # Extra letter used in epsilon. See Table I of [AG82]
+    # The epsilon index that is not contracted with the Cartesian tensor -- the tau
+    # index, which the natural projector takes instead. The n Cartesian indices have
+    # used the first n upper-case letters, so this takes the next free one.
     tau_letter = letter_index(1, start=n, upper_case=True)
 
-    all_perms = get_permutations_2(n, num_delta=(n - j - 1) // 2)
+    all_perms = get_permutations_2(n, num_delta=(n - ell - 1) // 2)
 
     # TODO, this depends on the order of the indices get_permutations_2 returns, where
     #   we put the remaining indices of t at the front, and the contracted indices at
     #   the end.
-    start = j + 1
+    start = ell + 1
 
     f_delta_rules = []
     f_epsilon_rules = []
@@ -106,10 +117,10 @@ def get_lowering_rules_odd(
     for perm in all_perms:  # each perm for a q in f_q
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # delta indices for f_{n-j}^q
+        # delta indices for F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
 
-        # remaining indices for epsilon and E_j
+        # remaining indices for epsilon and the natural projector
         s_remaining = indices[:start]
         s_remaining_set = set(s_remaining)
 
@@ -119,7 +130,7 @@ def get_lowering_rules_odd(
             # choose two indices for epsilon
             f_epsilon_rules.append(tau_letter + "".join(sorted(comb)))
 
-            # the remaining indices and also tau for E_j
+            # the remaining indices and also tau for the natural projector
             E_s_letters.append(
                 "".join(sorted(s_remaining_set - set(comb))) + tau_letter
             )
@@ -127,16 +138,16 @@ def get_lowering_rules_odd(
     return E_s_letters, f_epsilon_rules, f_delta_rules
 
 
-def get_lowering_rules_odd_weight_zero(j, n):
+def get_lowering_rules_odd_weight_zero(ell, n):
     """
     For j = 0, and odd n, the rules for G(n|0) are different from the general case.
 
     Here we do a trivial contraction with epsilon tensor, instead of a double
     contraction in the general case.
     """
-    assert j == 0, f"j must be 0, got {j}"
-    assert n % 2 == 1, f"n must be odd, got {n}"
-    assert n >= 3, f"n must be greater than or equal to 3, got {n}"
+    assert ell == 0, f"weight (ell) must be 0, got ell={ell}"
+    assert n % 2 == 1, f"rank (n) must be odd, got n={n}"
+    assert n >= 3, f"rank (n) must be at least 3, got n={n}"
 
     # All s letters
     letters = letter_index(n, upper_case=True)
@@ -155,11 +166,11 @@ def get_lowering_rules_odd_weight_zero(j, n):
     for perm in all_perms:  # each perm for a q in f_q
         indices = [letters[perm.index(i)] for i in range(n)]
 
-        # delta indices for f_{n-j}^q
+        # delta indices for F^p, the rank-lowering tensor
         delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
         f_delta_rules.append(delta_pairs)
 
-        # remaining indices for epsilon (indices for E_j is empty)
+        # remaining indices for epsilon (the natural projector gets none)
         s_remaining = indices[:start]
         f_epsilon_rules.append("".join(sorted(s_remaining)))
         E_s_letters.append("")

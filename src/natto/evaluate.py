@@ -1,4 +1,4 @@
-r"""Numerical evaluation of the symbolic operators.
+"""Numerical evaluation of the symbolic operators.
 
 A symbolic operator is a linear combination of products of Kronecker deltas and
 Levi-Civita symbols. This module contracts one into the array that `numpy.einsum`
@@ -22,7 +22,7 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
     Note, the order of the indices need to be taken care of.
-    Upper-case letters are used to represent tensors in the n space (namely for
+    Upper-case letters are used to represent tensors in the Cartesian tensor space (namely for
     tensors T and such), while lower-case letters are used to represent tensors in the
     j space (namely for tensors X). So:
     1. Extraction, X = G~ T: G~ would consist of both lower case and upper-case
@@ -95,9 +95,17 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
 
 
 def evaluate_tensors(tensors: LinearCombination, mode: str) -> np.ndarray:
-    """
-    Evaluate the tensor product of Kronecker delta and Levi-Civita tensors to get
-    numerical values.
+    """Evaluate a symbolic operator into a numerical array.
+
+    The operator is a linear combination of products of Kronecker deltas and
+    Levi-Civita symbols, and each product is contracted into an array and summed.
+
+    Args:
+        tensors: The symbolic operator.
+        mode: Which index order the result should carry; see `tp_delta_epsilon`.
+
+    Returns:
+        The evaluated operator.
     """
 
     # Evaluate each tensor product
@@ -112,18 +120,22 @@ def evaluate_tensors(tensors: LinearCombination, mode: str) -> np.ndarray:
 
 
 def extract(G_tilde: LinearCombination, T: np.ndarray) -> np.ndarray:
-    r"""
-    Evaluate X(j) = G~(j|n) \odot^n T(n).
+    """
+    Extract the ICT of one weight from a Cartesian tensor.
 
-    In G~, lower case indices are for r1, r2, ..., rj, and upper case indices are for
-    s1, s2, ..., sn. Here, the upper indices are to be contracted away.
+    The dual mapping is contracted with the tensor over all the tensor's indices,
+    leaving the weight indices free. In the dual, lower-case indices are the weight
+    indices and upper-case the rank indices; the upper-case ones are contracted away.
 
     Args:
-        G_tilde: the dual mapping tensor G~(j|n), symbolically.
-        T: the ordinary tensor T(n) to contract with G~.
+        G_tilde: The dual mapping tensor, symbolically.
+        T: The Cartesian tensor to contract it with.
 
     Returns:
-        X(j) in the space j.
+        The ICT of this weight.
+
+    References:
+        Eq. 18 of [Wen2026].
     """
     # Get numerical values of G~
     G_tilde = simplify_linear_combination(G_tilde)
@@ -145,18 +157,22 @@ def extract(G_tilde: LinearCombination, T: np.ndarray) -> np.ndarray:
 
 
 def embed(G: LinearCombination, X: np.ndarray) -> np.ndarray:
-    r"""
-    Evaluate T'(n) = G(n|j) \odot^j X(j).
+    """
+    Embed an ICT back into Cartesian tensor space.
 
-    In G, lower case indices are for r1, r2, ..., rj, and upper case indices are for
-    s1, s2, ..., sn. Here, the lower indices are to be contracted away.
+    The mapping is contracted with the ICT over the weight indices, leaving the rank
+    indices free. In the mapping, lower-case indices are the weight indices and
+    upper-case the rank indices; the lower-case ones are contracted away.
 
     Args:
-        G: the mapping tensor G(n|j), symbolically.
-        X: the natural tensor X(j) to contract with G.
+        G: The mapping tensor, symbolically.
+        X: The ICT to contract it with.
 
-    Return:
-        T'(n) in the space n.
+    Returns:
+        The Cartesian tensor it embeds to.
+
+    References:
+        Eq. 19 of [Wen2026].
     """
     # Get numerical values of G
     G = simplify_linear_combination(G)

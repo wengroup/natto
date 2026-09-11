@@ -1,17 +1,21 @@
-r"""Symmetry-adapted mapping tensors, by exact null space.
+"""Symmetry-adapted mapping tensors, by exact null space.
 
-A Cartesian tensor with an intrinsic symmetry is spanned by fewer mappings than
-a generic one of the same rank. Procedure 2 of the paper finds them: each
-generator of the symmetry acts on the mapping basis through a mixing matrix
-$\mathbf{M}^a$ (Eq. 37), and a combination survives the symmetry exactly when it
-lies in the null space of $\mathbf{M}^a - \eta_a \mathbf{I}$ for every generator.
-The surviving combinations are the $\mathbf{Q}^p$ of Eq. (36).
+A Cartesian tensor with an intrinsic symmetry is spanned by fewer mappings than a
+generic one of the same rank. Procedure 2 of the paper finds them: each generator of
+the symmetry acts on the mapping basis through a mixing matrix, and a combination
+survives the symmetry exactly when it lies in the null space of that matrix minus
+the generator's sign times the identity, for every generator. The surviving
+combinations are the symmetry-adapted mappings.
 
 Both steps are exact. The mixing matrices are built by symbolic contraction and
 the null space by Gaussian elimination over the rationals, so a
 symmetry-adapted mapping carries no numerical tolerance -- and a multiplicity
 that comes out as zero, as weight one does for the third-order elastic tensor,
 is a statement rather than a threshold.
+
+References:
+    Eq. 30 of [Wen2026] for the mixing matrix, Eq. 27 for the symmetry-adapted
+    mappings, and Procedure 2 for the steps.
 """
 
 from fractions import Fraction
@@ -25,8 +29,8 @@ from natto.symbolic import LinearCombination
 
 
 def get_symmetry_adapted_mappings(
-    weight: int,
-    rank: int,
+    ell: int,
+    n: int,
     mappings: list[LinearCombination],
     gram_inverse: list[list[Fraction]],
     symmetry: str,
@@ -38,8 +42,8 @@ def get_symmetry_adapted_mappings(
     symmetry-adapted mappings carry no numerical tolerance at all.
 
     Args:
-        weight: Weight of the natural-tensor space.
-        rank: Rank of the Cartesian tensor space.
+        ell: Weight of the natural-tensor space.
+        n: Rank of the Cartesian tensor space.
         mappings: Independent mappings of that weight.
         gram_inverse: Exact inverse of their Gram matrix.
         symmetry: Internal index symmetry of the Cartesian tensor.
@@ -47,12 +51,10 @@ def get_symmetry_adapted_mappings(
     Returns:
         The symmetry-adapted mappings, one per null-space basis vector.
     """
-    generators = parse_symmetry_generators(symmetry, rank=rank)
+    generators = parse_symmetry_generators(symmetry, n)
     constraints = []
     for permutation, sign in generators:
-        action = get_symmetry_action_matrix(
-            mappings, gram_inverse, weight, rank, permutation
-        )
+        action = get_symmetry_action_matrix(mappings, gram_inverse, ell, n, permutation)
         for row_index, row in enumerate(action):
             constraints.append(
                 [
@@ -73,57 +75,51 @@ def get_symmetry_adapted_mappings(
 def get_symmetry_action_matrix(
     mappings: list[LinearCombination],
     gram_inverse: list[list[Fraction]],
-    weight: int,
-    rank: int,
+    ell: int,
+    n: int,
     permutation: tuple[int, ...],
 ) -> list[list[Fraction]]:
-    r"""Evaluate the action of one index permutation on the mapping basis.
+    """Evaluate the action of one index permutation on the mapping basis.
 
     If ``P G[q] = sum_p M[p, q] G[p]``, duality gives
-    $$
-    M^a_{pq} = \frac{\widetilde{\mathbf{G}}^p \odot^{n+\ell}
-        (\Pi_a \mathbf{G}^q)}{2\ell + 1}
-    $$
 
-    That form is not the one evaluated. A dual is a combination of all ``N``
-    mappings, so contracting one costs ``N`` times a plain contraction, and the
-    matrix costs ``N^3``. Expanding the dual moves the inverse Gram matrix
-    outside the contraction,
+        M[p, q] = (G_dual[p] . P G[q]) / (2*ell + 1)
 
-    $$
-    \mathbf{M}^a = \mathbf{g}^{-1} \mathbf{O},
-    \qquad
-    O_{pq} = \frac{\mathbf{G}^p \odot^{n+\ell} (\Pi_a \mathbf{G}^q)}{2\ell + 1}
-    $$
+    That form is not the one evaluated. A dual is a combination of all N mappings,
+    so contracting one costs N times a plain contraction, and the matrix costs
+    N^3. Expanding the dual moves the inverse Gram matrix outside the contraction,
 
-    which is the same matrix from contractions between single mappings. At rank
-    six and weight three that is the difference between eighteen minutes and
-    under one.
+        M = g_inverse O,   O[p, q] = (G[p] . P G[q]) / (2*ell + 1)
+
+    which is the same matrix from contractions between single mappings. At rank six
+    and weight three that is the difference between eighteen minutes and under one.
 
     Args:
         mappings: Independent mappings of this weight.
         gram_inverse: Exact inverse of their Gram matrix.
-        weight: Weight of the natural-tensor space.
-        rank: Rank of the Cartesian tensor space.
+        ell: Weight of the natural-tensor space.
+        n: Rank of the Cartesian tensor space.
         permutation: The generator, as a permutation of the Cartesian indices.
 
     Returns:
         The exact mixing matrix of this generator.
 
     Raises:
-        ValueError: If the permutation does not match the Cartesian rank.
+        ValueError: If the permutation does not match the Cartesian n.
     """
-    if len(permutation) != rank:
-        raise ValueError("Symmetry permutation does not match the Cartesian rank")
+    if len(permutation) != n:
+        raise ValueError(
+            f"Symmetry permutation does not match the Cartesian rank n={n}"
+        )
 
     # Permuting the axes of a tensor renames its indices: the slot that now
     # holds axis `permutation[k]` carries the letter that axis `k` had.
-    letters = letter_index(rank, upper_case=True)
-    relabeling = {letters[permutation[k]]: letters[k] for k in range(rank)}
+    letters = letter_index(n, upper_case=True)
+    relabeling = {letters[permutation[k]]: letters[k] for k in range(n)}
     permuted = [relabel_indices_2(mapping, relabeling) for mapping in mappings]
 
     overlap = [
-        [get_gram_entry(weight, rank, mapping, image) for image in permuted]
+        [get_gram_entry(ell, n, mapping, image) for image in permuted]
         for mapping in mappings
     ]
 

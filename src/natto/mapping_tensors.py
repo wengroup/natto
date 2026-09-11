@@ -1,18 +1,20 @@
-r"""Mapping tensors between a Cartesian tensor and its irreducible parts.
+"""Mapping tensors between a Cartesian tensor and its irreducible parts.
 
-The candidate mapping tensors $\mathbf{G}^p_{(\ell|n)}$ of Eq. (19), the extraction
-duals $\widetilde{\mathbf{G}}^p_{(\ell|n)}$ of Eq. (22), and the decomposition
-operators $\mathbf{S}$ of Eq. (25) that compose the two. Everything here is
-symbolic and exact.
+The candidate mapping tensors, the extraction duals, and the decomposition operators
+that compose the two. Everything here is symbolic and exact.
 
 A mapping tensor is a rank-lowering tensor followed by the natural projector, so the
 candidates of a weight are assembled out of `lowering` and `natural_projector`.
-Which of them are independent is settled in `qr`, against the exact Gram matrix of
-`gram`; `reduction` is what runs the whole pipeline and publishes the result.
+Which of them are independent is settled in `independence`, against the exact Gram
+matrix of `gram`; `reduction` is what runs the whole pipeline and publishes the
+result.
 
 References:
-1. [CS70] Irreducible Cartesian Tensors. II. General Formulation, http://dx.doi.org/10.1063/1.1665190
-2. [AG82] Irreducible fourth-rank Cartesian tensors, https://doi.org/10.1103/PhysRevA.25.2647
+    Eq. 13 of [Wen2026] for the mapping tensors, Eq. 16 for the duals, and Eq. 19
+    for the decomposition operators.
+
+    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
+    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 from fractions import Fraction
@@ -29,66 +31,70 @@ from natto.symbolic import (
 )
 
 
-def get_mappings_even(j: int, n: int) -> list[LinearCombination]:
-    r"""
-    Mapping operator G to map minimal rank tensor subspaces j onto the space n.
+def get_mappings_even(ell: int, n: int) -> list[LinearCombination]:
+    """The candidate mapping tensors of a weight, for even n - ell.
 
-    G(n|j)^q = E_j \otimes^{n-j} f_{n-j}^q.
-
-    This is for even n-j.
-
-    Reference: Eq. 2.4 of [AG82].
+    A mapping tensor is a rank-lowering tensor followed by the natural projector, so
+    there is one candidate per choice of which indices the rank lowering contracts
+    away.
 
     Args:
-        j: the minimal tensor subspace
-        n: the space to map to
+        ell: Weight of the ICT.
+        n: Rank of the Cartesian tensor to map onto.
 
     Returns:
-        A list of Tensors objects, each corresponding to a q in f_{n-j}^q.
+        One mapping tensor per choice of contracted indices.
+
+    References:
+        Eq. 13 of [Wen2026].
     """
 
-    assert (n - j) % 2 == 0, f"n-j must be even, got n={n}, j={j}"
+    assert (n - ell) % 2 == 0, (
+        f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
+    )
 
-    E_s_letters, delta_rules = get_lowering_rules_even(j, n)
+    E_s_letters, delta_rules = get_lowering_rules_even(ell, n)
 
     all_G = []
     for si, rule in zip(E_s_letters, delta_rules):
-        E_j = get_natural_projector(j, s_letters=si)
+        E = get_natural_projector(ell, s_letters=si)
         f_q = create_delta_epsilon_tensors(rule)
-        G = multiply_2(E_j, f_q)
+        G = multiply_2(E, f_q)
         all_G.append(G)
 
     return all_G
 
 
-def get_mappings_odd(j: int, n: int) -> list[LinearCombination]:
-    r"""
-    Mapping operator G to map minimal rank tensor subspaces j onto the space n.
+def get_mappings_odd(ell: int, n: int) -> list[LinearCombination]:
+    """The candidate mapping tensors of a weight, for odd n - ell.
 
-
-    G(n|j)^q = E_j \otimes^{n-j} f_{n-j}^q.
-
-    This is for odd n-j.
-
-    Reference: Eq. 2.5 of [AG82].
+    A mapping tensor is a rank-lowering tensor followed by the natural projector, so
+    there is one candidate per choice of which indices the rank lowering contracts
+    away. The odd parity means the rank lowering carries one Levi-Civita
+    symbol as well as its Kronecker deltas.
 
     Args:
-        j: the minimal tensor subspace
-        n: the space to map to
+        ell: Weight of the ICT.
+        n: Rank of the Cartesian tensor to map onto.
 
     Returns:
-        A list of Tensors objects, each corresponding to a q in f_{n-j}^q.
-    """
-    assert (n - j) % 2 == 1, f"n-j must be odd, got n={n}, j={j}"
+        One mapping tensor per choice of contracted indices.
 
-    E_s_letters, f_epsilon_rules, f_delta_rules = get_lowering_rules_odd(j, n)
+    References:
+        Eq. 13 of [Wen2026].
+    """
+    assert (n - ell) % 2 == 1, (
+        f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
+    )
+
+    E_s_letters, f_epsilon_rules, f_delta_rules = get_lowering_rules_odd(ell, n)
 
     all_G = []
     for si, e_rule, d_rule in zip(E_s_letters, f_epsilon_rules, f_delta_rules):
-        E_j = get_natural_projector(j, s_letters=si)
+        E = get_natural_projector(ell, s_letters=si)
         f_q_epsilon = Epsilon(e_rule)
         f_q_delta = create_delta_epsilon_tensors(d_rule)
-        G = multiply_2(E_j, f_q_epsilon, f_q_delta)
+        G = multiply_2(E, f_q_epsilon, f_q_delta)
         all_G.append(G)
 
     return all_G
@@ -97,17 +103,11 @@ def get_mappings_odd(j: int, n: int) -> list[LinearCombination]:
 def get_extraction_operators(
     gram_inverse: list[list[Fraction]], embedding: list[LinearCombination]
 ) -> list[LinearCombination]:
-    r"""Build the extraction operators dual to a set of embedding operators.
+    """Build the extraction operators dual to a set of embedding operators.
 
-    The paper's Eq. (22),
-
-    $$
-    \widetilde{\mathbf{G}}^p_{(\ell|n)}
-        = \sum_q (\mathbf{g}^{-1})_{pq} \mathbf{G}^q_{(\ell|n)}
-    $$
-
-    Contracted with a Cartesian tensor, each returns the natural tensor of its
-    weight and channel.
+    Each dual is the combination of the embedding operators whose coefficients are the
+    corresponding row of the inverse Gram matrix. Contracted with a Cartesian tensor,
+    each returns the ICT of its weight and channel.
 
     Args:
         gram_inverse: Exact inverse of the embedding operators' Gram matrix.
@@ -115,6 +115,9 @@ def get_extraction_operators(
 
     Returns:
         One extraction operator per row of `gram_inverse`.
+
+    References:
+        Eq. 16 of [Wen2026].
     """
     extraction = []
     for row in gram_inverse:
@@ -130,18 +133,26 @@ def get_extraction_operators(
 def get_decomposition_operators(
     G: list[LinearCombination], G_tilde: list[LinearCombination], n: int
 ) -> list[LinearCombination]:
-    r"""
-    Get the decomposition operators of a mapping and its dual.
+    """Get the decomposition operators of a mapping and its dual.
 
-    S = G \odot^j G~
+    Each is a mapping composed with its own dual, so contracting one with a Cartesian
+    tensor gives that tensor's part of this weight and channel directly, without
+    forming the ICT on the way.
+
+    Careful with the paper's S: there it is a rank-n *tensor*, one weight's part of a
+    particular T, while here it is the rank-2n *operator* that produces it. Same
+    letter, one the map and one its output.
 
     Args:
-        G: mapping tensors
-        G_tilde: the duals, in the order of the mappings they correspond to.
-        n: rank of the Cartesian tensor.
+        G: Mapping tensors.
+        G_tilde: The duals, in the order of the mappings they correspond to.
+        n: Rank of the Cartesian tensor.
 
     Returns:
-        S: one decomposition operator per channel
+        One decomposition operator per channel.
+
+    References:
+        Eq. 19 of [Wen2026].
     """
     S = []
     for G_i, dual_i in zip(G, G_tilde):

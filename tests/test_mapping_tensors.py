@@ -4,23 +4,23 @@ from natto.natural_projector import get_natural_projector
 
 
 def test_mappings_even():
-    # n=0, j=0
-    all_G = get_mappings_even(j=0, n=0)
+    # rank 0, weight 0
+    all_G = get_mappings_even(ell=0, n=0)
     assert len(all_G) == 1
     assert set(all_G[0].to_str_list()) == {"+1"}
 
-    # n=1, j=1
-    all_G = get_mappings_even(j=1, n=1)
+    # rank 1, weight 1
+    all_G = get_mappings_even(ell=1, n=1)
     assert len(all_G) == 1
     assert set(all_G[0].to_str_list()) == {"+1 δ_aA"}
 
-    # n=2, j=0
-    all_G = get_mappings_even(j=0, n=2)
+    # rank 2, weight 0
+    all_G = get_mappings_even(ell=0, n=2)
     assert len(all_G) == 1
     assert set(all_G[0].to_str_list()) == {"+1 δ_AB"}
 
-    # n=2, j=2
-    all_G = get_mappings_even(j=2, n=2)
+    # rank 2, weight 2
+    all_G = get_mappings_even(ell=2, n=2)
     assert len(all_G) == 1
     assert set(all_G[0].to_str_list()) == {
         "-1/3 δ_ab δ_AB",
@@ -28,27 +28,27 @@ def test_mappings_even():
         "+1/2 δ_aA δ_bB",
     }
 
-    # n=3, j=1
-    all_G = get_mappings_even(j=1, n=3)
+    # rank 3, weight 1
+    all_G = get_mappings_even(ell=1, n=3)
     assert len(all_G) == 3
     assert set(all_G[0].to_str_list()) == {"+1 δ_aA δ_BC"}
     assert set(all_G[1].to_str_list()) == {"+1 δ_aB δ_AC"}
     assert set(all_G[2].to_str_list()) == {"+1 δ_aC δ_AB"}
 
-    # n=3, j=3
-    all_G = get_mappings_even(j=3, n=3)
+    # rank 3, weight 3
+    all_G = get_mappings_even(ell=3, n=3)
     assert len(all_G) == 1
     assert set(all_G[0].to_str_list()) == set(get_natural_projector(3).to_str_list())
 
-    # n=4, j=0
-    all_G = get_mappings_even(j=0, n=4)
+    # rank 4, weight 0
+    all_G = get_mappings_even(ell=0, n=4)
     assert len(all_G) == 3
     assert set(all_G[0].to_str_list()) == {"+1 δ_AB δ_CD"}
     assert set(all_G[1].to_str_list()) == {"+1 δ_AC δ_BD"}
     assert set(all_G[2].to_str_list()) == {"+1 δ_AD δ_BC"}
 
-    # n=4, j=2
-    all_G = get_mappings_even(j=2, n=4)
+    # rank 4, weight 2
+    all_G = get_mappings_even(ell=2, n=4)
     assert len(all_G) == 6
     assert set(all_G[0].to_str_list()) == {
         "+1/2 δ_aA δ_bB δ_CD",
@@ -90,18 +90,18 @@ def test_mappings_odd():
     # n = 1, j = 0 not possible
 
     # # n = 2, j = 1
-    # all_G = get_mappings_odd(j=1, n=2)
+    # all_G = get_mappings_odd(ell=1, n=2)
     # assert len(all_G) == 1
     # assert set(all_G[0].to_str_list()) == {"(1) δ_aC ε_CAB"}
 
     # TODO, seems we need to implement triple products os epsilon
     # n 3, j = 0
-    # all_G = get_mappings_odd(j=0, n=3)
+    # all_G = get_mappings_odd(ell=0, n=3)
     # assert len(all_G) == 3
     # assert set(all_G[0].to_str_list()) == {"(1) ε_CAB δ_aC"}
 
     # n = 3, j = 2
-    all_G = get_mappings_odd(j=2, n=3)
+    all_G = get_mappings_odd(ell=2, n=3)
     assert len(all_G) == 3
     assert set(all_G[0].to_str_list()) == {
         "-1/3 δ_ab δ_CD ε_DAB",
@@ -120,7 +120,7 @@ def test_mappings_odd():
     }
 
     # n = 4, j = 1
-    all_G = get_mappings_odd(j=1, n=4)
+    all_G = get_mappings_odd(ell=1, n=4)
     assert len(all_G) == 6
     assert set(all_G[0].to_str_list()) == {"+1 δ_aE ε_EAB δ_CD"}
     assert set(all_G[1].to_str_list()) == {"+1 δ_aE ε_EAC δ_BD"}
@@ -130,7 +130,7 @@ def test_mappings_odd():
     assert set(all_G[5].to_str_list()) == {"+1 δ_aE ε_ECD δ_AB"}
 
     # n = 4, j = 3
-    all_G = get_mappings_odd(j=3, n=4)
+    all_G = get_mappings_odd(ell=3, n=4)
     assert len(all_G) == 6
     assert set(all_G[0].to_str_list()) == {
         "-1/15 δ_aC δ_bc δ_DE ε_EAB",
@@ -171,7 +171,7 @@ def test_mappings_odd():
 
 def test_g_matrix_ignores_symbolic_zero_terms():
     """Check that explicit zero terms do not affect the symbolic Gram matrix."""
-    all_G = get_mappings_even(j=2, n=4)
+    all_G = get_mappings_even(ell=2, n=4)
     mapping_with_zeros = all_G[0] + 0 * all_G[1]
 
     assert get_gram_matrix(2, 4, [mapping_with_zeros]) == get_gram_matrix(

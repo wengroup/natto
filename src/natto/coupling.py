@@ -1,43 +1,43 @@
-r"""Coupling of two irreducible Cartesian tensors into a third.
+"""Coupling of two irreducible Cartesian tensors into a third.
 
-The coupling operator $\mathbf{K}_{(\ell_3 \mid \ell_1, \ell_2)}$ of Eqs. (47)
-and (48) takes natural tensors $\mathbf{X}^{\ell_1}$ and $\mathbf{Y}^{\ell_2}$
-to the weight-$\ell_3$ tensor of their product,
+The coupling operator takes an ICT of weight l1 and one of weight l2 to the
+weight-l3 part of their product, the Cartesian counterpart of a Clebsch-Gordan
+coefficient. Two closed forms build it, one for each parity of l1 + l2 - l3; the odd
+one carries a Levi-Civita symbol. `get_coupling_operator` dispatches on that parity,
+so a caller supplies only the three weights.
 
-$$\mathbf{Z}^{\ell_3} = \mathbf{K}_{(\ell_3 \mid \ell_1, \ell_2)}
-\odot^{\ell_1} \mathbf{X}^{\ell_1} \odot^{\ell_2} \mathbf{Y}^{\ell_2},$$
-
-the Cartesian counterpart of a Clebsch-Gordan coefficient. Two closed forms
-build it, one for each parity of $\ell_1 + \ell_2 - \ell_3$; the odd one carries
-a Levi-Civita symbol. `get_coupling_operator` dispatches on that parity, so a
-caller supplies only the three weights.
-
-The scale is not fixed by the construction. One factor per weight triple is
-free, and the normalization constants $C$ of Eqs. (49) and (50) fix it, one per
-parity; `tests/test_coupling.py` asserts the two conditions they come from.
+The scale is not fixed by the construction. One factor per weight triple is free,
+and the normalization constants fix it, one per parity; `tests/test_coupling.py`
+asserts the two conditions they come from.
 
 ## Why this is not a call into the reduction
 
-This is the only route to the coupling, and it is a closed form rather than a
-call into the general symmetry machinery of `mappings`. That is worth
-explaining, since $\mathbf{X} \otimes \mathbf{Y}$ is symmetric within its first
-$\ell_1$ indices and within its last $\ell_2$, which is an intrinsic symmetry in
-the ordinary sense, and the symmetry route does apply to it.
+This is the only route to the coupling, and it is a closed form rather than a call
+into the general symmetry machinery. That is worth explaining, since the product of
+the two ICTs is symmetric within its first l1 indices and within its last l2, which
+is an intrinsic symmetry in the ordinary sense, and the symmetry route does apply to
+it.
 
-Applying it is not enough on its own. What reduces the weight-$\ell_3$ mapping
-space to a single dimension is a second property: $\mathbf{X}$ and $\mathbf{Y}$
-are traceless, so a contraction taken inside either vanishes and only
-contractions between the two survive. Tracelessness is not an index permutation,
-so no symmetry string expresses it and the symmetry-adapted construction cannot
-use it. The derivation narrows the candidates with it separately, and the result
-is the single operator built here.
+Applying it is not enough on its own. What reduces the weight-l3 mapping space to a
+single dimension is a second property: both inputs are traceless, so a contraction
+taken inside either vanishes and only contractions between the two survive.
+Tracelessness is not an index permutation, so no symmetry string expresses it and
+the symmetry-adapted construction cannot use it. The derivation narrows the
+candidates with it separately, and the result is the single operator built here.
 
-A second route did exist, reaching $\mathbf{Z}$ by reducing the rank-$(\ell_1 +
-\ell_2)$ product and grouping the resulting mappings numerically, which is how
-it saw tracelessness: by working on an actual traceless product rather than
-through the symmetry. It gave the same operator up to a scalar and was removed.
-The closed form is exact and far cheaper, the general route having to pass
-through the reduction of a rank-six tensor once $\ell_1 = \ell_2 = 3$.
+A second route did exist, reaching the output by reducing the rank-(l1 + l2) product
+and grouping the resulting mappings numerically, which is how it saw tracelessness:
+by working on an actual traceless product rather than through the symmetry. It gave
+the same operator up to a scalar and was removed. The closed form is exact and far
+cheaper, the general route having to pass through the reduction of a rank-six tensor
+once l1 = l2 = 3.
+
+References:
+    Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, with the
+    normalization constant of Eq. 53.
+
+    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
+    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 from fractions import Fraction
@@ -105,23 +105,20 @@ def get_coupling_symbolic(
 
 
 def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    r"""
-    Get the einsum rule when l1 + l2 - l3 is even.
+    """Get the einsum rule when l1 + l2 - l3 is even.
 
-    x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^m}
+    The first input is contracted with the second over k + t indices, and the result
+    tensored with t Kronecker deltas.
 
-    After contraction, the resultant tensor will have l1-k-t indices from x, and these
-    indices are still symmetric. Similarly, the resultant tensor will have l2-k-t
-    symmetric indices from y. It will have 2*t indices from I. Each two indices from I
-    are symmetric.
-
-    In total, the resultant tensor will have l3 = l1 + l2 - 2(k + t) tensor indices.
+    After contraction the result has l1 - k - t indices from the first input, still
+    symmetric among themselves, and l2 - k - t from the second, likewise. It has 2 * t
+    indices from the deltas, symmetric in pairs. In total l3 = l1 + l2 - 2 * (k + t).
 
     Returns:
-        rule: The einsum rule for the tensor product
-        symmetry: The symmetry information of the resultant tensor after the tensor.
-            product. e.g. `xxxyyyaa` means the first three indices are symmetric, the
-            next three indices are symmetric, and the last two indices are symmetric.
+        rule: The einsum rule for the tensor product.
+        symmetry: The symmetry of the resulting tensor. For example `xxxyyyaa` means
+            the first three indices are symmetric, the next three are symmetric, and
+            the last two are symmetric.
         delta_indices: The indices for the delta tensors.
     """
 
@@ -158,26 +155,20 @@ def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
 
 
 def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    r"""
-    Get the einsum rule when l1 + l2 - l3 is odd.
+    """Get the einsum rule when l1 + l2 - l3 is odd.
 
-    epsilon : x_l1 \odot^{k+t} x_l2 \otimes I ^{\otimes^t}
+    As in the even case, but with a Levi-Civita symbol in front. It contracts away one
+    index from each input, so the result takes one index from the symbol itself.
 
-    epsilon is the Levi-Civita symbol. It contracts away one index from x and one index
-    from y. So, after contraction, the resultant tensor will have 1 index from epsilon.
-    After contraction, the resultant tensor will have l1-1-k-t indices from x, and these
-    indices are still symmetric. Similarly, the resultant tensor will have l2-1-k-t
-    symmetric indices from y. It will have 2*m indices from I. Each two indices from I
-    are symmetric.
-
-    In total, the resultant tensor will have l3 = l1 + l2 - 1 - 2(k + t) indices.
-
+    After contraction the result has l1 - 1 - k - t indices from the first input, still
+    symmetric among themselves, and l2 - 1 - k - t from the second, likewise. It has
+    2 * t indices from the deltas, symmetric in pairs. In total
+    l3 = l1 + l2 - 1 - 2 * (k + t).
 
     Returns:
-        rule: The einsum rule for the tensor product
-        symmetry: The symmetry information of the resultant tensor after the tensor
-            product. e.g. `aabb` means the first two indices are symmetric, and the last
-            two indices are symmetric.
+        rule: The einsum rule for the tensor product.
+        symmetry: The symmetry of the resulting tensor. For example `aabb` means the
+            first two indices are symmetric and the last two are symmetric.
         delta_indices: The indices for the delta tensors.
     """
     # example: epsilon_Uvw x_vabc  y_wabd I_AB -> UcdAB
@@ -257,31 +248,30 @@ def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
 
 
 def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
-    r"""Normalization constant `C` for odd `L = l1 + l2 + l3`, Eq. (50).
+    """Normalization constant `C` for odd `L = l1 + l2 + l3`.
 
     The condition differs from the one behind `coeff_C_even`. For odd `L` the
-    coupling operator carries a Levi-Civita symbol, so contracting the output
-    l3 times with a single unit vector vanishes identically by antisymmetry and
-    cannot fix the scale. The constant is fixed instead by the rate of that
-    vanishing: with $\mathbf{X}^{\ell_1}$ built from a unit vector $\mathbf{r}$
-    and $\mathbf{Y}^{\ell_2}$ from a unit vector $\mathbf{b}$,
-
-    $$\lim_{\mathbf{b} \to \mathbf{r}}
-    \frac{\lVert \mathbf{Z}^{\ell_3} \odot^{\ell_3 - 1}
-    \mathbf{r}^{\otimes(\ell_3 - 1)} \rVert}
-    {\lVert \mathbf{r} \times \mathbf{b} \rVert} = 1.$$
-
-    Args:
-        l1: Weight of the first natural tensor X.
-        l2: Weight of the second natural tensor Y.
-        l3: Weight of the output natural tensor Z.
+    coupling operator carries a Levi-Civita symbol, so contracting the output l3
+    times with a single unit vector vanishes identically by antisymmetry and cannot
+    fix the scale. The constant is fixed instead by the rate of that vanishing: the
+    output's contraction with l3 - 1 copies of one direction, divided by the norm of
+    the cross product of the two input directions, tends to one as the directions
+    merge.
 
     The value is a ratio of factorials, so it is returned exactly. Multiplying a
-    float array by a `Fraction` would silently make it an object array, so the
+    float array by a Fraction would silently make it an object array, so the
     conversion happens at that boundary rather than here.
+
+    Args:
+        l1: Weight of the first ICT, X.
+        l2: Weight of the second ICT, Y.
+        l3: Weight of the output ICT, Z.
 
     Returns:
         The normalization constant.
+
+    References:
+        Eq. 53 of [Wen2026].
     """
     L = l1 + l2 + l3
     L1 = L - 2 * l1 - 1
@@ -379,7 +369,9 @@ def _get_coupling_symbolic_even(
     l1: int, l2: int, l3: int
 ) -> tuple[LinearCombination, str, str, str]:
     """Build `K` symbolically for even `l1 + l2 - l3`; see `get_coupling_symbolic`."""
-    assert (l1 + l2 - l3) % 2 == 0, "l1 + l2 - l3 must be even"
+    assert (l1 + l2 - l3) % 2 == 0, (
+        f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
+    )
 
     k = (l1 + l2 - l3) // 2
 
@@ -416,7 +408,9 @@ def _get_coupling_symbolic_odd(
     l1: int, l2: int, l3: int
 ) -> tuple[LinearCombination, str, str, str]:
     """Build `K` symbolically for odd `l1 + l2 - l3`; see `get_coupling_symbolic`."""
-    assert (l1 + l2 - l3) % 2 == 1, "l1 + l2 - l3 must be odd"
+    assert (l1 + l2 - l3) % 2 == 1, (
+        f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
+    )
 
     k = (l1 + l2 - l3 - 1) // 2
 
@@ -470,7 +464,9 @@ def _get_coupling_rules_even(
         The r_indices, s_indices, and a_indices can be used to create the
         right-hand-side of the einsum rule.
     """
-    assert (l1 + l2 - l3) % 2 == 0, "l1 + l2 - l3 must be even"
+    assert (l1 + l2 - l3) % 2 == 0, (
+        f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
+    )
 
     k = (l1 + l2 - l3) // 2
 
@@ -550,7 +546,9 @@ def _get_coupling_rules_odd(
 
     """
 
-    assert (l1 + l2 - l3) % 2 == 1, "l1 + l2 - l3 must be odd"
+    assert (l1 + l2 - l3) % 2 == 1, (
+        f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
+    )
 
     k = (l1 + l2 - l3 - 1) // 2
 

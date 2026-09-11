@@ -1,17 +1,19 @@
-r"""Making a numerical tensor symmetric and traceless.
+"""Making a numerical tensor symmetric and traceless.
 
-An ICT is a tensor that is symmetric in all its indices and traceless on every
-pair of them. This module is the numerical route to one: average a numpy array
-over the permutations of its indices, then subtract the $\bm\delta$ terms that
-carry its traces. It is the array-level counterpart of `natural_projector`, which
-does the same thing symbolically and exactly.
+An ICT is a tensor that is symmetric in all its indices and traceless on every pair
+of them. This module is the numerical route to one: average a numpy array over the
+permutations of its indices, then subtract the delta terms that carry its traces. It
+is the array-level counterpart of `natural_projector`, which does the same thing
+symbolically and exactly, and is much the cheaper of the two at high rank because it
+works on the array rather than on the projector.
 
-The index permutations and contraction rules the routines here work through are
-built in `indices`; this module only applies them to arrays.
+The index permutations and contraction rules the routines here work through are built
+in `indices`; this module only applies them to arrays.
 
-Reference:
-J. Jerphagnon, D. Chemla, and R. Bonneville, The description of the physical properties
-of condensed matter using irreducible tensors, Advances in Physics 27, 609 (1978).
+References:
+    [JCB78] J. Jerphagnon, D. Chemla, and R. Bonneville, The description of the
+    physical properties of condensed matter using irreducible tensors, Advances in
+    Physics 27, 609 (1978).
 """
 
 import itertools
@@ -70,7 +72,6 @@ def symmetrize_and_remove_trace(
     return remove_trace(symmetrize(t, start_dim, symmetry), start_dim)
 
 
-# TODO, this fn has the same name as one in the sym.py file. We should rename
 def symmetrize(
     t: np.ndarray, start_dim: int = 0, symmetry: str = None, mode: str = "mean"
 ) -> np.ndarray:
@@ -149,30 +150,25 @@ def symmetrize_2(t: np.ndarray, num_delta: int, start_dim: int = 0) -> np.ndarra
 
 # TODO, this can be refactored to be similar as unit_vector.py
 def remove_trace(u: np.ndarray, start_dim: int = 0) -> np.ndarray:
-    r"""
-    Remove the trace of a symmetric tensors to get a natural tensor of the same rank.
+    """Remove the trace of a symmetric tensor, leaving an ICT of the same rank.
+
+    The traces are subtracted off as a signed sum over the number of delta pairs taken
+    out, each term symmetrized and weighted by a ratio of double factorials. The sum runs
+    to half the rank, rounded down.
 
     Args:
-        u: a fully symmetric tensor
-        start_dim: the starting dimension to perform the operation. Dimensions before
+        u: A fully symmetric tensor.
+        start_dim: The starting dimension to perform the operation. Dimensions before
             `start_dim` will not be used in the operation.
 
-    This implements:
-    X_{ij\dots m} = U_{ij\dots m} + \sum_{d=1}^D (-1)^d \frac{(2m-2d-1)!!}{(2m-1)!!}
-    \{ \delta_{ij}\delta_{kl} \dots U_{rrss\dots m} \}
-    where:
-    U: fully symmetric tensor of rank m
-    X: natural tensor of rank m
-    D: D=m/2 if m is even, D=(m-1)/2 if m is odd
-    {} denotes fully symmetrization.
+    Returns:
+        An ICT of the same shape as the input tensor.
 
     References:
-        1. Eq 10 of http://dx.doi.org/10.1080/00018737800101454
-        2. Cartesian tensors writeup by Mingjian Wen, which is an explicit form of the
-           above reference.
-
-    Returns:
-        A natural tensor of the same shape as the input tensor.
+        Eq. 10 of [JCB78]. This is one of the few places the implementation does not
+        follow [Wen2026]: it is the explicit numerical formula, and it works on the
+        rank-ell array rather than on the rank-2*ell natural projector that does
+        the same thing exactly, so it stays much the cheaper route at high weight.
     """
 
     m = u.ndim - start_dim
@@ -201,11 +197,11 @@ def remove_trace(u: np.ndarray, start_dim: int = 0) -> np.ndarray:
 #  Can we merge them?
 
 
-def get_random_natural_tensor(rank: int, seed: int = 35) -> np.ndarray:
+def get_random_natural_tensor(n: int, seed: int = 35) -> np.ndarray:
     """
     Create a random symmetric traceless tensor of the given rank.
     """
-    X = np.random.default_rng(seed).standard_normal((3,) * rank)
+    X = np.random.default_rng(seed).standard_normal((3,) * n)
     X = symmetrize_and_remove_trace(X)
 
     return X
