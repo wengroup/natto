@@ -18,8 +18,8 @@ Change the `rank` and `symmetry` arguments at the bottom to try other classes;
 
 import numpy as np
 
+from natto.intrinsic_symmetry import impose_symmetry
 from natto.mappings import get_reduction
-from natto.sym import symmetrize
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 
@@ -35,7 +35,7 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
     # Create a random tensor T of the given rank and symmetry
     T = np.random.default_rng(35).standard_normal((3,) * rank)
     if symmetry is not None:
-        T = symmetrize(T, symmetry)
+        T = impose_symmetry(T, symmetry)
 
     output = get_reduction(rank, symmetry)
 

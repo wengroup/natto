@@ -9,8 +9,8 @@ product -- and that extraction followed by embedding still recovers the tensor.
 import numpy as np
 import pytest
 
+from natto.intrinsic_symmetry import check_symmetry, impose_symmetry
 from natto.mappings import get_reduction
-from natto.sym import check_symmetry, symmetrize
 
 #: The operators are built in double precision and the identity they satisfy is
 #: exact, so what is left is rounding in the eigendecomposition.
@@ -91,7 +91,7 @@ def test_reconstructs_a_symmetric_tensor(rank: int, symmetry: str):
     Each embedded part must carry the symmetry of the class on its own, not
     only in the sum.
     """
-    tensor = symmetrize(
+    tensor = impose_symmetry(
         np.random.default_rng(35).standard_normal((3,) * rank), symmetry
     )
     output = orthonormal(rank, symmetry)

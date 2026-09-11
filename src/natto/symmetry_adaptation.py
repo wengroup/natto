@@ -17,10 +17,10 @@ is a statement rather than a threshold.
 from fractions import Fraction
 
 from natto.algebra import simplify_linear_combination
+from natto.gram import get_gram_entry
 from natto.indices import letter_index, relabel_indices_2
-from natto.operators import get_gram_entry
+from natto.intrinsic_symmetry import parse_symmetry_generators
 from natto.rational import matrix_multiply, matrix_null_space
-from natto.sym import parse_symmetry_generators
 from natto.symbolic import LinearCombination
 
 

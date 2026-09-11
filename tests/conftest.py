@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from natto.symmetrize import symmetrize_and_remove_trace
+from natto.symmetric_traceless import symmetrize_and_remove_trace
 
 
 def pytest_configure(config):

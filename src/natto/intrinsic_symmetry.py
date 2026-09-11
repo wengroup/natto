@@ -1,13 +1,21 @@
-"""
-Symmetrization of a generic tensor to get a tensor with specific symmetry.
+r"""Intrinsic permutation symmetry of a tensor.
+
+Some tensors are constrained before any reduction happens: an elasticity tensor
+obeys $C_{ijkl} = C_{jikl} = C_{klij}$, a piezoelectric one $d_{ijk} = d_{ikj}$.
+Such a constraint is a group of signed index permutations, and this module is
+where one is parsed from its index equalities, closed into a group, imposed on a
+tensor, or checked.
+
+This is *not* full symmetrization: `impose_symmetry` projects onto whichever
+permutation group was asked for, while `symmetric_traceless` averages over all
+permutations and removes the traces. The two are easy to confuse, which is why
+they are named apart.
 """
 
 import numpy as np
 
 
-# TODO, this fn has the same name as one in the symmetrize.py file. We should
-#  rename one of them
-def symmetrize(t: np.ndarray, symmetry: str, mode: str = "mean") -> np.ndarray:
+def impose_symmetry(t: np.ndarray, symmetry: str, mode: str = "mean") -> np.ndarray:
     """
     Symmetrize a generic tensor to obtain a tensor with the specified symmetry.
 
@@ -194,7 +202,7 @@ def get_random_tensor_of_symmetry(
     Create a random tensor of the given rank and symmetry.
     """
     T = np.random.default_rng(seed).standard_normal((3,) * rank)
-    T = symmetrize(T, symmetry)
+    T = impose_symmetry(T, symmetry)
 
     return T
 

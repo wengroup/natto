@@ -67,9 +67,20 @@ Names that meant something else, or several things, and must not come back.
 | `get_G_H_S` | the whole reduction | `get_reduction` |
 | `_of_j` | the suffix for one weight | `_of_weight`; `j` is `weight` and `n` is `rank` throughout |
 | `H_tp` | module | `coupling` |
-| `GHS` | module | `mappings`, plus `orthonormal` and `symmetry_adapted` |
-| `EGH` | module | `operators` |
-| `ops` | module | `algebra`, to keep it distinct from `operators` |
+| `GHS` | module | `mappings`, plus `orthonormal` and `symmetry_adaptation` |
+| `EGH` | module | `lowering`, `natural_projector`, `mappings` and `gram` |
+| `operators` | module holding four separate things | split, as above |
+| `ops` | module | `algebra` |
+| `sym` | module | `intrinsic_symmetry`; the permutation symmetry a tensor already has |
+| `symmetry_adapted` | module | `symmetry_adaptation`, so it no longer reads as a half of `intrinsic_symmetry` |
+| `symmetrize` | module | `symmetric_traceless`; the numerical route to an ICT |
+| `symmetrize` | *two* functions of that name, in those two modules | `intrinsic_symmetry.impose_symmetry` and `symmetric_traceless.symmetrize` |
+| `matrix` | module | `rational`; it is exact arithmetic, not numpy |
+| `get_E_rules` | index patterns of the natural projector | `get_projector_rules` |
+| `get_G_rules_*` | index patterns of the rank-lowering tensors | `get_lowering_rules_*` |
+| `get_G_even`, `get_G_odd` | the candidate mapping tensors | `get_mappings_even`, `get_mappings_odd` |
+| `get_S` | the decomposition operators | `get_decomposition_operators` |
+| `contract_G` | contraction of two mappings | `contract_mappings` |
 
 ## The three operators
 

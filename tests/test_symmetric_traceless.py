@@ -1,41 +1,7 @@
 import numpy as np
 
-from natto.symmetrize import (
-    get_permutations,
-    get_permutations_2,
-    remove_trace,
-    remove_trace_rule,
-    symmetrize,
-)
+from natto.symmetric_traceless import remove_trace, symmetrize
 from natto.utils import is_symmetric
-
-
-def test_get_permutations():
-    assert get_permutations("aaaa") == [[0, 1, 2, 3]]
-    assert get_permutations("aaaa", start_dim=2) == [[0, 1, 2, 3, 4, 5]]
-
-    ref = [
-        [0, 1, 2, 3, 4],
-        [0, 1, 3, 2, 4],
-        [0, 1, 3, 4, 2],
-        [0, 3, 1, 2, 4],
-        [0, 3, 1, 4, 2],
-        [0, 3, 4, 1, 2],
-        [3, 0, 1, 2, 4],
-        [3, 0, 1, 4, 2],
-        [3, 0, 4, 1, 2],
-        [3, 4, 0, 1, 2],
-    ]
-    perms = get_permutations("aaabb")
-    assert perms == ref
-
-    perms = get_permutations("aaabb", start_dim=2)
-    assert perms == [[0, 1] + [2 + i for i in sub] for sub in ref]
-
-
-def test_get_permutations_2():
-    perms = get_permutations_2(m=2, num_delta=1)
-    assert perms == [[0, 1]]
 
 
 def test_symmetrize(T2, T3, T4):
@@ -43,11 +9,6 @@ def test_symmetrize(T2, T3, T4):
         for start_dim in range(2):
             sym = symmetrize(t, start_dim)
             is_symmetric(sym, start_dim)
-
-
-def test_remove_trace_rule():
-    rule = remove_trace_rule(5, 2)
-    assert rule == "...aabbc,de,fg->...cdefg"
 
 
 def test_remove_trace(T2, T3, T4):
