@@ -369,9 +369,10 @@ def _get_coupling_symbolic_even(
     l1: int, l2: int, l3: int
 ) -> tuple[LinearCombination, str, str, str]:
     """Build `K` symbolically for even `l1 + l2 - l3`; see `get_coupling_symbolic`."""
-    assert (l1 + l2 - l3) % 2 == 0, (
-        f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
-    )
+    if (l1 + l2 - l3) % 2 != 0:
+        raise ValueError(
+            f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
+        )
 
     k = (l1 + l2 - l3) // 2
 
@@ -408,9 +409,10 @@ def _get_coupling_symbolic_odd(
     l1: int, l2: int, l3: int
 ) -> tuple[LinearCombination, str, str, str]:
     """Build `K` symbolically for odd `l1 + l2 - l3`; see `get_coupling_symbolic`."""
-    assert (l1 + l2 - l3) % 2 == 1, (
-        f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
-    )
+    if (l1 + l2 - l3) % 2 != 1:
+        raise ValueError(
+            f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
+        )
 
     k = (l1 + l2 - l3 - 1) // 2
 
@@ -464,9 +466,10 @@ def _get_coupling_rules_even(
         The r_indices, s_indices, and a_indices can be used to create the
         right-hand-side of the einsum rule.
     """
-    assert (l1 + l2 - l3) % 2 == 0, (
-        f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
-    )
+    if (l1 + l2 - l3) % 2 != 0:
+        raise ValueError(
+            f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
+        )
 
     k = (l1 + l2 - l3) // 2
 
@@ -546,9 +549,10 @@ def _get_coupling_rules_odd(
 
     """
 
-    assert (l1 + l2 - l3) % 2 == 1, (
-        f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
-    )
+    if (l1 + l2 - l3) % 2 != 1:
+        raise ValueError(
+            f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
+        )
 
     k = (l1 + l2 - l3 - 1) // 2
 
