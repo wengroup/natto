@@ -105,12 +105,12 @@ def dual_pair_content(rank: int, symmetry: str | None) -> dict:
     output = get_reduction_cached(rank, symmetry)
 
     content = {}
-    for weight, per_weight in output.items():
+    for weight, data in output.items():
         content[weight] = {
-            "gram": per_weight["gram"]["symbolic"],
-            "gram_inverse": per_weight["gram_inverse"]["symbolic"],
-            "embedding": [_operator(entry) for entry in per_weight["embedding"]],
-            "extraction": [_operator(entry) for entry in per_weight["extraction"]],
+            "gram": data["gram"]["symbolic"],
+            "gram_inverse": data["gram_inverse"]["symbolic"],
+            "embedding": [_operator(entry) for entry in data["embedding"]],
+            "extraction": [_operator(entry) for entry in data["extraction"]],
         }
 
     return content
@@ -139,19 +139,17 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     output = get_orthonormal_cached(rank, symmetry)
 
     content = {}
-    for weight, per_weight in output.items():
+    for weight, data in output.items():
         content[weight] = {
-            "gram": per_weight["gram"],
-            "gram_inverse_sqrt": per_weight["gram_inverse_sqrt"],
+            "gram": data["gram"],
+            "gram_inverse_sqrt": data["gram_inverse_sqrt"],
             "orthonormal": [
                 {
                     "extraction_rule": extraction["rule"],
                     "embedding_rule": embedding["rule"],
                     "numerical": fingerprint(embedding["numerical"]),
                 }
-                for embedding, extraction in zip(
-                    per_weight["embedding"], per_weight["extraction"]
-                )
+                for embedding, extraction in zip(data["embedding"], data["extraction"])
             ],
         }
 

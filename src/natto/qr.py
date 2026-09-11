@@ -180,6 +180,11 @@ def find_independent_tensors_scipy_qr(
     # the pivoted diagonal is non-increasing, so the rank is the count of entries
     # above the tolerance
     rank = int(np.sum(np.abs(np.diag(R)) > tolerance))
+    # `P[:rank]` is in pivot order, largest residual first, so *which* columns these
+    # are was decided by norm and not by position. Sorting only makes the return
+    # value stable; it does not make the selection order-preserving, and on a
+    # rank-deficient input this is generally a different subset from the one
+    # `find_independent_tensors_gram_schmidt` returns. Both are valid.
     independent_indices = sorted(int(i) for i in P[:rank])
 
     independent_tensors = [tensors[i] for i in independent_indices]
