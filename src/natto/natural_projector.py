@@ -116,7 +116,8 @@ def get_projector_rules(
     References:
         Eq. 7 of [Wen2026].
     """
-    assert ell >= 2 * t, f"weight (ell) must be at least 2*t, got ell={ell}, t={t}"
+    if ell < 2 * t:
+        raise ValueError(f"weight (ell) must be at least 2*t, got ell={ell}, t={t}")
 
     r_letters = letter_index(ell, upper_case=False)
 

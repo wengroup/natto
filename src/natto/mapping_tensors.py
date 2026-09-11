@@ -49,9 +49,10 @@ def get_mappings_even(ell: int, n: int) -> list[LinearCombination]:
         Eq. 13 of [Wen2026].
     """
 
-    assert (n - ell) % 2 == 0, (
-        f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
-    )
+    if (n - ell) % 2 != 0:
+        raise ValueError(
+            f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
+        )
 
     E_s_letters, delta_rules = get_lowering_rules_even(ell, n)
 
@@ -83,9 +84,10 @@ def get_mappings_odd(ell: int, n: int) -> list[LinearCombination]:
     References:
         Eq. 13 of [Wen2026].
     """
-    assert (n - ell) % 2 == 1, (
-        f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
-    )
+    if (n - ell) % 2 != 1:
+        raise ValueError(
+            f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
+        )
 
     E_s_letters, f_epsilon_rules, f_delta_rules = get_lowering_rules_odd(ell, n)
 

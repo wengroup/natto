@@ -40,9 +40,10 @@ def get_lowering_rules_even(ell: int, n: int) -> tuple[list[str], list[list[str]
     References:
         Eq. 3 of [Wen2026].
     """
-    assert (n - ell) % 2 == 0, (
-        f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
-    )
+    if (n - ell) % 2 != 0:
+        raise ValueError(
+            f"rank minus weight (n - ell) must be even, got n={n}, ell={ell}"
+        )
 
     letters = letter_index(n, upper_case=True)
 
@@ -89,9 +90,10 @@ def get_lowering_rules_odd(
     References:
         Eq. 5 of [Wen2026].
     """
-    assert (n - ell) % 2 == 1, (
-        f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
-    )
+    if (n - ell) % 2 != 1:
+        raise ValueError(
+            f"rank minus weight (n - ell) must be odd, got n={n}, ell={ell}"
+        )
 
     if ell == 0:
         return get_lowering_rules_odd_weight_zero(ell, n)
@@ -145,9 +147,12 @@ def get_lowering_rules_odd_weight_zero(ell, n):
     Here we do a trivial contraction with epsilon tensor, instead of a double
     contraction in the general case.
     """
-    assert ell == 0, f"weight (ell) must be 0, got ell={ell}"
-    assert n % 2 == 1, f"rank (n) must be odd, got n={n}"
-    assert n >= 3, f"rank (n) must be at least 3, got n={n}"
+    if ell != 0:
+        raise ValueError(f"weight (ell) must be 0, got ell={ell}")
+    if n % 2 != 1:
+        raise ValueError(f"rank (n) must be odd, got n={n}")
+    if n < 3:
+        raise ValueError(f"rank (n) must be at least 3, got n={n}")
 
     # All s letters
     letters = letter_index(n, upper_case=True)
