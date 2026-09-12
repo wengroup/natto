@@ -21,7 +21,7 @@ Nothing here knows what the operators mean; it is the plumbing they share.
 import itertools
 import string
 
-from natto.symbolic import CartesianTensor, LinearCombination, TensorProduct
+from natto.symbolic import IsotropicProduct, IsotropicTensor, LinearCombination
 
 
 def letter_index(n: int, start: int = 0, upper_case: bool = False) -> str:
@@ -79,8 +79,8 @@ def repeat_double_index(n: int, start: int = 0, upper_case: bool = False) -> lis
 
 
 def shift_index(
-    tensor: CartesianTensor | TensorProduct, shift: int, letters: str = None
-) -> CartesianTensor | TensorProduct:
+    tensor: IsotropicTensor | IsotropicProduct, shift: int, letters: str = None
+) -> IsotropicTensor | IsotropicProduct:
     """
     Shift the index of a tensor by a certain amount.
 
@@ -98,12 +98,12 @@ def shift_index(
     """
 
     # The zero tensor has no meaningful indices to shift. In particular, a zero
-    # TensorProduct stores a Zero component whose constructor does not accept the
-    # general CartesianTensor arguments used below.
+    # IsotropicProduct stores a Zero component whose constructor does not accept the
+    # general IsotropicTensor arguments used below.
     if tensor.factor == 0:
         return tensor
 
-    def _shift(t: CartesianTensor):
+    def _shift(t: IsotropicTensor):
         if letters is None:
             indices = "".join([chr(ord(i) + shift) for i in t.indices])
         else:
@@ -112,10 +112,10 @@ def shift_index(
             )
         return t.__class__(indices, factor=t.factor, symbol=t.symbol)
 
-    if isinstance(tensor, CartesianTensor):
+    if isinstance(tensor, IsotropicTensor):
         return _shift(tensor)
 
-    elif isinstance(tensor, TensorProduct):
+    elif isinstance(tensor, IsotropicProduct):
         components = [_shift(t) for t in tensor]
         return tensor.__class__(*components, factor=tensor.factor)
 
@@ -124,8 +124,8 @@ def shift_index(
 
 
 def relabel_indices(
-    tensor: CartesianTensor | TensorProduct, mapping: dict[str, str]
-) -> CartesianTensor | TensorProduct:
+    tensor: IsotropicTensor | IsotropicProduct, mapping: dict[str, str]
+) -> IsotropicTensor | IsotropicProduct:
     """Rename the indices of a tensor according to `mapping`.
 
     The substitution is simultaneous, so a mapping may permute letters among
@@ -139,20 +139,20 @@ def relabel_indices(
     Returns:
         The tensor with its indices renamed.
     """
-    # A zero tensor carries no meaningful indices, and a zero TensorProduct holds
+    # A zero tensor carries no meaningful indices, and a zero IsotropicProduct holds
     # a component whose constructor does not take the arguments used below.
     if tensor.factor == 0:
         return tensor
 
-    def _relabel(t: CartesianTensor):
+    def _relabel(t: IsotropicTensor):
         indices = "".join(mapping.get(index, index) for index in t.indices)
 
         return t.__class__(indices, factor=t.factor, symbol=t.symbol)
 
-    if isinstance(tensor, CartesianTensor):
+    if isinstance(tensor, IsotropicTensor):
         return _relabel(tensor)
 
-    if isinstance(tensor, TensorProduct):
+    if isinstance(tensor, IsotropicProduct):
         return tensor.__class__(*[_relabel(t) for t in tensor], factor=tensor.factor)
 
     raise ValueError(f"Unknown tensor type: {type(tensor)}")

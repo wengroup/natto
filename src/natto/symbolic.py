@@ -1,5 +1,5 @@
 """
-Symbolic representation of cartesian tensor, tensor product, and linear combinations.
+Symbolic representation of the isotropic tensors, their products, and sums of those.
 """
 
 from collections import Counter, defaultdict
@@ -7,11 +7,17 @@ from fractions import Fraction
 from typing import Union
 
 
-class CartesianTensor:
-    """
-    A general Cartesian tensor T_ij...k.
+class IsotropicTensor:
+    """One isotropic tensor, carrying named indices.
 
-    This allows for pairs of repeated indices, e.g. ii, jj, etc.
+    Isotropic means the components are the same in every rotated frame, and in three
+    dimensions only two such tensors exist: the Kronecker delta and the Levi-Civita
+    symbol. Every operator this package builds is made of those two alone, which is
+    why they are the only atoms here. `Scalar` is the rank-zero case.
+
+    Note this is not the Cartesian tensor being reduced, which is the caller's own
+    array and never has a symbolic form. Repeated index pairs are allowed, as in ii
+    or jj, since a contraction can leave them.
 
     Args:
         indices: The indices of the tensor.
@@ -50,7 +56,7 @@ class CartesianTensor:
 
     def permute_indices(
         self, permute: list[int], factor: int | Fraction = 1
-    ) -> "CartesianTensor":
+    ) -> "IsotropicTensor":
         """
         Permute the indices of the tensor.
 
@@ -120,7 +126,7 @@ class CartesianTensor:
             return f"({self.factor}) {self.symbol}_{self.indices}"
 
 
-class Scalar(CartesianTensor):
+class Scalar(IsotropicTensor):
     """
     Zero rank tensor, a scalar.
     """
@@ -139,7 +145,7 @@ class Zero(Scalar):
         super().__init__(0)
 
 
-class Delta(CartesianTensor):
+class Delta(IsotropicTensor):
     """
     The Kronecker delta tensor.
 
@@ -167,7 +173,7 @@ class Delta(CartesianTensor):
         return True
 
 
-class Epsilon(CartesianTensor):
+class Epsilon(IsotropicTensor):
     """
     The Levi-Civita tensor.
 
@@ -182,7 +188,7 @@ class Epsilon(CartesianTensor):
         super().__init__(indices, factor, symbol)
 
     def __eq__(self, other):
-        # should not compare symbol, but just make sure it is a Epsilon tensor
+        # should not compare symbol, but just make sure it is an Epsilon tensor
         if not isinstance(other, Epsilon):
             return False
 
@@ -201,23 +207,25 @@ class Epsilon(CartesianTensor):
         return True
 
 
-class TensorProduct:
-    """
-    A representation of a tensor product of multiple tensors.
+class IsotropicProduct:
+    """A product of isotropic tensors.
+
+    Deltas and Levi-Civita symbols multiplied together, which is the form every term
+    of every operator here takes. It is not a general tensor product: nothing but
+    those two, and scalars, can appear in it.
 
     Args:
         tensors: The constituting tensors.
-        factor: Additional factor multiplied to the tensor product. Each tensor in the
-            product can have its own factor. So, the overall factor is the product of
-            the factors of the constituting tensors and this factor.
-        combine_scalars: If True, combine scalars in the tensor product. For example, all
-            scalars will be combined into the factor of the tensor product, and the scalars
-            will be removed from the tensor product. Default is True.
+        factor: Additional factor multiplied to the product. Each tensor in the
+            product can have its own factor, so the overall factor is the product of
+            theirs and this one.
+        combine_scalars: If True, scalars are folded into the product's factor and
+            removed from the product itself. Default is True.
     """
 
     def __init__(
         self,
-        *tensors: CartesianTensor | Epsilon | Delta | Scalar,
+        *tensors: IsotropicTensor | Epsilon | Delta | Scalar,
         factor: int | Fraction = 1,
         combine_scalars: bool = True,
     ):
@@ -246,7 +254,7 @@ class TensorProduct:
 
     @property
     def factor(self):
-        """The overall factor of the tensor product."""
+        """The overall factor of the isotropic product."""
         return self._factor
 
     @property
@@ -256,14 +264,14 @@ class TensorProduct:
 
     @property
     def indices(self):
-        """The indices of the tensor product."""
+        """The indices of the isotropic product."""
         return "".join([t.indices for t in self._tensors])
 
     def permute_indices(
         self, permute: list[int], factor: int | Fraction = 1
-    ) -> "TensorProduct":
+    ) -> "IsotropicProduct":
         """
-        Permute the indices of the tensor product.
+        Permute the indices of the isotropic product.
 
         For example,
         if the tensor is D_ab T_ijk and permute is [2,4,0,1,3], the new tensor is
@@ -274,7 +282,7 @@ class TensorProduct:
             factor: Additional factor to be multiplied to the tensor, default is 1.
 
         Returns:
-            The tensor product with permuted indices.
+            The isotropic product with permuted indices.
         """
 
         indices = self.indices
@@ -288,11 +296,11 @@ class TensorProduct:
             tensors.append(nt)
             i += len(t.indices)
 
-        return TensorProduct(*tensors, factor=factor * self.factor)
+        return IsotropicProduct(*tensors, factor=factor * self.factor)
 
     def canonize(self):
         """
-        Canonicalize the tensor product.
+        Canonicalize the isotropic product.
 
         1. The canonized form will be like: delta_... epsilon_... T_...
         2. For a delta, the indices will be ordered, e.g. delta_ji -> delta_ij
@@ -305,7 +313,7 @@ class TensorProduct:
            since a < i. This is similarly for the epsilon tensors and general tensors.
 
         Returns:
-            A canonized tensor product.
+            A canonized isotropic product.
         """
         # TODO, this assumes the factor of each component is 1, which may not be true
         #  in general.
@@ -343,13 +351,13 @@ class TensorProduct:
 
         # canonize general tensors
         all_indices = sorted([t.indices for t in general])
-        general = [CartesianTensor(indices) for indices in all_indices]
+        general = [IsotropicTensor(indices) for indices in all_indices]
 
-        # Create the tensor product
+        # Create the isotropic product
         tensors = deltas + epsilons + general
-        return TensorProduct(*tensors, factor=self.factor)
+        return IsotropicProduct(*tensors, factor=self.factor)
 
-    def __eq__(self, other: Union[CartesianTensor, "TensorProduct"]):
+    def __eq__(self, other: Union[IsotropicTensor, "IsotropicProduct"]):
         if len(self) != len(other):
             return False
 
@@ -387,7 +395,7 @@ class TensorProduct:
         return f"{factor}{rep}"
 
     def str_rep_without_factor(self):
-        """Get the string representation of the tensor product without the factor."""
+        """Get the string representation of the isotropic product without the factor."""
         rep = ""
         for t in self._tensors:
             # scalars will be included in the factor, so we skip them here
@@ -398,14 +406,18 @@ class TensorProduct:
 
 
 class LinearCombination:
-    """A linear combination of Cartesian tensors or tensor Product."""
+    """A sum of isotropic tensors and products of them, with rational coefficients.
 
-    def __init__(self, *tensors: CartesianTensor | Delta | Epsilon | TensorProduct):
+    This is what an operator is: `simplify_linear_combination` reduces one to its
+    canonical form, and `evaluate_tensors` turns it into an array.
+    """
+
+    def __init__(self, *tensors: IsotropicTensor | Delta | Epsilon | IsotropicProduct):
         self._tensors = tensors
 
     @property
     def components(self):
-        """The constituting tensor products."""
+        """The constituting isotropic products."""
         return self._tensors
 
     def to_str_list(self, including_zero: bool = False) -> list[str]:
@@ -463,8 +475,8 @@ class LinearCombination:
 
 def create_delta_epsilon_tensors(
     rule: list[str], epsilon: str = None, factor: int | Fraction = 1
-) -> TensorProduct:
-    """Create a TensorProduct of deltas and epsilons.
+) -> IsotropicProduct:
+    """Create a IsotropicProduct of deltas and epsilons.
 
     Currently, we only support a single epsilon tensor in the product, because it is
     all needed to create the E, G, H tensors.
@@ -472,10 +484,10 @@ def create_delta_epsilon_tensors(
     Args:
         rule: Each string contains a pair of indices for a delta tensor.
         epsilon: A three letter string for the epsilon tensor.
-        factor: additional factor to multiply with the tensor product
+        factor: additional factor to multiply with the isotropic product
 
     Returns:
-        List of TensorProduct objects.
+        List of IsotropicProduct objects.
     """
 
     tensors = [Delta(pair) for pair in rule]
@@ -484,6 +496,6 @@ def create_delta_epsilon_tensors(
         e = Epsilon(epsilon)
         tensors.append(e)
 
-    tp = TensorProduct(*tensors, factor=factor)
+    tp = IsotropicProduct(*tensors, factor=factor)
 
     return tp

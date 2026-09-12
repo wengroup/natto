@@ -12,13 +12,13 @@ import numpy as np
 
 from natto.algebra import simplify_linear_combination
 from natto.indices import letter_index
-from natto.symbolic import Delta, Epsilon, LinearCombination, TensorProduct
+from natto.symbolic import Delta, Epsilon, IsotropicProduct, LinearCombination
 from natto.utils import dij, eijk
 
 _MAX_CACHED_CONTRACTION_ELEMENTS = 3**8
 
 
-def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
+def tp_delta_epsilon(tp: IsotropicProduct, mode: str) -> np.ndarray:
     """Get the tensor product of Kronecker delta and Levi-Civita tensors.
 
     Note, the order of the indices need to be taken care of.
@@ -54,7 +54,7 @@ def tp_delta_epsilon(tp: TensorProduct, mode: str) -> np.ndarray:
         else:
             raise ValueError(f"Unknown tensor type: {type(t)}")
 
-    # The tensor product actually has no delta or epsilon tensors
+    # The isotropic product actually has no delta or epsilon tensors
     if not delta_rules and not epsilon_rules:
         return np.asarray(float(tp.factor))
 
@@ -108,10 +108,10 @@ def evaluate_tensors(tensors: LinearCombination, mode: str) -> np.ndarray:
         The evaluated operator.
     """
 
-    # Evaluate each tensor product
+    # Evaluate each isotropic product
     output = 0
     for tp in tensors.components:
-        if isinstance(tp, TensorProduct):
+        if isinstance(tp, IsotropicProduct):
             output += tp_delta_epsilon(tp, mode)
         else:
             raise ValueError(f"Unknown tensor type: {type(tp)}")

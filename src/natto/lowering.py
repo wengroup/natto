@@ -22,10 +22,10 @@ References:
 import itertools
 
 from natto.indices import get_permutations_2, letter_index
-from natto.symbolic import TensorProduct, create_delta_epsilon_tensors
+from natto.symbolic import IsotropicProduct, create_delta_epsilon_tensors
 
 
-def get_lowering_tensors(ell: int, n: int) -> tuple[list[TensorProduct], list[str]]:
+def get_lowering_tensors(ell: int, n: int) -> tuple[list[IsotropicProduct], list[str]]:
     """The rank-lowering tensors of a weight, whichever parity applies.
 
     Which form the rank-lowering tensor takes depends on the parity of n - ell:
@@ -51,7 +51,7 @@ def get_lowering_tensors(ell: int, n: int) -> tuple[list[TensorProduct], list[st
 
 def get_lowering_tensors_even(
     ell: int, n: int
-) -> tuple[list[TensorProduct], list[str]]:
+) -> tuple[list[IsotropicProduct], list[str]]:
     """The rank-lowering tensors of even n - ell.
 
     With the parity even the rank-lowering tensor is built from Kronecker deltas alone,
@@ -92,7 +92,9 @@ def get_lowering_tensors_even(
     return tensors, remaining_letters
 
 
-def get_lowering_tensors_odd(ell: int, n: int) -> tuple[list[TensorProduct], list[str]]:
+def get_lowering_tensors_odd(
+    ell: int, n: int
+) -> tuple[list[IsotropicProduct], list[str]]:
     """The rank-lowering tensors of odd n - ell.
 
     With the parity odd, one Levi-Civita symbol is needed alongside the Kronecker deltas.
@@ -155,7 +157,7 @@ def get_lowering_tensors_odd(ell: int, n: int) -> tuple[list[TensorProduct], lis
 
 def get_lowering_tensors_odd_weight_zero(
     ell: int, n: int
-) -> tuple[list[TensorProduct], list[str]]:
+) -> tuple[list[IsotropicProduct], list[str]]:
     """
     For j = 0, and odd n, the rules for G(n|0) are different from the general case.
 

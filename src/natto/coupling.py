@@ -384,7 +384,7 @@ def _get_coupling_symbolic_even(
 
         all_rules = _get_coupling_rules_even(l1, l2, l3, t)
 
-        # create tensor products of deltas for each rule
+        # create isotropic products of deltas for each rule
         tensors = [
             create_delta_epsilon_tensors(
                 ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"], factor=coeff
@@ -425,7 +425,7 @@ def _get_coupling_symbolic_odd(
 
         all_rules = _get_coupling_rules_odd(l1, l2, l3, t)
 
-        # create tensor products of deltas for each rule
+        # create isotropic products of deltas for each rule
         tensors = [
             create_delta_epsilon_tensors(
                 ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"],
