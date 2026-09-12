@@ -149,7 +149,7 @@ def test_even_parity_normalization(l1: int, l2: int, l3: int):
     This is the condition that fixes `coeff_C_even`.
     """
     a = random_unit_vector(0)
-    operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
+    operator, rule = get_coupling_operator(l1, l2, l3, normalize="legendre")
 
     coupled = np.einsum(
         rule,
@@ -177,7 +177,7 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
     b = a + LIMIT_SEPARATION * perpendicular / np.linalg.norm(perpendicular)
     b = b / np.linalg.norm(b)
 
-    operator, rule = get_coupling_operator(l1, l2, l3, normalize="unity")
+    operator, rule = get_coupling_operator(l1, l2, l3, normalize="legendre")
     coupled = np.einsum(
         rule,
         operator.astype(np.float64),

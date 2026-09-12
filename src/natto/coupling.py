@@ -35,6 +35,7 @@ References:
 """
 
 from fractions import Fraction
+from typing import Literal
 
 import numpy as np
 
@@ -52,9 +53,13 @@ from natto.utils import (
     factorial,
 )
 
+#: How the coupling operator is scaled. `legendre` applies the normalization
+#: constant `C` of Eq. 53 and Eq. 54; `none` leaves the operator unscaled.
+Normalization = Literal["legendre", "none"]
+
 
 def get_coupling_operator(
-    l1: int, l2: int, l3: int, normalize: str = "unity"
+    l1: int, l2: int, l3: int, normalize: Normalization = "legendre"
 ) -> tuple[np.ndarray, str]:
     """Build the coupling operator `K` of one weight triple, evaluated.
 
@@ -62,7 +67,7 @@ def get_coupling_operator(
         l1: Weight of the first natural tensor X.
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
-        normalize: `unity` applies the normalization constant `C` of the paper,
+        normalize: `legendre` applies the normalization constant `C` of the paper,
             fixing the scale by the condition for the parity of
             `L = l1 + l2 + l3`; `none` leaves the operator unscaled.
 
@@ -351,7 +356,7 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
 
 
 def _get_coupling_operator_even(
-    l1: int, l2: int, l3: int, normalize: str = "unity"
+    l1: int, l2: int, l3: int, normalize: Normalization = "legendre"
 ) -> tuple[np.ndarray, str]:
     """Evaluate `K` for even `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_even(l1, l2, l3)
@@ -372,13 +377,13 @@ def _get_coupling_operator_even(
     # TODO, create a new function like evaluate_tensors to deal with this case.
     K_numerical = evaluate_tensors(K, mode="extraction")
 
-    if normalize == "unity":
+    if normalize == "legendre":
         c = coeff_C_even(l1, l2, l3)
         K_numerical = K_numerical * float(c)
     elif normalize == "none":
         pass
     else:
-        supported = ["none", "unity"]
+        supported = ["legendre", "none"]
         raise ValueError(
             f"Unknown normalization method: {normalize}. Supported are: {supported}."
         )
@@ -393,7 +398,7 @@ def _get_coupling_operator_odd(
     l1: int,
     l2: int,
     l3: int,
-    normalize: str = "unity",
+    normalize: Normalization = "legendre",
 ) -> tuple[np.ndarray, str]:
     """Evaluate `K` for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
     K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_odd(l1, l2, l3)
@@ -401,13 +406,13 @@ def _get_coupling_operator_odd(
 
     K_numerical = evaluate_tensors(K, mode="extraction")
 
-    if normalize == "unity":
+    if normalize == "legendre":
         c = coeff_C_odd(l1, l2, l3)
         K_numerical = K_numerical * float(c)
     elif normalize == "none":
         pass
     else:
-        supported = ["none", "unity"]
+        supported = ["legendre", "none"]
         raise ValueError(
             f"Unknown normalization method: {normalize}. Supported are: {supported}."
         )

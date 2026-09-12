@@ -22,6 +22,7 @@ References:
 
 import math
 from fractions import Fraction
+from typing import Literal
 
 import numpy as np
 
@@ -32,14 +33,21 @@ from natto.natural_projector import get_natural_projector
 from natto.symbolic import LinearCombination
 from natto.utils import double_factorial
 
+#: How the harmonic operator is scaled. `legendre` applies `coeff_harmonic`, the
+#: constant of Eq. 47 that makes the harmonic generate the Legendre polynomials;
+#: `none` leaves the natural projector unscaled.
+Normalization = Literal["legendre", "none"]
 
-def get_harmonic_operator(n: int, normalize: str = "unity") -> tuple[np.ndarray, str]:
+
+def get_harmonic_operator(
+    n: int, normalize: Normalization = "legendre"
+) -> tuple[np.ndarray, str]:
     """Build the harmonic operator of one rank, evaluated.
 
     Args:
         n: Rank of the harmonic, which for a harmonic is also its weight. At least
             zero.
-        normalize: `unity` applies the normalization constant, under which the
+        normalize: `legendre` applies the normalization constant, under which the
             n-fold contraction of the harmonic with a unit vector is the Legendre
             polynomial of the angle between the two, and is 1 when the two coincide.
             `none` leaves the natural projector unscaled.
@@ -60,10 +68,10 @@ def get_harmonic_operator(n: int, normalize: str = "unity") -> tuple[np.ndarray,
     H, upper, lower = get_harmonic_symbolic(n)
     H_numerical = evaluate_tensors(H, mode="extraction")
 
-    if normalize == "unity":
+    if normalize == "legendre":
         H_numerical = H_numerical * float(coeff_harmonic(n))
     elif normalize != "none":
-        supported = ["none", "unity"]
+        supported = ["legendre", "none"]
         raise ValueError(
             f"Unknown normalization method: {normalize}. Supported are: {supported}."
         )

@@ -31,7 +31,7 @@ def unit_vector(seed: int) -> np.ndarray:
     return vector / np.linalg.norm(vector)
 
 
-def harmonic(direction: np.ndarray, weight: int, normalize: str = "unity"):
+def harmonic(direction: np.ndarray, weight: int, normalize: str = "legendre"):
     """The Cartesian harmonic of `direction`, through the operator."""
     operator, rule = get_harmonic_operator(weight, normalize)
 
@@ -76,7 +76,7 @@ def test_the_harmonic_is_a_natural_tensor(weight: int):
 
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
 def test_without_normalization_the_scale_is_the_only_difference(weight: int):
-    """`normalize="none"` differs from `unity` by `coeff_harmonic` and nothing else."""
+    """`normalize="none"` differs from `legendre` by `coeff_harmonic` and nothing else."""
     a = unit_vector(0)
 
     # `coeff_harmonic` is exact, and a float array times a Fraction would be an
