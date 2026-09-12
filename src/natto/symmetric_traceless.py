@@ -14,6 +14,9 @@ References:
     [JCB78] J. Jerphagnon, D. Chemla, and R. Bonneville, The description of the
     physical properties of condensed matter using irreducible tensors, Advances in
     Physics 27, 609 (1978).
+
+    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
+    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import itertools
@@ -22,29 +25,6 @@ import numpy as np
 
 from natto.indices import get_permutations, get_permutations_2, remove_trace_rule
 from natto.utils import dij
-
-
-def symmetrize_via_permutation(
-    t: np.ndarray, perms: list[list[int]], mode: str = "sum"
-) -> np.ndarray:
-    """
-    Symmetrize a tensor by summing/averaging over all permutations.
-
-    Args:
-        t: The tensor to symmetrize.
-        perms: Permutations of the indices for symmetrization.
-        mode: The mode of symmetrization. For `sum`, summation is performed over all
-            permutations. For `mean`, the average is taken.
-
-    Returns:
-        The symmetrized tensor.
-    """
-    if mode == "sum":
-        return np.stack([np.transpose(t, p) for p in perms]).sum(axis=0)
-    elif mode == "mean":
-        return np.stack([np.transpose(t, p) for p in perms]).mean(axis=0)
-    else:
-        raise ValueError(f"Unknown mode: {mode}")
 
 
 def symmetrize_and_remove_trace(
@@ -72,14 +52,12 @@ def symmetrize_and_remove_trace(
     return remove_trace(symmetrize(t, start_dim, symmetry), start_dim)
 
 
-def symmetrize(
-    t: np.ndarray, start_dim: int = 0, symmetry: str = None, mode: str = "mean"
-) -> np.ndarray:
+def symmetrize(t: np.ndarray, start_dim: int = 0, symmetry: str = None) -> np.ndarray:
     """
     Symmetrize a tensor.
 
-    The symmetrization is done by averaging/sum over unique permutations of the indices,
-    considering the symmetry of the indices.
+    The symmetrization is done by averaging over the unique permutations of the
+    indices, considering the symmetry of the indices.
 
     Args:
         t: The tensor to symmetrize
@@ -89,8 +67,6 @@ def symmetrize(
             `abba` means the first and the fourth indices are symmetric, and the
             second and the third indices are symmetric. Default is None, which means
             there is no symmetry between the indices.
-        mode: `mean` or `sum`. If `mean`, the tensor is averaged over the permutations.
-            If `sum`, the tensor is summed over the permutations.
 
     Returns:
         The symmetrized tensor.
@@ -110,12 +86,7 @@ def symmetrize(
         )
         permutations = get_permutations(symmetry, start_dim)
 
-    if mode == "mean":
-        u = np.mean(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
-    elif mode == "sum":
-        u = np.sum(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
-    else:
-        raise ValueError("The mode must be either 'mean' or 'sum'.")
+    u = np.mean(np.stack([np.transpose(t, p) for p in permutations]), axis=0)
 
     return u
 
@@ -126,6 +97,10 @@ def symmetrize_2(t: np.ndarray, num_delta: int, start_dim: int = 0) -> np.ndarra
 
     Symmetrization is done by summation over unique permutations of the indices,
     considering the three set of symmetries. See `get_permutations_2` for more details.
+
+    This sums where `symmetrize` averages, and deliberately: it is one factor of
+    Eq. 10 of [JCB78], whose coefficient in `remove_trace` is written for the sum.
+    [Wen2026] averages throughout, but this is not one of its formulas.
 
     Args:
         t: the tensor

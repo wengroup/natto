@@ -15,17 +15,17 @@ they are named apart.
 import numpy as np
 
 
-def impose_symmetry(t: np.ndarray, symmetry: str, mode: str = "mean") -> np.ndarray:
+def impose_symmetry(t: np.ndarray, symmetry: str) -> np.ndarray:
     """
     Symmetrize a generic tensor to obtain a tensor with the specified symmetry.
 
-    This is achieved by pooling permutations of the tensor indices according to the
-    the given symmetry.
+    This is achieved by averaging the permutations of the tensor indices according to
+    the given symmetry. The average, not the sum, is what makes this a projector: it
+    leaves a tensor that already has the symmetry unchanged.
 
     Args:
         t: The input tensor to be symmetrized.
         symmetry: The target symmetry of the output tensor. e.g. 'ijk=ikj=jik'.
-        mode: The pooling operation to be used. Can be "mean" or "sum".
 
     Returns:
         The symmetrized tensor with the specified symmetry.
@@ -38,12 +38,7 @@ def impose_symmetry(t: np.ndarray, symmetry: str, mode: str = "mean") -> np.ndar
     transformed = [
         sign * np.transpose(t, permutation) for permutation, sign in permutations
     ]
-    if mode == "mean":
-        return np.mean(np.stack(transformed), axis=0)
-    elif mode == "sum":
-        return np.sum(np.stack(transformed), axis=0)
-    else:
-        raise ValueError(f"Unknown pooling operation: {mode}. Use 'mean' or 'sum'.")
+    return np.mean(np.stack(transformed), axis=0)
 
 
 def check_symmetry(

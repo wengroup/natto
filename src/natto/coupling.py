@@ -25,16 +25,10 @@ Tracelessness is not an index permutation, so no symmetry string expresses it an
 the symmetry-adapted construction cannot use it. The derivation narrows the
 candidates with it separately, and the result is the single operator built here.
 
-A second route did exist, reaching the output by reducing the rank-(l1 + l2) product
-and grouping the resulting mappings numerically, which is how it saw tracelessness:
-by working on an actual traceless product rather than through the symmetry. It gave
-the same operator up to a scalar and was removed. The closed form is exact and far
-cheaper, the general route having to pass through the reduction of a rank-six tensor
-once l1 = l2 = 3.
-
 References:
-    Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, with the
-    normalization constant of Eq. 53.
+    Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
+    coefficient of Eq. 49, and with the normalization constant of Eq. 53 for even
+    and Eq. 54 for odd.
 
     [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
     Decomposition and Coupling, arXiv:2609.05971 (2026).
@@ -206,41 +200,102 @@ def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
     return rule, symmetry, delta_indices
 
 
-def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
-    """Normalization constant `C` for even `L = l1 + l2 + l3`, Eq. (49).
+def triangle_numbers(l1: int, l2: int, l3: int) -> tuple[int, int, int]:
+    """The triangle numbers of a weight triple.
 
-    The constant is fixed by requiring that the l3-fold contraction of the output
-    tensor with a unit vector yields 1.
+    Each counts the contractions between the two groups other than its own: L1 those
+    between Y and Z, L2 those between X and Z, and L3 those between X and Y. They
+    bound the operator's sum over t, and appear in the factorials of both its
+    coefficient and its normalization constant.
 
     Args:
         l1: Weight of the first natural tensor X.
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
 
+    Returns:
+        L1, L2 and L3.
+
+    References:
+        Defined below Eq. 48 of [Wen2026] as L_i = floor(L / 2) - l_i, with
+        L = l1 + l2 + l3.
+    """
+    half = (l1 + l2 + l3) // 2
+
+    return half - l1, half - l2, half - l3
+
+
+def coeff_kappa(l1: int, l2: int, l3: int, t: int) -> Fraction:
+    """The coefficient k_t of one term of the coupling operator.
+
+    It is the counterpart of the natural projector's c_t, and what composing the
+    projector with the rank lowering leaves in front of the average of Eq. 50 and
+    Eq. 51. Taking that average is the caller's job; this returns the coefficient
+    alone.
+
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+        t: Index of the term, counting the traces taken within the output group.
+
+    Returns:
+        The exact coefficient k_t.
+
+    References:
+        Eq. 49 of [Wen2026].
+    """
+    L1, L2, _ = triangle_numbers(l1, l2, l3)
+
+    # The equation's (2*l3 - 2*t - 1)!! / (2*l3 - 1)!! is the reciprocal of the t
+    # factors separating the two, which is the bounded double factorial below.
+    numerator = (-1) ** t * factorial(l3)
+    denominator = (
+        double_factorial(2 * l3 - 1, 2 * l3 - 2 * t + 1)
+        * factorial(L2 - t)
+        * factorial(L1 - t)
+        * factorial(t)
+    )
+
+    return Fraction(numerator, denominator)
+
+
+def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
+    """Normalization constant `C` for even `L = l1 + l2 + l3`.
+
+    The constant is fixed by requiring that the l3-fold contraction of the output
+    tensor with a unit vector yields 1.
+
     The value is a ratio of factorials, so it is returned exactly. Multiplying a
     float array by a `Fraction` would silently make it an object array, so the
     conversion happens at that boundary rather than here.
 
+    Args:
+        l1: Weight of the first natural tensor X.
+        l2: Weight of the second natural tensor Y.
+        l3: Weight of the output natural tensor Z.
+
     Returns:
         The normalization constant.
+
+    References:
+        Eq. 53 of [Wen2026].
     """
     L = l1 + l2 + l3
-    L1 = L - 2 * l1 - 1
-    L2 = L - 2 * l2 - 1
-    L3 = L - 2 * l3 - 1
+    L1, L2, L3 = triangle_numbers(l1, l2, l3)
 
     numerator = (
         factorial(l1)
         * factorial(l2)
         * double_factorial(2 * l3 - 1)
-        * factorial((L1 + 1) // 2)
-        * factorial((L2 + 1) // 2)
+        * factorial(L2)
+        * factorial(L1)
     )
     denominator = (
         factorial(l3)
-        * double_factorial(L1)
-        * double_factorial(L2)
-        * double_factorial(L3)
+        * double_factorial(2 * L2 - 1)
+        * double_factorial(2 * L1 - 1)
+        * double_factorial(2 * L3 - 1)
         * factorial(L // 2)
     )
 
@@ -271,26 +326,24 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
         The normalization constant.
 
     References:
-        Eq. 53 of [Wen2026].
+        Eq. 54 of [Wen2026].
     """
     L = l1 + l2 + l3
-    L1 = L - 2 * l1 - 1
-    L2 = L - 2 * l2 - 1
-    L3 = L - 2 * l3 - 1
+    L1, L2, L3 = triangle_numbers(l1, l2, l3)
 
     numerator = (
         2
         * factorial(l1)
         * factorial(l2)
         * double_factorial(2 * l3 - 1)
-        * factorial(L1 // 2)
-        * factorial(L2 // 2)
+        * factorial(L2)
+        * factorial(L1)
     )
     denominator = (
         factorial(l3 - 1)
-        * double_factorial(L1 + 1)
-        * double_factorial(L2 + 1)
-        * double_factorial(L3 + 1)
+        * double_factorial(2 * L2 + 1)
+        * double_factorial(2 * L1 + 1)
+        * double_factorial(2 * L3 + 1)
         * factorial((L + 1) // 2)
     )
 
@@ -374,20 +427,21 @@ def _get_coupling_symbolic_even(
             f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
         )
 
-    k = (l1 + l2 - l3) // 2
+    L1, L2, _ = triangle_numbers(l1, l2, l3)
 
     out = []
-    for t in range(min(l1, l2) - k + 1):
-        coeff = Fraction(
-            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2)
-        )
-
+    for t in range(min(L2, L1) + 1):
         all_rules = _get_coupling_rules_even(l1, l2, l3, t)
+
+        # Total factor: the coefficient of Eq. 49 divided by len(all_rules), which
+        # averages over the rules as the angle brackets of Eq. 50 ask. The rules are
+        # the distinct terms of that average.
+        factor = coeff_kappa(l1, l2, l3, t) / len(all_rules)
 
         # create isotropic products of deltas for each rule
         tensors = [
             create_delta_epsilon_tensors(
-                ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"], factor=coeff
+                ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"], factor=factor
             )
             for ru in all_rules
         ]
@@ -414,23 +468,23 @@ def _get_coupling_symbolic_odd(
             f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
         )
 
-    k = (l1 + l2 - l3 - 1) // 2
+    L1, L2, _ = triangle_numbers(l1, l2, l3)
 
     out = []
 
-    for t in range(min(l1, l2) - k):
-        coeff = Fraction(
-            (-2) ** t, double_factorial(2 * l3 - 1, 2 * l3 - 2 * t - 1 + 2)
-        )
-
+    for t in range(min(L2, L1) + 1):
         all_rules = _get_coupling_rules_odd(l1, l2, l3, t)
+
+        # Total factor: as in the even case, the coefficient of Eq. 49 averaged over
+        # the rules, here those of Eq. 51.
+        factor = coeff_kappa(l1, l2, l3, t) / len(all_rules)
 
         # create isotropic products of deltas for each rule
         tensors = [
             create_delta_epsilon_tensors(
                 ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"],
                 epsilon=ru["rsa"][0],
-                factor=coeff,
+                factor=factor,
             )
             for ru in all_rules
         ]
