@@ -4,22 +4,22 @@ from natto.algebra import (
     contract_epsilon_delta,
     contract_two_epsilon,
     contract_with_delta,
-    simplify_tensor_product,
+    simplify_isotropic_product,
 )
 from natto.symbolic import (
-    CartesianTensor,
     Delta,
     Epsilon,
+    IsotropicProduct,
+    IsotropicTensor,
     LinearCombination,
     Scalar,
-    TensorProduct,
     Zero,
 )
 
 
 @fixture
 def T4():
-    return CartesianTensor("ijkl")
+    return IsotropicTensor("ijkl")
 
 
 @fixture
@@ -63,7 +63,7 @@ def epsilon_ilm():
 
 
 def test_cartesian_tensor():
-    assert CartesianTensor("ijjl") == CartesianTensor("ikkl")
+    assert IsotropicTensor("ijjl") == IsotropicTensor("ikkl")
 
 
 def test_delta():
@@ -77,9 +77,9 @@ def test_epsilon(epsilon_ijk, epsilon_kij, epsilon_jik):
 
 
 def test_contract_with_delta(T4, delta_ij, delta_ik, delta_ai):
-    assert contract_with_delta(delta_ij, T4) == CartesianTensor("jjkl")
-    assert contract_with_delta(delta_ik, T4) == CartesianTensor("kjkl")
-    assert contract_with_delta(delta_ai, T4) == CartesianTensor("ajkl")
+    assert contract_with_delta(delta_ij, T4) == IsotropicTensor("jjkl")
+    assert contract_with_delta(delta_ik, T4) == IsotropicTensor("kjkl")
+    assert contract_with_delta(delta_ai, T4) == IsotropicTensor("ajkl")
 
     assert contract_with_delta(delta_ij, delta_ik) == Delta("jk")
 
@@ -93,8 +93,8 @@ def test_contract_two_epsilon(epsilon_ijk, epsilon_ijl, epsilon_ilm):
     assert contract_two_epsilon(epsilon_ijl, epsilon_ijl) == Scalar(6)
     assert contract_two_epsilon(epsilon_ijk, epsilon_ijl) == Delta("kl", factor=2)
     assert contract_two_epsilon(epsilon_ijk, epsilon_ilm) == LinearCombination(
-        TensorProduct(Delta("jl"), Delta("km")),
-        TensorProduct(Delta("jm"), Delta("kl"), factor=-1),
+        IsotropicProduct(Delta("jl"), Delta("km")),
+        IsotropicProduct(Delta("jm"), Delta("kl"), factor=-1),
     )
 
 
@@ -104,68 +104,68 @@ def test_simplify():
     e1 = Epsilon("ijk", factor=3)
     e2 = Epsilon("ikl", factor=3)
     e3 = Epsilon("ilm", factor=3)
-    T1 = CartesianTensor("ijkl", factor=4)
+    T1 = IsotropicTensor("ijkl", factor=4)
 
-    tp = TensorProduct(d1, d2)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, d2)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+4 δ_ik"]
 
-    tp = TensorProduct(d1, e1)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, e1)
+    tp_s = simplify_isotropic_product(tp)
     assert len(tp_s) == 0
 
-    tp = TensorProduct(d1, e2)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, e2)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+6 ε_jkl"]
 
-    tp = TensorProduct(d2, e2)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d2, e2)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+6 ε_ijl"]
 
-    tp = TensorProduct(e1, e2)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(e1, e2)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["-18 δ_jl"]
 
-    tp = TensorProduct(e1, e3)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(e1, e3)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+9 δ_jl δ_km", "-9 δ_jm δ_kl"]
 
-    tp = TensorProduct(d1, e1, e3)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, e1, e3)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+18 δ_km δ_il", "-18 δ_kl δ_im"]
 
-    tp = TensorProduct(d1, T1)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, T1)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+8 T_jjkl"]
 
-    tp = TensorProduct(d1, e1, e2, T1)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, e1, e2, T1)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["-144 T_ljkl"]
 
-    tp = TensorProduct(d1, e1, e3, T1)
-    tp_s = simplify_tensor_product(tp)
+    tp = IsotropicProduct(d1, e1, e3, T1)
+    tp_s = simplify_isotropic_product(tp)
     assert tp_s.to_str_list() == ["+72 T_ljml", "-72 T_mjll"]
 
 
 # def test_symmetrize():
 #     indices = "ijkl"  # symmetrizing indices
 #     tensors = [
-#         CartesianTensor("".join(p), factor=Fraction(1, 24))
+#         IsotropicTensor("".join(p), factor=Fraction(1, 24))
 #         for p in itertools.permutations(indices)
 #     ]
-#     assert symmetrize(CartesianTensor(indices)) == LinearCombination(*tensors)
+#     assert symmetrize(IsotropicTensor(indices)) == LinearCombination(*tensors)
 #
 #     indices = "akl"  # symmetrizing indices
 #     tensors = []
 #     for p in itertools.permutations(indices):
-#         t = TensorProduct(
+#         t = IsotropicProduct(
 #             Epsilon(f"{p[0]}ij"),
-#             CartesianTensor(f"ij{p[1]}{p[2]}"),
+#             IsotropicTensor(f"ij{p[1]}{p[2]}"),
 #             factor=Fraction(1, 6),
 #         )
 #         tensors.append(t)
 #     lin_comb = LinearCombination(*tensors)
 #
-#     t = TensorProduct(Epsilon("aij"), CartesianTensor("ijkl"))
+#     t = IsotropicProduct(Epsilon("aij"), IsotropicTensor("ijkl"))
 #     s = symmetrize(t)
 #     assert s == lin_comb

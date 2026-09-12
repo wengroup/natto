@@ -61,7 +61,7 @@ def get_natural_projector(
         # the rules.
         factor = c / len(all_rules)
 
-        # create tensor products of deltas for each rule
+        # create isotropic products of deltas for each rule
         delta_tensors = [
             create_delta_epsilon_tensors(
                 rule["d_rs"] + rule["d_rr"] + rule["d_ss"], factor=factor

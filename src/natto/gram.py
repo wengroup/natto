@@ -19,7 +19,7 @@ from fractions import Fraction
 
 from natto.algebra import multiply_2, simplify_linear_combination
 from natto.indices import shift_index_2
-from natto.symbolic import Delta, LinearCombination, TensorProduct
+from natto.symbolic import Delta, IsotropicProduct, LinearCombination
 
 
 def contract_mappings(
@@ -38,7 +38,7 @@ def contract_mappings(
         The contracted tensor.
     """
     contraction_delta = [Delta(i + j) for i, j in zip(G1_indices, G2_indices)]
-    contraction_delta = TensorProduct(*contraction_delta)
+    contraction_delta = IsotropicProduct(*contraction_delta)
     prod = multiply_2(G1, G2, contraction_delta)
     simplified = simplify_linear_combination(prod)
 

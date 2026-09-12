@@ -10,17 +10,17 @@ from collections import defaultdict
 from fractions import Fraction
 
 from natto.symbolic import (
-    CartesianTensor,
     Delta,
     Epsilon,
+    IsotropicProduct,
+    IsotropicTensor,
     LinearCombination,
     Scalar,
-    TensorProduct,
     Zero,
 )
 
 
-def contract_with_delta(delta: Delta, tensor: CartesianTensor) -> CartesianTensor:
+def contract_with_delta(delta: Delta, tensor: IsotropicTensor) -> IsotropicTensor:
     """
     Contract a tensor with a delta tensor.
 
@@ -49,7 +49,9 @@ def contract_with_delta(delta: Delta, tensor: CartesianTensor) -> CartesianTenso
     raise ValueError("Delta tensor does not have common indices with the tensor")
 
 
-def contract_with_epsilon(epsilon: Epsilon, tensor: CartesianTensor) -> TensorProduct:
+def contract_with_epsilon(
+    epsilon: Epsilon, tensor: IsotropicTensor
+) -> IsotropicProduct:
     """
     Contract a tensor with an epsilon tensor.
 
@@ -67,10 +69,10 @@ def contract_with_epsilon(epsilon: Epsilon, tensor: CartesianTensor) -> TensorPr
     # check at least one of the indices is in common
     if not (set(tensor.indices) & set(epsilon.indices)):
         raise ValueError("Epsilon tensor does not have common indices with the tensor")
-    return TensorProduct(epsilon, tensor)
+    return IsotropicProduct(epsilon, tensor)
 
 
-def contract_epsilon_delta(epsilon: Epsilon, delta: Delta) -> Zero | CartesianTensor:
+def contract_epsilon_delta(epsilon: Epsilon, delta: Delta) -> Zero | IsotropicTensor:
     """
     Contract an epsilon tensor with a delta tensor.
 
@@ -204,23 +206,23 @@ def contract_two_epsilon(
         d3 = Delta(eps1[0] + eps2[1])
         d4 = Delta(eps1[1] + eps2[0])
         return LinearCombination(
-            TensorProduct(d1, d2), TensorProduct(d3, d4, factor=-1)
+            IsotropicProduct(d1, d2), IsotropicProduct(d3, d4, factor=-1)
         )
 
     else:
         raise ValueError("No repeated indices")
 
 
-def simplify_delta(product: TensorProduct) -> tuple[TensorProduct, bool]:
+def simplify_delta(product: IsotropicProduct) -> tuple[IsotropicProduct, bool]:
     """
-    Evaluate delta tensors in a tensor product.
+    Evaluate delta tensors in an isotropic product.
 
     This will recursively contract all possible delta tensors in the product.
 
     Tensors like delta_ii will evaluate to 3.
 
     Returns:
-        product: The simplified tensor product.
+        product: The simplified isotropic product.
         performed: True if any contraction was performed, False otherwise.
     """
     # Positions of delta tensors in the product
@@ -287,14 +289,14 @@ def simplify_delta(product: TensorProduct) -> tuple[TensorProduct, bool]:
         components = new_components
 
     if performed:
-        return TensorProduct(*components.values(), factor=product.factor), True
+        return IsotropicProduct(*components.values(), factor=product.factor), True
     else:
         return product, False
 
 
 def simplify_epsilon(
-    product: TensorProduct,
-) -> tuple[TensorProduct | LinearCombination, bool]:
+    product: IsotropicProduct,
+) -> tuple[IsotropicProduct | LinearCombination, bool]:
     """
     Evaluate product of epsilon tensors.
 
@@ -302,7 +304,7 @@ def simplify_epsilon(
     It will consider all possible combinations of epsilon tensors in the product.
 
     Returns:
-        product: The simplified tensor product.
+        product: The simplified isotropic product.
         performed: True if any contraction was performed, False otherwise.
     """
 
@@ -319,23 +321,23 @@ def simplify_epsilon(
             # three identical indices, resulting in a scalar
             if isinstance(out, Scalar):
                 return (
-                    TensorProduct(out, *remaining, factor=product.factor),
+                    IsotropicProduct(out, *remaining, factor=product.factor),
                     True,
                 )
 
             # two identical indices, resulting in a delta tensor
             elif isinstance(out, Delta):
                 return (
-                    TensorProduct(out, *remaining, factor=product.factor),
+                    IsotropicProduct(out, *remaining, factor=product.factor),
                     True,
                 )
 
-            # one identical index, resulting in linear combination of tensor products
+            # one identical index, resulting in linear combination of isotropic products
             # of delta tensors e_ijk e_ilm = d_jl d_km - d_jm d_kl
             elif isinstance(out, LinearCombination):
                 all_tp = []
                 for tp in out:
-                    new_tp = TensorProduct(
+                    new_tp = IsotropicProduct(
                         *tp.components,
                         *remaining,
                         factor=tp.factor * product.factor,
@@ -350,9 +352,9 @@ def simplify_epsilon(
     return product, False
 
 
-def simplify_tensor_product(tp: TensorProduct) -> LinearCombination:
+def simplify_isotropic_product(tp: IsotropicProduct) -> LinearCombination:
     """
-    Simplify a tensor product by apply delta and epsilon rules.
+    Simplify an isotropic product by applying the delta and epsilon rules.
 
     The simplification is done iteratively until no more simplification can be done.
     Zeros resulting from the simplification are removed.
@@ -364,7 +366,7 @@ def simplify_tensor_product(tp: TensorProduct) -> LinearCombination:
         The simplified output as a linear combination.
     """
 
-    # Iteratively simplify the tensor product
+    # Iteratively simplify the isotropic product
     performed = True
     simplified = LinearCombination(tp)
     while performed:
@@ -394,12 +396,12 @@ def simplify_tensor_product(tp: TensorProduct) -> LinearCombination:
             performed.append(perf)
 
         # Double epsilon contraction will return a LinearCombination of sum of two
-        # tensor products. We need to expand it to be produced with other components
+        # isotropic products. We need to expand it to be produced with other components
         # in the input tp.
         if double_epsilon is not None:
             linear_comb = []
             for de in double_epsilon:
-                # list of tensor products
+                # list of isotropic products
                 comb = new_simplified.copy()
                 comb[double_epsilon_pos] = de
                 new_tp = multiply(*comb)
@@ -421,30 +423,30 @@ def simplify_linear_combination(tensor: LinearCombination) -> LinearCombination:
     """Simplify a linear combination of tensors.
 
     1. Applying delta and epsilon rules.
-    2. Removing zero tensors or tensor products.
-    3. Combine tensor products that are of the same form.
+    2. Removing zero tensors or isotropic products.
+    3. Combine isotropic products that are of the same form.
     """
     simplified = []
     for t in tensor:
         if t.factor == 0:  # remove zeros
             continue
-        if isinstance(t, CartesianTensor):
+        if isinstance(t, IsotropicTensor):
             simplified.append(t)
-        elif isinstance(t, TensorProduct):
-            out = simplify_tensor_product(t)
+        elif isinstance(t, IsotropicProduct):
+            out = simplify_isotropic_product(t)
             simplified.extend(out)
         else:
             raise ValueError("Unexpected type")
 
-    # Combine tensor products that are of the same form
+    # Combine isotropic products that are of the same form
     categorized = defaultdict(list)
     for t in simplified:
-        if isinstance(t, CartesianTensor):
+        if isinstance(t, IsotropicTensor):
             raise ValueError(
                 "Not implemented, should modify the `for tp_list in "
                 "categorized.values()` block too"
             )
-        elif isinstance(t, TensorProduct):
+        elif isinstance(t, IsotropicProduct):
             t = t.canonize()
             rep = t.str_rep_without_factor()
             categorized[rep].append(t)
@@ -457,7 +459,7 @@ def simplify_linear_combination(tensor: LinearCombination) -> LinearCombination:
         if factor == 0:  # remove zeros
             continue
         components = tp_list[0].components
-        tp = TensorProduct(*components, factor=factor)
+        tp = IsotropicProduct(*components, factor=factor)
         lin_comb.append(tp)
     simplified = LinearCombination(*lin_comb)
 
@@ -465,52 +467,52 @@ def simplify_linear_combination(tensor: LinearCombination) -> LinearCombination:
 
 
 def multiply(
-    *tensors: CartesianTensor | TensorProduct, factor: int | Fraction = 1
-) -> TensorProduct:
+    *tensors: IsotropicTensor | IsotropicProduct, factor: int | Fraction = 1
+) -> IsotropicProduct:
     """
-    Multiple tensors, tensor products to create a new tensor product.
+    Multiple tensors, isotropic products to create a new isotropic product.
 
     Args:
-        *tensors: the tensors or tensor products to multiply.
-        factor: Additional factor to be multiplied to the tensor product, default is 1.
+        *tensors: the tensors or isotropic products to multiply.
+        factor: Additional factor to be multiplied to the isotropic product, default is 1.
 
     Returns:
-        The new tensor product.
+        The new isotropic product.
     """
     new_tensors = []
     factor = Fraction(factor)
     for t in tensors:
-        if isinstance(t, CartesianTensor):
+        if isinstance(t, IsotropicTensor):
             new_tensors.append(t)
-        elif isinstance(t, TensorProduct):
+        elif isinstance(t, IsotropicProduct):
             new_tensors.extend(t.components)
             factor *= t.factor
         else:
             raise ValueError("Unexpected type")
 
-    tp = TensorProduct(*new_tensors, factor=factor)
+    tp = IsotropicProduct(*new_tensors, factor=factor)
 
     return tp
 
 
 def multiply_2(
-    *tensors: CartesianTensor | TensorProduct | LinearCombination,
+    *tensors: IsotropicTensor | IsotropicProduct | LinearCombination,
     factor: int | Fraction = 1,
 ) -> LinearCombination:
     """
-    Multiply tensors, tensor products, linearly combined tensors.
+    Multiply tensors, isotropic products, linearly combined tensors.
 
     Args:
-        *tensors: the tensors or tensor products to multiply.
-        factor: Additional factor to be multiplied to the tensor product, default is 1.
+        *tensors: the tensors or isotropic products to multiply.
+        factor: Additional factor to be multiplied to the isotropic product, default is 1.
 
     Returns:
-        The new tensor product.
+        The new isotropic product.
     """
     # First, convert input to Tensors
     new_tensors = []
     for t in tensors:
-        if isinstance(t, (CartesianTensor, TensorProduct)):
+        if isinstance(t, (IsotropicTensor, IsotropicProduct)):
             new_tensors.append(LinearCombination(t))
         elif isinstance(t, LinearCombination):
             new_tensors.append(t)
@@ -525,18 +527,18 @@ def multiply_2(
 
 
 # def symmetrize(
-#     tensor: CartesianTensor | TensorProduct, indices: str = None
+#     tensor: IsotropicTensor | IsotropicProduct, indices: str = None
 # ) -> LinearCombination:
 #     """
-#     Symmetrize a tensor or tensor product over the given indices.
+#     Symmetrize a tensor or isotropic product over the given indices.
 #
 #     Args:
-#         tensor: The tensor or tensor product to symmetrize.
+#         tensor: The tensor or isotropic product to symmetrize.
 #         indices: The indices to symmetrize over. If None, all non-repeated indices are
 #             symmetrized.
 #
 #     Returns:
-#         A `LinearCombination` of tensors/tensor products, each with a different
+#         A `LinearCombination` of tensors/isotropic products, each with a different
 #         permutation of the indices, and each is normalized by the number of total
 #         permutations.
 #     """
