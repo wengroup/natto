@@ -22,7 +22,7 @@ import string
 from collections.abc import Sequence
 from fractions import Fraction
 
-from natto.algebra import contract
+from natto.algebra import contract, contract_fully
 from natto.lowering import LoweringLabel, get_lowering_labels
 from natto.natural_projector import get_natural_projector
 from natto.symbolic import IndexGroup, Operator, Signature, Term
@@ -52,9 +52,15 @@ class Sector:
         )
 
         self._index = {label: i for i, label in enumerate(self.labels)}
-        self._projector = None
+        self._projector = get_natural_projector(ell)
         self._candidates = {}
         self._table = {}
+
+        # The projector's terms grouped by coefficient; only ell // 2 + 1 are distinct
+        groups = {}
+        for term, coefficient in self._projector.terms.items():
+            groups.setdefault(coefficient, []).append(term.deltas)
+        self._projector_groups = list(groups.items())
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -80,35 +86,44 @@ class Sector:
         """The contraction of candidates `i` and `j` over all their indices.
 
         Both carry the natural projector, which is symmetric and idempotent, so one of
-        the two is left out: the entry is the contraction of the rank-lowering tensor
-        of one candidate with the other candidate. The table is symmetric, so each pair
-        is contracted once and cached.
+        the two is left out: the entry is the natural projector contracted with the two
+        rank-lowering tensors. Those two are contracted over their rank indices first,
+        which leaves them on the projector's own slots, and each term of the projector
+        then closes the product into cycles that are counted rather than contracted.
+        The table is symmetric, so each pair is computed once and cached.
 
         Returns:
             The exact entry L_ij, which is 2 * ell + 1 times the Gram entry.
 
         References:
-            Lemma 1 (Eq. 15, Sec. 4.1) and Proposition 5 (Sec. 6.4) of
-            [Wen2026Refactor].
+            Lemma 1 (Eq. 15, Sec. 4.1), Theorems 1 and 2 (Sec. 4.5) and Proposition 5
+            (Sec. 6.4) of [Wen2026Refactor].
         """
         key = (i, j) if i <= j else (j, i)
         if key not in self._table:
-            sigma = [("sigma", k) for k in range(self.ell)]
+            ell = self.ell
             rank = [("rank", a) for a in range(self.n)]
             factors = [
-                (self._lowering(key[0]), sigma + rank),
-                (self._candidate(key[1]), rank + sigma),
+                (self._lowering(key[0]), list(range(ell)) + rank),
+                (self._lowering(key[1]), list(range(ell, 2 * ell)) + rank),
             ]
-            contracted = contract(factors, Signature(()))
-            self._table[key] = contracted.terms.get(Term(), Fraction(0))
+            lowered = contract(factors, self._projector.signature)
+
+            entry = Fraction(0)
+            for term, value in lowered.terms.items():
+                for coefficient, matchings in self._projector_groups:
+                    count = sum(
+                        contract_fully(term.deltas + matching, term.epsilons)
+                        for matching in matchings
+                    )
+                    entry += value * coefficient * count
+            self._table[key] = entry
 
         return self._table[key]
 
     def _candidate(self, i: int) -> Operator:
         """Candidate `i`: the natural projector applied to rank-lowering tensor `i`."""
         if i not in self._candidates:
-            if self._projector is None:
-                self._projector = get_natural_projector(self.ell)
             sigma = [("sigma", k) for k in range(self.ell)]
             weight = [self.n + k for k in range(self.ell)]
             factors = [

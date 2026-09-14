@@ -76,6 +76,80 @@ def contract(
     return Operator(signature, terms)
 
 
+def contract_fully(
+    deltas: Sequence[Sequence[Hashable]], epsilons: Sequence[Sequence[Hashable]] = ()
+) -> int:
+    """Sum a product of deltas and Levi-Civita symbols over every index.
+
+    Every label occurs exactly twice, so the deltas form closed cycles, each a factor
+    of 3, and paths whose ends are slots of the symbols. A path joining two slots of
+    one symbol makes the product vanish; otherwise the paths join each slot of the
+    first symbol to one of the second, and the two symbols give 6 times the sign of
+    that bijection.
+
+    Args:
+        deltas: Pairs of labels, one per Kronecker delta.
+        epsilons: Triples of labels, one per Levi-Civita symbol, at most two.
+
+    Returns:
+        The value of the product.
+
+    Raises:
+        ValueError: If a label does not occur exactly twice, or there are more than two
+            Levi-Civita symbols.
+
+    References:
+        Theorems 1 and 2 (Sec. 4.5) of [Wen2026Refactor].
+    """
+    if len(epsilons) > 2:
+        raise ValueError("At most two Levi-Civita symbols can be contracted fully")
+
+    # The two ends at each label: a delta by its number, or a symbol's slot as a pair
+    ends = {}
+    for k, (u, v) in enumerate(deltas):
+        ends.setdefault(u, []).append(k)
+        ends.setdefault(v, []).append(k)
+    for s, triple in enumerate(epsilons):
+        for position, label in enumerate(triple):
+            ends.setdefault(label, []).append((s, position))
+    if any(len(pair) != 2 for pair in ends.values()):
+        raise ValueError("Every label must occur exactly twice")
+
+    visited = [False] * len(deltas)
+    factor = 1
+    if epsilons:
+        targets = []
+        for position, label in enumerate(epsilons[0]):
+            end, here = (0, position), label
+            while True:
+                first, second = ends[here]
+                end = second if first == end else first
+                if isinstance(end, tuple):
+                    break
+                visited[end] = True
+                u, v = deltas[end]
+                here = v if u == here else u
+            if end[0] == 0:
+                return 0
+            targets.append(end[1])
+        factor = 6 * sort_with_sign(targets)[1]
+
+    cycles = 0
+    for k in range(len(deltas)):
+        if visited[k]:
+            continue
+        cycles += 1
+        edge, here = k, deltas[k][0]
+        while not visited[edge]:
+            visited[edge] = True
+            u, v = deltas[edge]
+            here = v if u == here else u
+            first, second = ends[here]
+            edge = second if first == edge else first
+
+    return factor * 3**cycles
+
+
 def _reduce(deltas: list, epsilons: list) -> list[tuple[int, list, list]]:
     """Sum over the repeated labels of one product of deltas and Levi-Civita symbols.
 

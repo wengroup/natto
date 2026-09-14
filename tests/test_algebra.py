@@ -7,7 +7,7 @@ shares nothing with the walk that reduces the terms.
 import numpy as np
 import pytest
 
-from natto.algebra import contract
+from natto.algebra import contract, contract_fully
 from natto.symbolic import IndexGroup, Operator, Signature
 
 
@@ -66,3 +66,31 @@ def test_contract(factors, size):
     expected = np.einsum(*operands, [ids[slot] for slot in range(size)])
 
     np.testing.assert_allclose(result.evaluate(), expected, atol=1e-12)
+
+
+#: (deltas, Levi-Civita symbols, value) of products summed over every label
+FULL_CASES = {
+    "trace": ([("i", "i")], [], 3),
+    "two loops": ([("i", "j"), ("j", "i"), ("k", "k")], [], 9),
+    "symbols aligned": ([], [("i", "j", "k"), ("i", "j", "k")], 6),
+    "symbols swapped": ([], [("i", "j", "k"), ("j", "i", "k")], -6),
+    "symbols through deltas": (
+        [("i", "m"), ("j", "l"), ("k", "p"), ("q", "q")],
+        [("i", "j", "k"), ("l", "m", "p")],
+        -18,
+    ),
+    "path on one symbol": (
+        [("i", "j"), ("l", "m"), ("k", "p")],
+        [("i", "j", "k"), ("l", "m", "p")],
+        0,
+    ),
+    "triangle": ([("i", "j"), ("j", "k"), ("k", "i")], [], 3),
+}
+
+
+@pytest.mark.parametrize(
+    "deltas, epsilons, value", FULL_CASES.values(), ids=FULL_CASES.keys()
+)
+def test_contract_fully(deltas, epsilons, value):
+    """Counting cycles gives the value of the fully contracted product."""
+    assert contract_fully(deltas, epsilons) == value

@@ -8,7 +8,6 @@ indices off against deltas, written out as `einsum` rules.
 Nothing here knows what the operators mean; it is the plumbing they share.
 """
 
-import itertools
 import string
 
 
@@ -99,22 +98,7 @@ def get_permutations(symmetry: str, start_dim: int = 0) -> list[list[int]]:
     Returns:
         Each tuple contains the permutation indices for symmetrization.
     """
-
-    all_perms = itertools.permutations(range(start_dim, start_dim + len(symmetry)))
-
-    prefix = list(range(start_dim))
-    unique_perms = []
-    unique_perm_string = set()
-
-    # Filter permutations based on the symmetry
-    for perm in all_perms:
-        perm_string = "".join(symmetry[i - start_dim] for i in perm)
-
-        if perm_string not in unique_perm_string:
-            unique_perms.append(prefix + list(perm))
-            unique_perm_string.add(perm_string)
-
-    return unique_perms
+    return get_permutations_delta(symmetry, "", start_dim)
 
 
 def get_permutations_2(m: int, num_delta: int, start_dim: int = 0) -> list[list[int]]:
@@ -228,25 +212,32 @@ def get_permutations_delta(
             `start_dim` will not be used in the operation.
 
     Returns:
-        Each inner tuple contains the permutation indices for symmetrization.
+        Each inner tuple contains the permutation indices for symmetrization, each the
+        first of its pattern among `itertools.permutations`, and in that order.
+
+    Raises:
+        ValueError: If a letter of `delta_indices` does not occur exactly twice.
+
+    References:
+        C.8 (Sec. 6.8) of [Wen2026Refactor].
     """
+    literals: dict[str, list[int]] = {}
+    pair_slots: dict[str, list[int]] = {}
+    for index, letter in enumerate(symmetry):
+        group = pair_slots if letter in delta_indices else literals
+        group.setdefault(letter, []).append(index)
+    if any(len(slots) != 2 for slots in pair_slots.values()):
+        raise ValueError(f"Each of {delta_indices} must occur twice in {symmetry}")
+    pairs = sorted(pair_slots.values())
 
-    all_perms = itertools.permutations(range(start_dim, start_dim + len(symmetry)))
-
+    patterns = []
+    _extend_patterns(
+        len(symmetry), literals, pairs, dict.fromkeys(literals, 0), [], 0, [], patterns
+    )
     prefix = list(range(start_dim))
-    unique_perms: list[list[int]] = []
-    unique_canonical_forms: list[str] = []
+    perms = [prefix + [start_dim + index for index in pattern] for pattern in patterns]
 
-    # Filter permutations based on contraction pattern
-    for perm in all_perms:
-        perm_string = "".join(symmetry[i - start_dim] for i in perm)
-
-        canonical_form = _canonize(perm_string, delta_indices)
-        if canonical_form not in unique_canonical_forms:
-            unique_perms.append(prefix + [int(i) for i in perm])
-            unique_canonical_forms.append(canonical_form)
-
-    return unique_perms
+    return perms
 
 
 def remove_trace_rule(m: int, d: int) -> str:
@@ -272,21 +263,65 @@ def remove_trace_rule(m: int, d: int) -> str:
     )
 
 
-def _canonize(ps: str, di: str) -> str:
-    """Convert a permutation string to its canonical form.
+def _extend_patterns(
+    size: int,
+    literals: dict[str, list[int]],
+    pairs: list[list[int]],
+    used: dict[str, int],
+    open_pairs: list[int],
+    opened: int,
+    perm: list[int],
+    patterns: list[list[int]],
+):
+    """Extend a partial pattern by every choice for its next position, recursively.
 
-    Equivalent permutation strings get the same representation. Major symmetry is
-    based on the first occurrence of each letter, so `baba` and `fefe` are equivalent
-    and both become `0101`.
+    Each position takes the smallest index a choice allows: the next index of a plain
+    letter, the second index of a pair already opened, or the first index of the next
+    pair. Trying the choices in increasing index order yields the patterns in the order
+    `itertools.permutations` first meets them.
 
     Args:
-        ps: The permutation string to convert.
-        di: `delta_indices`.
-
-    Returns:
-        The canonical form of the permutation string.
+        size: Length of the symmetry string.
+        literals: Indices of each plain letter, increasing.
+        pairs: The two indices of each delta letter, ordered by the first.
+        used: How many indices of each plain letter the partial pattern has taken.
+        open_pairs: Pairs whose first index is taken and second is not, in order.
+        opened: How many pairs have been opened.
+        perm: The partial pattern, extended and restored in place.
+        patterns: Where each complete pattern is appended.
     """
-    # Do not need to canonize indices not in `delta_indices`.
-    # For example, in `symmetry = xxyyaabb` and `delta_indices = ab`,
-    # xxyy and yyxx are different.
-    return "".join(str(ps.index(c)) if c in di else c for c in ps)
+    if len(perm) == size:
+        patterns.append(perm[:])
+        return
+
+    choices = [
+        (indices[used[letter]], "letter", letter)
+        for letter, indices in literals.items()
+        if used[letter] < len(indices)
+    ]
+    choices += [(pairs[p][1], "close", p) for p in open_pairs]
+    if opened < len(pairs):
+        choices.append((pairs[opened][0], "open", opened))
+
+    for index, kind, key in sorted(choices):
+        perm.append(index)
+        if kind == "letter":
+            used[key] += 1
+            _extend_patterns(
+                size, literals, pairs, used, open_pairs, opened, perm, patterns
+            )
+            used[key] -= 1
+        elif kind == "close":
+            position = open_pairs.index(key)
+            open_pairs.pop(position)
+            _extend_patterns(
+                size, literals, pairs, used, open_pairs, opened, perm, patterns
+            )
+            open_pairs.insert(position, key)
+        else:
+            open_pairs.append(key)
+            _extend_patterns(
+                size, literals, pairs, used, open_pairs, opened + 1, perm, patterns
+            )
+            open_pairs.pop()
+        perm.pop()
