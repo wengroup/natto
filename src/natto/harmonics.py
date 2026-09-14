@@ -26,11 +26,8 @@ from typing import Literal
 
 import numpy as np
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import evaluate_tensors
-from natto.indices import letter_index
-from natto.natural_projector import get_natural_projector
-from natto.symbolic import LinearCombination
+from natto.natural_projector import get_projector_operator
+from natto.symbolic import Operator
 from natto.utils import double_factorial
 
 #: How the harmonic operator is scaled. `legendre` applies `coeff_harmonic`, the
@@ -65,8 +62,10 @@ def get_harmonic_operator(
     if n < 0:
         raise ValueError(f"rank (n) must be at least zero, got n={n}")
 
-    H, upper, lower = get_harmonic_symbolic(n)
-    H_numerical = evaluate_tensors(H, mode="extraction")
+    H = get_harmonic_symbolic(n)
+    H_numerical = H.evaluate()
+    lower = H.signature.letters_of("weight")
+    upper = H.signature.letters_of("sigma")
 
     if normalize == "legendre":
         H_numerical = H_numerical * float(coeff_harmonic(n))
@@ -83,7 +82,7 @@ def get_harmonic_operator(
     return H_numerical, rule
 
 
-def get_harmonic_symbolic(n: int) -> tuple[LinearCombination, str, str]:
+def get_harmonic_symbolic(n: int) -> Operator:
     """Build the harmonic operator of one rank, symbolically.
 
     The terms are exact, with rational coefficients, and unnormalized; the
@@ -94,15 +93,13 @@ def get_harmonic_symbolic(n: int) -> tuple[LinearCombination, str, str]:
             zero.
 
     Returns:
-        The symbolic operator, the letters carrying the polyadic's indices, and the
-        letters carrying the harmonic's.
+        The symbolic operator. Its `weight` group carries the harmonic's indices and
+        its `sigma` group the polyadic's.
 
     References:
         Eq. 46 of [Wen2026].
     """
-    H = simplify_linear_combination(get_natural_projector(n))
-
-    return H, letter_index(n, upper_case=True), letter_index(n)
+    return get_projector_operator(n)
 
 
 def coeff_harmonic(n: int) -> Fraction:

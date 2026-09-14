@@ -22,7 +22,14 @@ import itertools
 from fractions import Fraction
 
 from natto.indices import get_permutations_2, letter_index
-from natto.symbolic import LinearCombination, create_delta_epsilon_tensors
+from natto.symbolic import (
+    IndexGroup,
+    LinearCombination,
+    Operator,
+    Signature,
+    Term,
+    create_delta_epsilon_tensors,
+)
 
 
 def get_natural_projector(
@@ -43,17 +50,8 @@ def get_natural_projector(
     References:
         Eq. 7 of [Wen2026], with the coefficients built by the recursion of Eq. S27.
     """
-    k = ell // 2
-
     out = []
-    c = Fraction(1, 1)  # c for t = 0
-    for t in range(k + 1):
-        if t > 0:
-            c *= -Fraction(
-                (ell - 2 * t + 2) * (ell - 2 * t + 1),
-                2 * t * (2 * ell - 2 * t + 1),
-            )
-
+    for t, c in enumerate(_projector_coefficients(ell)):
         # get all rules
         all_rules = get_projector_rules(ell, t, s_letters)
 
@@ -80,6 +78,44 @@ def get_natural_projector(
             )
 
     return LinearCombination(*out)
+
+
+def get_projector_operator(ell: int) -> Operator:
+    """The natural projector of one weight, as an operator over index slots.
+
+    Its signature is the `weight` group, printing as a, b, c, ..., followed by the
+    `sigma` group, printing as A, B, C, ...; its terms come in the order
+    `get_natural_projector` builds them.
+
+    Args:
+        ell: Weight of the ICT the projector belongs to.
+
+    Returns:
+        The projector, with exact coefficients.
+
+    References:
+        Eq. 7 of [Wen2026], with the coefficients of Eq. 8 built by the recursion of
+        Eq. S27. Definition 3 (Sec. 6.3) of [Wen2026Refactor] for the operator.
+    """
+    signature = Signature(
+        (IndexGroup("weight", ell, upper=False), IndexGroup("sigma", ell, upper=True))
+    )
+
+    terms = []
+    for t, c in enumerate(_projector_coefficients(ell)):
+        all_rules = get_projector_rules(ell, t)
+
+        # The coefficient of Eq. 8 is shared by the rules of one t, and averaged over
+        # them.
+        factor = c / len(all_rules)
+
+        for rule in all_rules:
+            sign, term = Term.from_letters(
+                signature, rule["d_rs"] + rule["d_rr"] + rule["d_ss"]
+            )
+            terms.append((sign * factor, term))
+
+    return Operator(signature, terms)
 
 
 def get_projector_rules(
@@ -167,3 +203,18 @@ def get_projector_rules(
                 )
 
     return all_indices
+
+
+def _projector_coefficients(ell: int) -> list[Fraction]:
+    """The coefficients c_t of Eq. 8 of [Wen2026], for t = 0, ..., ell // 2.
+
+    Built by the recursion of Eq. S27, which keeps every step exact.
+    """
+    coefficients = [Fraction(1)]
+    for t in range(1, ell // 2 + 1):
+        ratio = Fraction(
+            (ell - 2 * t + 2) * (ell - 2 * t + 1), 2 * t * (2 * ell - 2 * t + 1)
+        )
+        coefficients.append(-ratio * coefficients[-1])
+
+    return coefficients

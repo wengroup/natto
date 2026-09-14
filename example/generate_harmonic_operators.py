@@ -21,7 +21,6 @@ from pathlib import Path
 
 import numpy as np
 
-from natto.algebra import simplify_linear_combination
 from natto.harmonics import get_harmonic_operator, get_harmonic_symbolic
 from natto.utils import yaml_dump
 
@@ -40,12 +39,11 @@ def generate_harmonic_operators(max_weight: int) -> dict[str, dict[str, np.ndarr
     all_H = {}
     for weight in range(max_weight + 1):
         for normalize in ["legendre", "none"]:
-            H_symbolic, _, _ = get_harmonic_symbolic(weight)
+            H_symbolic = get_harmonic_symbolic(weight)
             H, rule = get_harmonic_operator(weight, normalize)
 
-            H_symbolic = simplify_linear_combination(H_symbolic)
-            # replace δ (delta) by d and ε (epsilon) by e
-            H_symbolic = str(H_symbolic).replace("δ", "d").replace("ε", "e")
+            # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
+            H_symbolic = H_symbolic.to_string(ascii=True)
 
             all_H[f"{weight}-{normalize}"] = {
                 "rule": rule,

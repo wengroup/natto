@@ -20,7 +20,6 @@ from pathlib import Path
 
 import numpy as np
 
-from natto.algebra import simplify_linear_combination
 from natto.coupling import get_coupling_operator, get_coupling_symbolic
 from natto.utils import yaml_dump
 
@@ -49,13 +48,11 @@ def generate_coupling_operators(
         for l2 in range(max_l2 + 1):
             for l3 in range(abs(l1 - l2), min(l1 + l2 + 1, max_l3 + 1)):
                 for normalize in ["legendre", "none"]:
-                    K_symbolic, _, _, _ = get_coupling_symbolic(l1, l2, l3)
+                    K_symbolic = get_coupling_symbolic(l1, l2, l3)
                     K, rule = get_coupling_operator(l1, l2, l3, normalize)
 
-                    K_symbolic = simplify_linear_combination(K_symbolic)
-                    # replace δ (delta) by d
-                    # replace ε (epsilon) by e
-                    K_symbolic = str(K_symbolic).replace("δ", "d").replace("ε", "e")
+                    # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
+                    K_symbolic = K_symbolic.to_string(ascii=True)
 
                     # Convert to numpy to save it
                     K = K.tolist()

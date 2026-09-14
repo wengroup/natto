@@ -10,7 +10,6 @@ import functools
 import numpy as np
 
 from natto.algebra import simplify_linear_combination
-from natto.coupling import get_coupling_symbolic
 from natto.evaluate import evaluate_tensors
 from natto.natural_projector import get_natural_projector
 from natto.reduction import get_dual_pair, get_independent_mappings
@@ -76,18 +75,6 @@ def package_operators() -> list:
         )
         E = simplify_linear_combination(get_natural_projector(ell))
         cases.append((f"E({ell})", E, signature, "extraction", ("weight", "sigma")))
-
-    for l1, l2, l3 in [(1, 1, 2), (1, 2, 1), (2, 2, 2), (2, 3, 3), (2, 2, 4)]:
-        signature = Signature(
-            (
-                IndexGroup("z", l3, upper=False),
-                IndexGroup("x", l1, upper=True),
-                IndexGroup("y", l2, upper=True),
-            )
-        )
-        K, *_ = get_coupling_symbolic(l1, l2, l3)
-        K = simplify_linear_combination(K)
-        cases.append((f"K{(l1, l2, l3)}", K, signature, "extraction", ("z", "x", "y")))
 
     return cases
 

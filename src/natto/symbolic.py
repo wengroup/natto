@@ -600,6 +600,10 @@ class Signature:
 
         return "".join(letters)
 
+    def letters_of(self, name: str) -> str:
+        """The letters of the group called `name`, in slot order."""
+        return "".join(self.letters[slot] for slot in self.slots(name))
+
     def slot_of(self, letter: str) -> int:
         """The slot a printed letter stands for.
 
@@ -683,6 +687,31 @@ class Term:
         term = cls(tuple(pairs), tuple(sorted(triples)))
 
         return sign, term
+
+    @classmethod
+    def from_letters(
+        cls,
+        signature: Signature,
+        deltas: Iterable[str] = (),
+        epsilons: Iterable[str] = (),
+    ) -> tuple[int, "Term"]:
+        """Build the canonical term of a product written in a signature's letters.
+
+        Args:
+            signature: The signature the letters belong to.
+            deltas: Two letters per Kronecker delta, e.g. `["Aa", "BC"]`.
+            epsilons: Three letters per Levi-Civita symbol, in the symbol's order.
+
+        Returns:
+            The sign of the product relative to the canonical term, and the term.
+
+        Raises:
+            ValueError: If a letter is not in the signature.
+        """
+        return cls.from_blocks(
+            [[signature.slot_of(letter) for letter in pair] for pair in deltas],
+            [[signature.slot_of(letter) for letter in triple] for triple in epsilons],
+        )
 
     @classmethod
     def parse(cls, text: str, signature: Signature) -> tuple[int, "Term"]:

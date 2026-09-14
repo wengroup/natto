@@ -67,13 +67,6 @@ def tp_delta_epsilon(tp: IsotropicProduct, mode: str) -> np.ndarray:
     # group) on the right does not matter for the operators built here, since each is
     # symmetric under permutations within either group; only which group an index
     # belongs to does, and that is what the mode fixes.
-    #
-    # TODO
-    # The order of the indices in the right rule can matter when we do
-    # Z = K:XY (see coupling.py), because K carries three set of indices then. That's
-    # why we sort the indices. This is definitely abuse of this function. It is
-    # designed only for cases like Z = ST, so we need to create a new function just
-    # like this for Z = K:XY.
     right = "".join(delta_rules + epsilon_rules)
     lower = sorted([c for c in right if c.islower()])
     upper = sorted([c for c in right if c.isupper()])

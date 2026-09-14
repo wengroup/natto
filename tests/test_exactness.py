@@ -27,6 +27,7 @@ from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_null_space
 from natto.reduction import get_dual_pair, get_independent_mappings
+from natto.symbolic import Operator
 from natto.symmetry_adaptation import get_symmetry_action_matrix
 
 #: `Fraction` is the exact type. A plain `int` is exact too; `bool` is an `int` by
@@ -50,11 +51,14 @@ def assert_exact(label: str, values):
 
 
 def coefficients(combination):
-    """Every scalar in a linear combination.
+    """Every scalar in a linear combination or an operator.
 
     A float can hide in a term's own factor or in any of its tensors', so both are
     collected.
     """
+    if isinstance(combination, Operator):
+        return list(combination.terms.values())
+
     values = []
     for term in combination:
         values.append(term.factor)
@@ -138,7 +142,7 @@ def test_natural_projector_is_exact(weight: int):
 @pytest.mark.parametrize("weight", range(4))
 def test_harmonic_is_exact(weight: int):
     """The harmonic operator, and the constant that normalizes it."""
-    H, _, _ = get_harmonic_symbolic(weight)
+    H = get_harmonic_symbolic(weight)
 
     assert_exact(f"V({weight})", coefficients(H))
     assert isinstance(coeff_harmonic(weight), Fraction)
@@ -152,7 +156,7 @@ def test_coupling_operator_is_exact(l1: int, l2: int, l3: int):
     a float, and `int / int` in Python would quietly make them one. The two cases
     are reached by the parity of `l1 + l2 + l3`.
     """
-    K, _, _, _ = get_coupling_symbolic(l1, l2, l3)
+    K = get_coupling_symbolic(l1, l2, l3)
     assert_exact(f"K({l1},{l2},{l3})", coefficients(K))
 
     even = (l1 + l2 + l3) % 2 == 0

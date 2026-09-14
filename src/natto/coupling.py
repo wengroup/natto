@@ -39,15 +39,13 @@ from typing import Literal
 
 import numpy as np
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import evaluate_tensors
 from natto.indices import (
     double_index,
     get_permutations_delta,
     letter_index,
     repeat_double_index,
 )
-from natto.symbolic import LinearCombination, create_delta_epsilon_tensors
+from natto.symbolic import IndexGroup, Operator, Signature, Term
 from natto.utils import (
     double_factorial,
     factorial,
@@ -74,16 +72,37 @@ def get_coupling_operator(
     Returns:
         The evaluated operator, and the einsum rule that applies it, so that
         `Z = numpy.einsum(rule, K, X, Y)`.
+
+    Raises:
+        ValueError: If `normalize` is not recognized.
     """
-    if (l1 + l2 - l3) % 2 == 0:
-        return _get_coupling_operator_even(l1, l2, l3, normalize)
+    if normalize not in ("legendre", "none"):
+        supported = ["legendre", "none"]
+        raise ValueError(
+            f"Unknown normalization method: {normalize}. Supported are: {supported}."
+        )
 
-    return _get_coupling_operator_odd(l1, l2, l3, normalize)
+    K = get_coupling_symbolic(l1, l2, l3)
+
+    # The signature orders the axes as Z, X, Y, which is what the rule contracts.
+    K_numerical = K.evaluate()
+
+    if normalize == "legendre":
+        if (l1 + l2 - l3) % 2 == 0:
+            constant = coeff_C_even(l1, l2, l3)
+        else:
+            constant = coeff_C_odd(l1, l2, l3)
+        K_numerical = K_numerical * float(constant)
+
+    X_idx = K.signature.letters_of("x")
+    Y_idx = K.signature.letters_of("y")
+    Z_idx = K.signature.letters_of("z")
+    rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
+
+    return K_numerical, rule
 
 
-def get_coupling_symbolic(
-    l1: int, l2: int, l3: int
-) -> tuple[LinearCombination, str, str, str]:
+def get_coupling_symbolic(l1: int, l2: int, l3: int) -> Operator:
     """Build the coupling operator `K` of one weight triple, symbolically.
 
     The terms are exact, with rational coefficients, and unnormalized; the
@@ -95,7 +114,8 @@ def get_coupling_symbolic(
         l3: Weight of the output natural tensor Z.
 
     Returns:
-        The symbolic operator, and the letters carrying the X, Y and Z indices.
+        The symbolic operator, whose groups `z`, `x` and `y` carry the Z, X and Y
+        indices.
     """
     if (l1 + l2 - l3) % 2 == 0:
         return _get_coupling_symbolic_even(l1, l2, l3)
@@ -340,86 +360,17 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
     return Fraction(numerator, denominator)
 
 
-def _get_coupling_operator_even(
-    l1: int, l2: int, l3: int, normalize: Normalization = "legendre"
-) -> tuple[np.ndarray, str]:
-    """Evaluate `K` for even `l1 + l2 - l3`; see `get_coupling_operator`."""
-    K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_even(l1, l2, l3)
-
-    K = simplify_linear_combination(K)
-
-    # We have three types indices, lower case for Z, upper case for X, and upper case
-    # for Y. But the function evaluate_tensors() can only deal with two types of
-    # indices: lower and upper case (cannot distinguish between X and Y). Then:
-    # Q: Why we still can use it to evaluate K?
-    # A: We take advantage of the fact that, by construction, all the indices in
-    # X_idx are smaller than the indices in Y_idx, and that in `evaluate_tensors()`,
-    # (actually `tp_delta_epsilon()`), the upper indices are sorted. As a result,
-    # we have all the indices of X_idx # comes before Y_idx in K_numerical.
-    # In other words, the indices of K_numerical is {Z_idx}{X_idx}{Y_idx}.
-    # Then, we can use this to do K:XY.
-    #
-    # TODO, create a new function like evaluate_tensors to deal with this case.
-    K_numerical = evaluate_tensors(K, mode="extraction")
-
-    if normalize == "legendre":
-        c = coeff_C_even(l1, l2, l3)
-        K_numerical = K_numerical * float(c)
-    elif normalize == "none":
-        pass
-    else:
-        supported = ["legendre", "none"]
-        raise ValueError(
-            f"Unknown normalization method: {normalize}. Supported are: {supported}."
-        )
-
-    # Rule that can be used in einsum to obtain Z = einsum(rule, G, X, Y)
-    rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
-
-    return K_numerical, rule
-
-
-def _get_coupling_operator_odd(
-    l1: int,
-    l2: int,
-    l3: int,
-    normalize: Normalization = "legendre",
-) -> tuple[np.ndarray, str]:
-    """Evaluate `K` for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
-    K, X_idx, Y_idx, Z_idx = _get_coupling_symbolic_odd(l1, l2, l3)
-    K = simplify_linear_combination(K)
-
-    K_numerical = evaluate_tensors(K, mode="extraction")
-
-    if normalize == "legendre":
-        c = coeff_C_odd(l1, l2, l3)
-        K_numerical = K_numerical * float(c)
-    elif normalize == "none":
-        pass
-    else:
-        supported = ["legendre", "none"]
-        raise ValueError(
-            f"Unknown normalization method: {normalize}. Supported are: {supported}."
-        )
-
-    # Rule that can be used in einsum to obtain Z = einsum(rule, G, X, Y)
-    rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
-
-    return K_numerical, rule
-
-
-def _get_coupling_symbolic_even(
-    l1: int, l2: int, l3: int
-) -> tuple[LinearCombination, str, str, str]:
+def _get_coupling_symbolic_even(l1: int, l2: int, l3: int) -> Operator:
     """Build `K` symbolically for even `l1 + l2 - l3`; see `get_coupling_symbolic`."""
     if (l1 + l2 - l3) % 2 != 0:
         raise ValueError(
             f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
         )
 
+    signature = _coupling_signature(l1, l2, l3)
     L1, L2, _ = triangle_numbers(l1, l2, l3)
 
-    out = []
+    terms = []
     for t in range(min(L2, L1) + 1):
         all_rules = _get_coupling_rules_even(l1, l2, l3, t)
 
@@ -428,40 +379,26 @@ def _get_coupling_symbolic_even(
         # the distinct terms of that average.
         factor = coeff_k(l1, l2, l3, t) / len(all_rules)
 
-        # create isotropic products of deltas for each rule
-        tensors = [
-            create_delta_epsilon_tensors(
-                ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"], factor=factor
+        for ru in all_rules:
+            sign, term = Term.from_letters(
+                signature, ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"]
             )
-            for ru in all_rules
-        ]
+            terms.append((sign * factor, term))
 
-        # extend them to sum up later
-        out.extend(tensors)
-
-    K = LinearCombination(*out)
-
-    # Note, this should exactly the same as those in `_get_coupling_rules_even()`
-    X_idx = letter_index(l1, upper_case=True)
-    Y_idx = letter_index(l2, start=l1, upper_case=True)
-    Z_idx = letter_index(l3)
-
-    return K, X_idx, Y_idx, Z_idx
+    return Operator(signature, terms)
 
 
-def _get_coupling_symbolic_odd(
-    l1: int, l2: int, l3: int
-) -> tuple[LinearCombination, str, str, str]:
+def _get_coupling_symbolic_odd(l1: int, l2: int, l3: int) -> Operator:
     """Build `K` symbolically for odd `l1 + l2 - l3`; see `get_coupling_symbolic`."""
     if (l1 + l2 - l3) % 2 != 1:
         raise ValueError(
             f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
         )
 
+    signature = _coupling_signature(l1, l2, l3)
     L1, L2, _ = triangle_numbers(l1, l2, l3)
 
-    out = []
-
+    terms = []
     for t in range(min(L2, L1) + 1):
         all_rules = _get_coupling_rules_odd(l1, l2, l3, t)
 
@@ -469,27 +406,28 @@ def _get_coupling_symbolic_odd(
         # the rules, here those of Eq. 51.
         factor = coeff_k(l1, l2, l3, t) / len(all_rules)
 
-        # create isotropic products of deltas for each rule
-        tensors = [
-            create_delta_epsilon_tensors(
-                ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"],
-                epsilon=ru["rsa"][0],
-                factor=factor,
+        for ru in all_rules:
+            sign, term = Term.from_letters(
+                signature, ru["ra"] + ru["sa"] + ru["aa"] + ru["rs"], ru["rsa"]
             )
-            for ru in all_rules
-        ]
+            terms.append((sign * factor, term))
 
-        # extend them to sum up later
-        out.extend(tensors)
+    return Operator(signature, terms)
 
-    K = LinearCombination(*out)
 
-    # Note, this should exactly the same as those in `_get_coupling_rules_odd()`
-    X_idx = letter_index(l1, upper_case=True)
-    Y_idx = letter_index(l2, start=l1, upper_case=True)
-    Z_idx = letter_index(l3)
+def _coupling_signature(l1: int, l2: int, l3: int) -> Signature:
+    """The Z indices, printing as a, b, ..., then those of X and Y, as A, B, ...
 
-    return K, X_idx, Y_idx, Z_idx
+    These are the letters `_get_coupling_rules_even` and `_get_coupling_rules_odd`
+    write the rules in.
+    """
+    return Signature(
+        (
+            IndexGroup("z", l3, upper=False),
+            IndexGroup("x", l1, upper=True),
+            IndexGroup("y", l2, upper=True),
+        )
+    )
 
 
 def _get_coupling_rules_even(
