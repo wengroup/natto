@@ -230,7 +230,7 @@ def triangle_numbers(l1: int, l2: int, l3: int) -> tuple[int, int, int]:
     return half - l1, half - l2, half - l3
 
 
-def coeff_kappa(l1: int, l2: int, l3: int, t: int) -> Fraction:
+def coeff_k(l1: int, l2: int, l3: int, t: int) -> Fraction:
     """The coefficient k_t of one term of the coupling operator.
 
     It is the counterpart of the natural projector's c_t, and what composing the
@@ -254,7 +254,7 @@ def coeff_kappa(l1: int, l2: int, l3: int, t: int) -> Fraction:
 
     # The equation's (2*l3 - 2*t - 1)!! / (2*l3 - 1)!! is the reciprocal of the t
     # factors separating the two, which is the bounded double factorial below.
-    numerator = (-1) ** t * factorial(l3)
+    numerator = (-1) ** t * factorial(L2) * factorial(L1)
     denominator = (
         double_factorial(2 * l3 - 1, 2 * l3 - 2 * t + 1)
         * factorial(L2 - t)
@@ -289,16 +289,9 @@ def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
     L = l1 + l2 + l3
     L1, L2, L3 = triangle_numbers(l1, l2, l3)
 
-    numerator = (
-        factorial(l1)
-        * factorial(l2)
-        * double_factorial(2 * l3 - 1)
-        * factorial(L2)
-        * factorial(L1)
-    )
+    numerator = factorial(l1) * factorial(l2) * double_factorial(2 * l3 - 1)
     denominator = (
-        factorial(l3)
-        * double_factorial(2 * L2 - 1)
+        double_factorial(2 * L2 - 1)
         * double_factorial(2 * L1 - 1)
         * double_factorial(2 * L3 - 1)
         * factorial(L // 2)
@@ -336,17 +329,9 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
     L = l1 + l2 + l3
     L1, L2, L3 = triangle_numbers(l1, l2, l3)
 
-    numerator = (
-        2
-        * factorial(l1)
-        * factorial(l2)
-        * double_factorial(2 * l3 - 1)
-        * factorial(L2)
-        * factorial(L1)
-    )
+    numerator = 2 * l3 * factorial(l1) * factorial(l2) * double_factorial(2 * l3 - 1)
     denominator = (
-        factorial(l3 - 1)
-        * double_factorial(2 * L2 + 1)
+        double_factorial(2 * L2 + 1)
         * double_factorial(2 * L1 + 1)
         * double_factorial(2 * L3 + 1)
         * factorial((L + 1) // 2)
@@ -441,7 +426,7 @@ def _get_coupling_symbolic_even(
         # Total factor: the coefficient of Eq. 49 divided by len(all_rules), which
         # averages over the rules as the angle brackets of Eq. 50 ask. The rules are
         # the distinct terms of that average.
-        factor = coeff_kappa(l1, l2, l3, t) / len(all_rules)
+        factor = coeff_k(l1, l2, l3, t) / len(all_rules)
 
         # create isotropic products of deltas for each rule
         tensors = [
@@ -482,7 +467,7 @@ def _get_coupling_symbolic_odd(
 
         # Total factor: as in the even case, the coefficient of Eq. 49 averaged over
         # the rules, here those of Eq. 51.
-        factor = coeff_kappa(l1, l2, l3, t) / len(all_rules)
+        factor = coeff_k(l1, l2, l3, t) / len(all_rules)
 
         # create isotropic products of deltas for each rule
         tensors = [

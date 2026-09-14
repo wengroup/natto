@@ -5,11 +5,14 @@ scale, so what needs asserting is not its shape but the two things the scale is
 chosen for: that contracting the harmonic of one direction with another
 direction gives the Legendre polynomial of the angle between them, and that the
 result is symmetric and traceless, which is what makes it a natural tensor.
+Without normalization it must also be what the general reduction extracts from the
+polyadic, which checks the closed form against the reduction itself.
 
 `scipy.special.eval_legendre` is the independent reference; nothing in
 the package is used to compute the expected values.
 """
 
+import functools
 import math
 
 import numpy as np
@@ -17,6 +20,7 @@ import pytest
 import scipy.special
 
 from natto.harmonics import coeff_harmonic, get_harmonic_operator
+from natto.reduction import get_reduction
 from natto.utils import is_symmetric_traceless
 
 #: Weights checked. The operator is a closed form, so this is cheap; the ceiling
@@ -47,9 +51,15 @@ def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
     return result
 
 
+@functools.lru_cache(maxsize=None)
+def reduction(rank: int) -> dict:
+    """The general reduction of a generic tensor of this rank, built once."""
+    return get_reduction(rank)
+
+
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
 def test_generates_the_legendre_polynomial(weight: int):
-    """The condition that fixes the normalization, Eq. (41)."""
+    """The condition that fixes the normalization, Eq. 47."""
     a, b = unit_vector(0), unit_vector(1)
 
     value = np.tensordot(harmonic(a, weight), outer_power(b, weight), axes=weight)
@@ -92,6 +102,35 @@ def test_coefficient_matches_the_paper(weight: int):
     expected = math.prod(range(2 * weight - 1, 0, -2)) / math.factorial(weight)
 
     assert coeff_harmonic(weight) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("weight", [1, 2, 3, pytest.param(4, marks=pytest.mark.slow)])
+def test_matches_reduction(weight: int):
+    """Without normalization, the harmonic is what the general reduction gives.
+
+    A polyadic of rank n has a single weight-n channel, whose mapping tensor and dual
+    are both the natural projector, so each of them applied to the polyadic must equal
+    the unnormalized harmonic. The rank-four reduction takes seconds, hence the mark.
+    """
+    a = unit_vector(0)
+    polyadic = outer_power(a, weight)
+    (embedding,) = reduction(weight)[weight]["embedding"]
+    (extraction,) = reduction(weight)[weight]["extraction"]
+
+    expected = harmonic(a, weight, normalize="none")
+    via_embedding = np.tensordot(
+        np.asarray(embedding["numerical"], dtype=np.float64),
+        polyadic,
+        axes=(list(range(weight)), list(range(weight))),
+    )
+    via_extraction = np.einsum(
+        extraction["rule"],
+        np.asarray(extraction["numerical"], dtype=np.float64),
+        polyadic,
+    )
+
+    np.testing.assert_allclose(via_embedding, expected, atol=1e-12)
+    np.testing.assert_allclose(via_extraction, expected, atol=1e-12)
 
 
 def test_a_batch_of_directions_works_like_one():

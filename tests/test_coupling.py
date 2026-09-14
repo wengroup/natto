@@ -10,6 +10,11 @@ Those conditions are what these tests assert. They are the only thing that pins
 `coeff_C_even` and `coeff_C_odd`, so without them the coupling operator is checked only
 up to a scalar.
 
+The unnormalized operator is checked separately, against the general reduction:
+applied to two ICTs, it must equal what the mapping tensors of the reduction of their
+product give. That pins the coefficients of Eq. 49, which the two conditions alone
+would leave free up to one factor per weight triple.
+
 The conditions are stated on the Cartesian harmonics, which the package does not
 build, so `cartesian_harmonic` below constructs them from the natural projector
 and the rank-dependent factor the paper gives. That reference is itself pinned
@@ -17,6 +22,7 @@ here, against the Legendre polynomials it must reproduce, so it cannot drift
 into agreeing with a wrong operator.
 """
 
+import functools
 import math
 
 import numpy as np
@@ -24,7 +30,8 @@ import pytest
 import scipy.special
 
 from natto.coupling import get_coupling_operator
-from natto.symmetric_traceless import remove_trace
+from natto.reduction import get_reduction
+from natto.symmetric_traceless import get_random_natural_tensor, remove_trace
 
 #: Weights the conditions are checked at. The operator is closed form, so this
 #: is cheap; the ceiling is only to keep the parametrization readable.
@@ -41,6 +48,10 @@ LIMIT_RTOL = 1e-3
 #: orders of margin on that. A wrong normalization constant would be off by a
 #: factor of order one, so it stays far from anything the check needs to catch.
 OPERATOR_RTOL = 1e-11
+
+#: Largest product rank, l1 + l2, compared against the general reduction in the default
+#: run. Reducing a rank-four tensor takes seconds, so those triples are marked slow.
+FAST_PRODUCT_RANK = 3
 
 
 def double_factorial(n: int) -> float:
@@ -126,6 +137,34 @@ def weight_triples(parity: int) -> list[tuple[int, int, int]]:
     return triples
 
 
+@functools.lru_cache(maxsize=None)
+def reduction(rank: int) -> dict:
+    """The general reduction of a generic tensor of this rank, built once."""
+    return get_reduction(rank)
+
+
+def product_triples() -> list:
+    """Weight triples with nonzero input weights and a product of rank at most four.
+
+    Triples whose product has rank above `FAST_PRODUCT_RANK` are marked slow.
+    """
+    params = []
+    for l1 in range(1, 4):
+        for l2 in range(1, 5 - l1):
+            for l3 in range(abs(l1 - l2), l1 + l2 + 1):
+                marks = pytest.mark.slow if l1 + l2 > FAST_PRODUCT_RANK else ()
+                params.append(pytest.param(l1, l2, l3, marks=marks))
+
+    return params
+
+
+def couple_unnormalized(l1: int, l2: int, l3: int, X: np.ndarray, Y: np.ndarray):
+    """The coupling of `X` and `Y` to weight `l3`, without its normalization."""
+    operator, rule = get_coupling_operator(l1, l2, l3, normalize="none")
+
+    return np.einsum(rule, operator.astype(np.float64), X, Y)
+
+
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
 def test_cartesian_harmonic_generates_legendre(weight: int):
     """The reference harmonic reproduces the Legendre polynomial it must.
@@ -196,4 +235,71 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
 
     np.testing.assert_allclose(
         rate, np.ones((), dtype=rate.dtype), rtol=LIMIT_RTOL, atol=0
+    )
+
+
+@pytest.mark.parametrize("l1,l2,l3", product_triples())
+def test_matches_mapping_tensors(l1: int, l2: int, l3: int):
+    """Without normalization, the coupling is the general reduction's mapping tensor.
+
+    Applied to the product of two ICTs, every weight-l3 mapping tensor of the
+    rank-(l1 + l2) reduction gives either the coupling's output or zero. A candidate
+    whose rank lowering joins indices of X only to indices of Y is the coupling's own
+    construction, and any other takes a trace of X or of Y. At least one kept
+    candidate must be of the first kind, since the kept ones span them all.
+    """
+    X = get_random_natural_tensor(l1, seed=3)
+    Y = get_random_natural_tensor(l2, seed=7)
+    coupled = couple_unnormalized(l1, l2, l3, X, Y)
+
+    rank = l1 + l2
+    product = np.multiply.outer(X, Y)
+    outcomes = []
+    for entry in reduction(rank)[l3]["embedding"]:
+        mapped = np.tensordot(
+            np.asarray(entry["numerical"], dtype=np.float64),
+            product,
+            axes=(list(range(rank)), list(range(rank))),
+        )
+        if np.allclose(mapped, coupled, rtol=OPERATOR_RTOL, atol=1e-12):
+            outcomes.append("coupling")
+        elif np.allclose(mapped, 0.0, atol=1e-12):
+            outcomes.append("zero")
+        else:
+            outcomes.append("other")
+
+    assert "other" not in outcomes, outcomes
+    assert "coupling" in outcomes, outcomes
+
+
+@pytest.mark.parametrize(
+    "l1,l2",
+    [
+        (1, 1),
+        (2, 1),
+        (1, 2),
+        pytest.param(2, 2, marks=pytest.mark.slow),
+        pytest.param(3, 1, marks=pytest.mark.slow),
+    ],
+)
+def test_top_weight_matches_extraction(l1: int, l2: int):
+    """At l3 = l1 + l2 the single mapping tensor is its own dual.
+
+    The Gram entry is one there, so the extraction operator, which below the top
+    weight mixes the channels, is the mapping tensor itself and must also give the
+    coupling's output.
+    """
+    l3 = l1 + l2
+    X = get_random_natural_tensor(l1, seed=3)
+    Y = get_random_natural_tensor(l2, seed=7)
+
+    (extraction,) = reduction(l3)[l3]["extraction"]
+    extracted = np.einsum(
+        extraction["rule"],
+        np.asarray(extraction["numerical"], dtype=np.float64),
+        np.multiply.outer(X, Y),
+    )
+
+    np.testing.assert_allclose(
+        extracted, couple_unnormalized(l1, l2, l3, X, Y), rtol=OPERATOR_RTOL, atol=1e-12
     )
