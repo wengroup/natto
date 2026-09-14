@@ -36,7 +36,7 @@ The data is organized in the following way:
 }
 
 - In "weight-normalization", weight is the weight of the harmonic, and
-  normalization can be `none` or `unity`. Under `unity` the weight-fold
+  normalization can be `none` or `legendre`. Under `legendre` the weight-fold
   contraction of the harmonic with a unit vector is the Legendre polynomial of
   the angle between the two.
 
@@ -59,7 +59,7 @@ The data is organized in the following way:
 
 - In "l1-l2-l3-normalization", l1 and l2 are the weights of the two input natural
   tensors, l3 is the weight of the output natural tensor, and normalization can be
-  `none` or `unity`, indicating whether K is normalized or not.
+  `none` or `legendre`, indicating whether K is normalized or not.
 
 
 # reduction_operators.yaml

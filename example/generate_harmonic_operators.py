@@ -10,7 +10,7 @@ taking a unit vector a to the Cartesian harmonic of that weight, the Cartesian
 counterpart of a spherical harmonic.
 
 Edit `max_weight` at the bottom to change how far the sweep runs. Under the
-`unity` normalization the weight-fold contraction of the harmonic with a unit
+`legendre` normalization the weight-fold contraction of the harmonic with a unit
 vector is the Legendre polynomial of the angle between the two; under `none` the
 operator is the bare natural projector. The symbolic forms are written with `d`
 for the Kronecker delta and `e` for the Levi-Civita symbol, so the file stays
@@ -39,7 +39,7 @@ def generate_harmonic_operators(max_weight: int) -> dict[str, dict[str, np.ndarr
     """
     all_H = {}
     for weight in range(max_weight + 1):
-        for normalize in ["unity", "none"]:
+        for normalize in ["legendre", "none"]:
             H_symbolic, _, _ = get_harmonic_symbolic(weight)
             H, rule = get_harmonic_operator(weight, normalize)
 

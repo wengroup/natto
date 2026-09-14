@@ -48,7 +48,7 @@ def generate_coupling_operators(
     for l1 in range(max_l1 + 1):
         for l2 in range(max_l2 + 1):
             for l3 in range(abs(l1 - l2), min(l1 + l2 + 1, max_l3 + 1)):
-                for normalize in ["unity", "none"]:
+                for normalize in ["legendre", "none"]:
                     K_symbolic, _, _, _ = get_coupling_symbolic(l1, l2, l3)
                     K, rule = get_coupling_operator(l1, l2, l3, normalize)
 
