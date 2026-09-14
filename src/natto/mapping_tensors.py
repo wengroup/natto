@@ -33,7 +33,7 @@ class Sector:
         n: Rank of the Cartesian tensor.
 
     References:
-        Definition 5 (Sec. 6.4) of [Wen2026Refactor].
+        Definition 5 (C.4) of [Wen2026Refactor].
     """
 
     def __init__(self, ell: int, n: int):
@@ -89,8 +89,10 @@ class Sector:
             The exact entry L_ij, which is 2 * ell + 1 times the Gram entry.
 
         References:
-            Lemma 1 (Eq. 15, Sec. 4.1), Theorems 1 and 2 (Sec. 4.5) and Proposition 5
-            (Sec. 6.4) of [Wen2026Refactor].
+            A.1 and A.5 of [Wen2026Refactor]: Lemma 1 leaves one natural projector
+            out, and Theorems 1 and 2 count cycles instead of contracting; the Gram
+            matrix is read from the table by Proposition 5 (C.4). Used for Eq. 15 of
+            [Wen2026].
         """
         key = (i, j) if i <= j else (j, i)
         if key not in self._table:
@@ -170,7 +172,7 @@ class Mapping:
         TypeError: If a coefficient is not exact.
 
     References:
-        Definition 6 and Proposition 4 (Sec. 6.4) of [Wen2026Refactor].
+        Definition 6 and Proposition 4 (C.4) of [Wen2026Refactor].
     """
 
     __slots__ = ("sector", "coefficients", "_expansion")
@@ -203,8 +205,10 @@ class Mapping:
             ValueError: If `permutation` does not permute the rank indices.
 
         References:
-            Proposition 2 (Sec. 4.4) and Proposition 4 (Sec. 6.4) of
-            [Wen2026Refactor].
+            A.4 of [Wen2026Refactor]: by Proposition 2 a permuted mapping is its
+            rank-lowering tensors relabelled, with their signs, and by Proposition 4
+            (C.4) it stays in the sector. Used for the mixing matrices of Eq. 30 of
+            [Wen2026].
         """
         n = self.sector.n
         if sorted(permutation) != list(range(n)):
@@ -389,7 +393,8 @@ def get_decomposition_operators(
         One decomposition operator per channel.
 
     References:
-        Eq. 19 of [Wen2026].
+        Eq. 19 of [Wen2026]. Computed as in A.2 of [Wen2026Refactor]: only the
+        rank-lowering tensors of each mapping enter, by Lemma 2.
     """
     return [compose(G_i, dual_i) for G_i, dual_i in zip(G, G_tilde)]
 
@@ -412,7 +417,8 @@ def compose(mapping: Mapping, other: Mapping) -> Operator:
         ValueError: If the mappings belong to different sectors.
 
     References:
-        Lemma 2 (Eq. 16, Sec. 4.2) of [Wen2026Refactor].
+        A.2 of [Wen2026Refactor]: by Lemma 2 only the rank-lowering tensors of
+        `mapping` enter. Used for Eq. 19 of [Wen2026].
     """
     sector = mapping.sector
     if other.sector is not sector:

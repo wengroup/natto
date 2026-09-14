@@ -40,8 +40,8 @@ def contract(
             number of labels.
 
     References:
-        Proposition 6 (Sec. 6.7) of [Wen2026Refactor] for the walk, and Theorems 1
-        and 2 (Sec. 4.5) for its full contractions.
+        Proposition 6 (C.7) of [Wen2026Refactor] for the walk, and Theorems 1 and 2
+        (A.5) for its full contractions.
     """
     counts = Counter()
     for operator, labels in factors:
@@ -99,7 +99,7 @@ def contract_fully(
             Levi-Civita symbols.
 
     References:
-        Theorems 1 and 2 (Sec. 4.5) of [Wen2026Refactor].
+        Theorems 1 and 2 (A.5) of [Wen2026Refactor].
     """
     if len(epsilons) > 2:
         raise ValueError("At most two Levi-Civita symbols can be contracted fully")

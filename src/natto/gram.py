@@ -34,8 +34,9 @@ def get_gram_entry(G_p: Mapping, G_q: Mapping) -> Fraction:
         ValueError: If the mappings belong to different sectors.
 
     References:
-        Eq. 15 of [Wen2026]. Lemma 1 (Eq. 15, Sec. 4.1) and Proposition 5
-        (Sec. 6.4) of [Wen2026Refactor].
+        Eq. 15 of [Wen2026]. Computed as in A.1 of [Wen2026Refactor]: one natural
+        projector is left out by Lemma 1, and the entry is read from the label table
+        by Proposition 5 (C.4).
     """
     sector = G_p.sector
     if G_q.sector is not sector:
@@ -64,7 +65,7 @@ def get_gram_matrix(mappings: list[Mapping]) -> list[list[Fraction]]:
         Symmetric matrix whose entries are exact Fraction values.
 
     References:
-        Eq. 15 of [Wen2026].
+        Eq. 15 of [Wen2026], computed entry by entry as in A.1 of [Wen2026Refactor].
     """
     num = len(mappings)
 

@@ -34,7 +34,7 @@ def get_natural_projector(ell: int) -> Operator:
 
     References:
         Eq. 7 of [Wen2026], with the coefficients of Eq. 8 built by the recursion of
-        Eq. S27. Definition 3 (Sec. 6.3) of [Wen2026Refactor] for the operator.
+        Eq. S27. Definition 3 (C.3) of [Wen2026Refactor] for the operator.
     """
     signature = Signature(
         (IndexGroup("weight", ell, upper=False), IndexGroup("sigma", ell, upper=True))

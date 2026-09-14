@@ -33,7 +33,7 @@ class LoweringLabel:
             ell = 0.
 
     References:
-        Definition 4 (Sec. 6.4) of [Wen2026Refactor].
+        Definition 4 (C.4) of [Wen2026Refactor].
     """
 
     deltas: tuple[tuple[int, int], ...]

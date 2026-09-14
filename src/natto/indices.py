@@ -53,7 +53,7 @@ def get_slot_partitions(
         [(((0,),), ((1, 2),)), (((1,),), ((0, 2),)), (((2,),), ((0, 1),))]
 
     References:
-        C.8 (Sec. 6.8) of [Wen2026Refactor].
+        C.8 of [Wen2026Refactor].
     """
     literals = {}
     start = 0

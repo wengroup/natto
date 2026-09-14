@@ -97,7 +97,9 @@ def get_symmetry_action_matrix(
         ValueError: If the permutation does not permute the Cartesian indices.
 
     References:
-        Eq. 30 of [Wen2026].
+        Eq. 30 of [Wen2026]. Computed as in A.4 of [Wen2026Refactor]: each permuted
+        mapping is relabelled rather than contracted (Proposition 2), and its overlaps
+        with the mappings are read from the label table.
     """
     # A permuted mapping is another mapping of the same sector, whose candidates are
     # the permuted candidates with their signs.
