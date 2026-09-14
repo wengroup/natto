@@ -1,4 +1,4 @@
-"""The self-dual basis of Eq. (26).
+"""The self-dual basis of Eq. 21.
 
 `get_reduction(..., basis="orthonormal")` returns one array per channel that
 both extracts and embeds. These tests assert the property that makes that
@@ -28,7 +28,7 @@ def orthonormal(rank: int, symmetry: str = None, weight: int = None) -> dict:
 
 
 def assert_orthonormal(data: dict, weight: int):
-    """Assert the mappings of one weight are orthonormal under Eq. (21)."""
+    """Assert the mappings of one weight are orthonormal, as Eq. 22 states."""
     stacked = np.stack([entry["numerical"] for entry in data["embedding"]])
     flattened = stacked.reshape(len(stacked), -1)
     gram = flattened @ flattened.T / (2 * weight + 1)

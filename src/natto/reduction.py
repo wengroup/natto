@@ -80,7 +80,7 @@ def get_reduction(
             does not matter.
         basis: `dual` returns the mappings and the duals that extract through
             them, exactly, with rational coefficients. `orthonormal` returns
-            the mappings of Eq. (26) instead, rotated by the inverse square root
+            the mappings of Eq. 21 instead, rotated by the inverse square root
             of their Gram matrix. Those are self-dual, so `embedding` and
             `extraction` carry the same array and differ only in the einsum rule
             applying it; the rotation is irrational, so they have no symbolic

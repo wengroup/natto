@@ -78,7 +78,7 @@ def get_lowering_labels(ell: int, n: int) -> list[LoweringLabel]:
         The rank-lowering tensors, one per choice of contracted indices.
 
     References:
-        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd; Sec. III A
+        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd; Sec. II C
         for the discussion.
     """
     if (n - ell) % 2 == 0:

@@ -68,7 +68,7 @@ def orthonormalize_mappings(
 
 
 def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
-    """Pack one weight's operators in the self-dual basis of Eq. (26).
+    """Pack one weight's operators in the self-dual basis of Eq. 21.
 
     One array both extracts and embeds, so it appears under both keys and only the
     einsum rule tells them apart. There is no symbolic form: the inverse square root

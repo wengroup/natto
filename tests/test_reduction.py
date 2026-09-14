@@ -9,7 +9,7 @@ from natto.reduction import get_independent_mappings, get_reduction
 
 
 class TensorClass(NamedTuple):
-    """One physical tensor class, i.e. one row of Table 1."""
+    """One physical tensor class, i.e. one row of Table III."""
 
     # `Example` column, e.g. `photoelastic effect`
     example: str
@@ -81,7 +81,7 @@ def get_tensor_class_params(
     """Parametrize over tensor classes, xfailing the unsupported and marking the slow.
 
     Args:
-        tensor_classes: classes to parametrize over, all of Table 1 by default.
+        tensor_classes: classes to parametrize over, all of Table III by default.
     """
     if tensor_classes is None:
         tensor_classes = PHYSICAL_TENSOR_CLASSES
@@ -109,7 +109,7 @@ def get_reduction_cached(rank: int, symmetry: str) -> dict:
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
 def test_weight_multiplicity(tensor_class: TensorClass):
-    """Check the weight decomposition of each physical tensor class in Table 1.
+    """Check the weight decomposition of each physical tensor class in Table III.
 
     Each weight-m sector appears N_m times, and the multiplicities account for all
     N_ind independent components: N_ind = sum_m N_m (2m + 1).
