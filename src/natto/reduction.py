@@ -25,13 +25,6 @@ From there the dual basis calls `get_dual_pair`, which inverts the exact Gram ma
 while the orthonormal basis goes to `orthonormal` instead and builds no duals at all
 -- its operator is its own dual, and is irrational, so the exact work would only be
 discarded.
-
-References:
-    Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the decomposition, and
-    Eq. 20 for the sum that returns the tensor.
-
-    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
-    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 from fractions import Fraction
@@ -115,6 +108,10 @@ def get_reduction(
     Raises:
         ValueError: If `basis` is neither `dual` nor `orthonormal`, or if
             `selection` is not one of `symbolic`, `components` and `embeddings`.
+
+    References:
+        Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the decomposition, and
+        Eq. 20 for the sum that returns the tensor.
     """
     if basis not in ("dual", "orthonormal"):
         raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")

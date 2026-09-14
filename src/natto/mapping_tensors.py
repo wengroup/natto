@@ -9,13 +9,6 @@ tensors. All mappings of one weight and rank combine the same candidates, so a
 them, and a `Mapping` is a vector of rational coefficients over them. Which candidates
 are independent is settled in `independence`, against the Gram matrix of `gram`;
 `reduction` runs the whole pipeline and publishes the result.
-
-References:
-    Eq. 13 of [Wen2026] for the mapping tensors, Eq. 16 for the duals, and Eq. 19
-    for the decomposition operators.
-
-    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
-    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import string

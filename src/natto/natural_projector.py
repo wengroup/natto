@@ -9,13 +9,6 @@ It is built here symbolically and exactly, as a sum of averaged products of
 Kronecker deltas with rational coefficients, one product per way of pairing its
 indices. Being isotropic, it is the only building block the reduction needs beyond
 the Levi-Civita symbol.
-
-References:
-    Eq. 7 of [Wen2026], with the coefficients of Eq. 8 and the recursion that
-    builds them in Eq. S27.
-
-    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
-    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import itertools

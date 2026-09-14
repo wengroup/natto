@@ -9,9 +9,6 @@ Its rank counts the independent channels of the weight, and its inverse turns th
 embedding mappings into the extraction duals of Eq. 16. Everything here is computed
 with Fraction, so the entries are exact and the channel count never depends on a
 tolerance.
-
-References:
-    Eq. 15 of [Wen2026] for the Gram matrix, Eq. 16 for the duals it gives.
 """
 
 from fractions import Fraction

@@ -14,10 +14,6 @@ Legendre polynomial of the angle between them. That is the condition
 Building the operator once and contracting is what makes this worth having as an
 operator at all: the harmonic of any direction is then a single `einsum` rather than
 a sum over terms.
-
-References:
-    Eq. 46 of [Wen2026] for the operator, Eq. 47 for the Legendre condition, and
-    Eq. 7 for the natural projector behind both.
 """
 
 import math
@@ -56,7 +52,8 @@ def get_harmonic_operator(
         ValueError: If `n` is negative, or `normalize` is not recognized.
 
     References:
-        Eq. 46 of [Wen2026], with the normalization of Eq. 47.
+        Eq. 46 of [Wen2026], with the normalization of Eq. 47 and the natural
+        projector of Eq. 7.
     """
     if n < 0:
         raise ValueError(f"rank (n) must be at least zero, got n={n}")

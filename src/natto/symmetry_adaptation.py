@@ -13,10 +13,6 @@ elimination over the rationals, so a
 symmetry-adapted mapping carries no numerical tolerance -- and a multiplicity
 that comes out as zero, as weight one does for the third-order elastic tensor,
 is a statement rather than a threshold.
-
-References:
-    Eq. 30 of [Wen2026] for the mixing matrix, Eq. 27 for the symmetry-adapted
-    mappings, and Procedure 2 for the steps.
 """
 
 from fractions import Fraction
@@ -45,6 +41,9 @@ def get_symmetry_adapted_mappings(
 
     Returns:
         The symmetry-adapted mappings, one per null-space basis vector.
+
+    References:
+        Procedure 2 of [Wen2026], with the symmetry-adapted mappings of Eq. 27.
     """
     if not mappings:
         return []
@@ -96,6 +95,9 @@ def get_symmetry_action_matrix(
 
     Raises:
         ValueError: If the permutation does not permute the Cartesian indices.
+
+    References:
+        Eq. 30 of [Wen2026].
     """
     # A permuted mapping is another mapping of the same sector, whose candidates are
     # the permuted candidates with their signs.

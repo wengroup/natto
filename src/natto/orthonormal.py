@@ -14,10 +14,6 @@ The same construction serves the symmetry-adapted mappings, as Section IV of
 [Wen2026] notes it must. That is why this is a basis rather than a pair of entry
 points: `get_reduction(..., basis="orthonormal")` returns these in place of the
 mappings and their duals, whether or not a symmetry was asked for.
-
-References:
-    Eq. 21 of [Wen2026] for the orthonormal mappings, Eq. 22 for the self-duality
-    that makes them a basis.
 """
 
 import numpy as np
@@ -85,6 +81,10 @@ def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
 
     Returns:
         The operators of this weight, in the form the package publishes.
+
+    References:
+        Eq. 21 of [Wen2026] for the orthonormal mappings, Eq. 22 for the self-duality
+        that makes them a basis.
     """
     _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, ell, n)
 

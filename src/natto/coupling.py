@@ -24,14 +24,6 @@ taken inside either vanishes and only contractions between the two survive.
 Tracelessness is not an index permutation, so no symmetry string expresses it and
 the symmetry-adapted construction cannot use it. The derivation narrows the
 candidates with it separately, and the result is the single operator built here.
-
-References:
-    Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
-    coefficient of Eq. 49, and with the normalization constant of Eq. 53 for even
-    and Eq. 54 for odd.
-
-    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
-    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 from fractions import Fraction
@@ -70,6 +62,10 @@ def get_coupling_operator(
 
     Raises:
         ValueError: If `normalize` is not recognized.
+
+    References:
+        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, with the
+        normalization constant of Eq. 53 for even and Eq. 54 for odd.
     """
     if normalize not in ("legendre", "none"):
         supported = ["legendre", "none"]
@@ -111,6 +107,10 @@ def get_coupling_symbolic(l1: int, l2: int, l3: int) -> Operator:
     Returns:
         The symbolic operator, whose groups `z`, `x` and `y` carry the Z, X and Y
         indices.
+
+    References:
+        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
+        coefficient of Eq. 49.
     """
     if (l1 + l2 - l3) % 2 == 0:
         return _get_coupling_symbolic_even(l1, l2, l3)

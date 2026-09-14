@@ -10,13 +10,6 @@ A rank-lowering tensor is given by its label: the pairs of rank indices its delt
 join, and the rank indices on its Levi-Civita symbol if it has one. The rank indices
 it leaves free, with the tau index of the symbol, are what the natural projector
 takes; `mapping_tensors` is where they are put to work.
-
-References:
-    Eq. 2 of [Wen2026] for the rank lowering, Eq. 3 for even n - ell and Eq. 5 for
-    odd. Sec. III A for the discussion.
-
-    [Wen2026] M. Wen, Reusable Operators for Irreducible Cartesian Tensor
-    Decomposition and Coupling, arXiv:2609.05971 (2026).
 """
 
 import itertools
@@ -85,7 +78,8 @@ def get_lowering_labels(ell: int, n: int) -> list[LoweringLabel]:
         The rank-lowering tensors, one per choice of contracted indices.
 
     References:
-        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd.
+        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd; Sec. III A
+        for the discussion.
     """
     if (n - ell) % 2 == 0:
         return get_lowering_labels_even(ell, n)
