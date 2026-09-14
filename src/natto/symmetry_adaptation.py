@@ -20,21 +20,17 @@ References:
 
 from fractions import Fraction
 
-from natto.algebra import simplify_linear_combination
 from natto.gram import get_gram_entry
-from natto.indices import letter_index, relabel_indices_2
 from natto.intrinsic_symmetry import parse_symmetry_generators
+from natto.mapping_tensors import Mapping, combine
 from natto.rational import matrix_multiply, matrix_null_space
-from natto.symbolic import LinearCombination
 
 
 def get_symmetry_adapted_mappings(
-    ell: int,
-    n: int,
-    mappings: list[LinearCombination],
+    mappings: list[Mapping],
     gram_inverse: list[list[Fraction]],
     symmetry: str,
-) -> list[LinearCombination]:
+) -> list[Mapping]:
     """Solve the exact coefficient constraints imposed by internal symmetry.
 
     Every step is exact: the mixing matrices are built by symbolic contraction
@@ -42,19 +38,20 @@ def get_symmetry_adapted_mappings(
     symmetry-adapted mappings carry no numerical tolerance at all.
 
     Args:
-        ell: Weight of the natural-tensor space.
-        n: Rank of the Cartesian tensor space.
-        mappings: Independent mappings of that weight.
+        mappings: Independent mappings of one sector.
         gram_inverse: Exact inverse of their Gram matrix.
         symmetry: Internal index symmetry of the Cartesian tensor.
 
     Returns:
         The symmetry-adapted mappings, one per null-space basis vector.
     """
-    generators = parse_symmetry_generators(symmetry, n)
+    if not mappings:
+        return []
+
+    generators = parse_symmetry_generators(symmetry, mappings[0].sector.n)
     constraints = []
     for permutation, sign in generators:
-        action = get_symmetry_action_matrix(mappings, gram_inverse, ell, n, permutation)
+        action = get_symmetry_action_matrix(mappings, gram_inverse, permutation)
         for row_index, row in enumerate(action):
             constraints.append(
                 [
@@ -64,19 +61,13 @@ def get_symmetry_adapted_mappings(
             )
 
     coefficients = matrix_null_space(constraints, len(mappings))
-    adapted = []
-    for vector in coefficients:
-        mapping = sum((c * G for c, G in zip(vector, mappings)), LinearCombination())
-        adapted.append(simplify_linear_combination(mapping))
 
-    return adapted
+    return [combine(vector, mappings) for vector in coefficients]
 
 
 def get_symmetry_action_matrix(
-    mappings: list[LinearCombination],
+    mappings: list[Mapping],
     gram_inverse: list[list[Fraction]],
-    ell: int,
-    n: int,
     permutation: tuple[int, ...],
 ) -> list[list[Fraction]]:
     """Evaluate the action of one index permutation on the mapping basis.
@@ -95,40 +86,22 @@ def get_symmetry_action_matrix(
     and weight three that is the difference between eighteen minutes and under one.
 
     Args:
-        mappings: Independent mappings of this weight.
+        mappings: Independent mappings of one sector.
         gram_inverse: Exact inverse of their Gram matrix.
-        ell: Weight of the natural-tensor space.
-        n: Rank of the Cartesian tensor space.
         permutation: The generator, as a permutation of the Cartesian indices.
 
     Returns:
         The exact mixing matrix of this generator.
 
     Raises:
-        ValueError: If the permutation does not match the Cartesian n.
+        ValueError: If the permutation does not permute the Cartesian indices.
     """
-    if len(permutation) != n:
-        raise ValueError(
-            f"Symmetry permutation does not match the Cartesian rank n={n}"
-        )
-
-    # Permuting the axes of a tensor renames its indices: the slot that now
-    # holds axis `permutation[k]` carries the letter that axis `k` had.
-    letters = letter_index(n, upper_case=True)
-    relabeling = {letters[permutation[k]]: letters[k] for k in range(n)}
-    permuted = [relabel_indices_2(mapping, relabeling) for mapping in mappings]
+    # A permuted mapping is another mapping of the same sector, whose candidates are
+    # the permuted candidates with their signs.
+    permuted = [mapping.permute(permutation) for mapping in mappings]
 
     overlap = [
-        [get_gram_entry(ell, n, mapping, image) for image in permuted]
-        for mapping in mappings
+        [get_gram_entry(mapping, image) for image in permuted] for mapping in mappings
     ]
 
     return matrix_multiply(gram_inverse, overlap)
-
-
-# TODO, this can be done symbolically. Probably do it.
-#  We need:
-#  1. symbolic symmetrize() to get T. It is implemented in ops.py, but commented out
-#  2. multiply_2() to get X = G \odot^n T
-#  3. Simplify_linear_combination() to get the simplified X.
-#  4. Compare X to see if they are the same.

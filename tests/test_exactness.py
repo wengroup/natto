@@ -24,6 +24,7 @@ import pytest
 
 from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_symbolic
 from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
+from natto.mapping_tensors import Mapping
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_null_space
 from natto.reduction import get_dual_pair, get_independent_mappings
@@ -58,6 +59,8 @@ def coefficients(combination):
     """
     if isinstance(combination, Operator):
         return list(combination.terms.values())
+    if isinstance(combination, Mapping):
+        return list(combination.coefficients)
 
     values = []
     for term in combination:
@@ -81,7 +84,7 @@ def reduce_weight(rank: int, symmetry: str, weight: int):
     if not G:
         return None
 
-    _, G_tilde, S, gram_inverse = get_dual_pair(G, gram, rank)
+    _, G_tilde, S, gram_inverse = get_dual_pair(G, gram)
 
     return G, gram, G_tilde, S, gram_inverse
 
@@ -126,7 +129,7 @@ def test_symmetry_mixing_matrix_and_null_space_are_exact(rank: int, symmetry: st
 
     for weight, (G, gram, _, _, gram_inverse) in sectors(rank, symmetry):
         tag = f"rank {rank} weight {weight}"
-        mixing = get_symmetry_action_matrix(G, gram_inverse, weight, rank, permutation)
+        mixing = get_symmetry_action_matrix(G, gram_inverse, permutation)
         assert_exact(f"{tag} mixing matrix", entries(mixing))
         assert_exact(
             f"{tag} null space",

@@ -22,17 +22,17 @@ cross-check the exact one. All three agree on every sector through rank six.
 
 from fractions import Fraction
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import embed, evaluate_tensors
+import numpy as np
+
 from natto.gram import get_gram_entry
+from natto.mapping_tensors import Mapping
 from natto.qr import DEFAULT_TOLERANCE, Method, find_independent_tensors
 from natto.rational import is_nonsingular
-from natto.symbolic import LinearCombination
 from natto.symmetric_traceless import get_random_natural_tensor
 
 
 def select_independent_mappings_and_gram(
-    ell: int, n: int, candidates: list[LinearCombination]
+    candidates: list[Mapping],
 ) -> tuple[list[int], list[list[Fraction]]]:
     """Select a maximal independent set of mapping tensors, and their Gram matrix.
 
@@ -55,9 +55,8 @@ def select_independent_mappings_and_gram(
     by-product rather than needing a second pass.
 
     Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
-        candidates: Candidate mapping tensors, in the order they are preferred.
+        candidates: Candidate mapping tensors of one sector, in the order they are
+            preferred.
 
     Returns:
         The indices of the kept candidates, and their exact Gram matrix.
@@ -69,8 +68,8 @@ def select_independent_mappings_and_gram(
     gram: list[list[Fraction]] = []
 
     for i, c in enumerate(candidates):
-        border = [get_gram_entry(ell, n, candidates[k], c) for k in kept]
-        diagonal = get_gram_entry(ell, n, c, c)
+        border = [get_gram_entry(candidates[k], c) for k in kept]
+        diagonal = get_gram_entry(c, c)
         bordered = [row + [b] for row, b in zip(gram, border)]
         bordered.append(border + [diagonal])
 
@@ -82,9 +81,7 @@ def select_independent_mappings_and_gram(
 
 
 def select_independent_mappings_via_components(
-    ell: int,
-    n: int,
-    candidates: list[LinearCombination],
+    candidates: list[Mapping],
     tolerance: float = DEFAULT_TOLERANCE,
     method: Method = "gram_schmidt",
 ) -> list[int]:
@@ -105,9 +102,8 @@ def select_independent_mappings_via_components(
     so this costs real memory and time at high n.
 
     Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
-        candidates: Candidate mapping tensors, in the order they are preferred.
+        candidates: Candidate mapping tensors of one sector, in the order they are
+            preferred.
         tolerance: Residual norm below which a candidate is taken as dependent.
         method: Which array-level scheme decides independence; see
             `find_independent_tensors`.
@@ -118,19 +114,10 @@ def select_independent_mappings_via_components(
     Raises:
         ValueError: If `method` is not a known scheme, from `find_independent_tensors`.
     """
-
     if not candidates:
         return []
 
-    evaluated = []
-    for c in candidates:
-        array = evaluate_tensors(simplify_linear_combination(c), mode="embedding")
-        if array.ndim != n + ell:
-            raise ValueError(
-                f"mapping tensor has rank {array.ndim}, expected rank plus weight "
-                f"(n + ell) = {n + ell}"
-            )
-        evaluated.append(array)
+    evaluated = [c.expand().evaluate(("rank", "weight")) for c in candidates]
 
     _, indices = find_independent_tensors(evaluated, tolerance=tolerance, method=method)
 
@@ -138,9 +125,7 @@ def select_independent_mappings_via_components(
 
 
 def select_independent_mappings_via_embeddings(
-    ell: int,
-    n: int,
-    candidates: list[LinearCombination],
+    candidates: list[Mapping],
     tolerance: float = DEFAULT_TOLERANCE,
     method: Method = "gram_schmidt",
 ) -> list[int]:
@@ -160,9 +145,8 @@ def select_independent_mappings_via_embeddings(
     looks at the mappings themselves.
 
     Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
-        candidates: Candidate mapping tensors, in the order they are preferred.
+        candidates: Candidate mapping tensors of one sector, in the order they are
+            preferred.
         tolerance: Residual norm below which a candidate is taken as dependent.
         method: Which array-level scheme decides independence; see
             `find_independent_tensors`.
@@ -176,8 +160,14 @@ def select_independent_mappings_via_embeddings(
     if not candidates:
         return []
 
+    ell = candidates[0].sector.ell
     X = get_random_natural_tensor(ell)
-    embedded = [embed(c, X) for c in candidates]
+
+    # The weight axes come last, and are contracted with the ICT in order.
+    embedded = [
+        np.tensordot(c.expand().evaluate(("rank", "weight")), X, axes=ell)
+        for c in candidates
+    ]
 
     _, indices = find_independent_tensors(embedded, tolerance=tolerance, method=method)
 

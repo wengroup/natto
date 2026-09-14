@@ -22,14 +22,12 @@ References:
 
 import numpy as np
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import evaluate_tensors
 from natto.indices import letter_index
-from natto.symbolic import LinearCombination
+from natto.mapping_tensors import Mapping
 
 
 def orthonormalize_mappings(
-    mappings: list[LinearCombination],
+    mappings: list[Mapping],
     ell: int,
     n: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -59,10 +57,7 @@ def orthonormalize_mappings(
         raise ValueError("At least one mapping tensor is required")
 
     numerical = np.stack(
-        [
-            evaluate_tensors(simplify_linear_combination(mapping), mode="embedding")
-            for mapping in mappings
-        ]
+        [mapping.expand().evaluate(("rank", "weight")) for mapping in mappings]
     )
     if numerical.ndim != n + ell + 1:
         raise ValueError(
@@ -76,7 +71,7 @@ def orthonormalize_mappings(
     return numerical, gram, gram_inverse_sqrt, orthonormal
 
 
-def get_orthonormal_entries(ell: int, n: int, G: list[LinearCombination]) -> dict:
+def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
     """Pack one weight's operators in the self-dual basis of Eq. (26).
 
     One array both extracts and embeds, so it appears under both keys and only the

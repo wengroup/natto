@@ -14,112 +14,54 @@ References:
     Eq. 15 of [Wen2026] for the Gram matrix, Eq. 16 for the duals it gives.
 """
 
-from collections import Counter
 from fractions import Fraction
 
-from natto.algebra import multiply_2, simplify_linear_combination
-from natto.indices import shift_index_2
-from natto.symbolic import Delta, IsotropicProduct, LinearCombination
+from natto.mapping_tensors import Mapping
 
 
-def contract_mappings(
-    G1: LinearCombination, G2: LinearCombination, G1_indices: str, G2_indices: str
-) -> LinearCombination:
-    """
-    Contract two mapping tensors over the index pairs named by the callers.
-
-    Args:
-        G1: The first mapping tensor.
-        G2: The second mapping tensor.
-        G1_indices: Free indices of `G1`, in the order they are to be paired.
-        G2_indices: Free indices of `G2`, paired against `G1_indices` in order.
-
-    Returns:
-        The contracted tensor.
-    """
-    contraction_delta = [Delta(i + j) for i, j in zip(G1_indices, G2_indices)]
-    contraction_delta = IsotropicProduct(*contraction_delta)
-    prod = multiply_2(G1, G2, contraction_delta)
-    simplified = simplify_linear_combination(prod)
-
-    return simplified
-
-
-def get_gram_entry(
-    ell: int, n: int, G_p: LinearCombination, G_q: LinearCombination
-) -> Fraction:
+def get_gram_entry(G_p: Mapping, G_q: Mapping) -> Fraction:
     """Compute one entry of the exact Gram matrix of the mapping tensors.
 
     The two mappings are contracted over all their indices and the result divided by
-    2*ell + 1. Every free index of the first is paired with the corresponding free index
-    of the second; indices repeated within a single term are internal dummies and are
-    contracted independently.
+    2*ell + 1. Both are combinations of the same candidates, so by bilinearity the
+    contraction is the sector's label table weighted by their coefficients.
 
     Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
-        G_p: First mapping tensor, of rank n + ell.
-        G_q: Second mapping tensor, of rank n + ell.
+        G_p: First mapping.
+        G_q: Second mapping, of the same sector.
 
     Returns:
         The exact Gram matrix entry, as a Fraction.
 
+    Raises:
+        ValueError: If the mappings belong to different sectors.
+
     References:
-        Eq. 15 of [Wen2026].
+        Eq. 15 of [Wen2026]. Lemma 1 (Eq. 15, Sec. 4.1) and Proposition 5
+        (Sec. 6.4) of [Wen2026Refactor].
     """
+    sector = G_p.sector
+    if G_q.sector is not sector:
+        raise ValueError("Mappings of different sectors have no Gram entry")
 
-    def get_free_indices(tensor: LinearCombination) -> str:
-        free_indices = None
-        for term in tensor:
-            if term.factor == 0:
-                continue
-            counts = Counter(term.indices)
-            term_free_indices = "".join(
-                sorted(index for index, count in counts.items() if count == 1)
-            )
-            if free_indices is None:
-                free_indices = term_free_indices
-            elif term_free_indices != free_indices:
-                raise ValueError("All terms must have the same free indices")
+    q_terms = [(j, c) for j, c in enumerate(G_q.coefficients) if c]
+    total = Fraction()
+    for i, c_i in enumerate(G_p.coefficients):
+        if c_i:
+            for j, c_j in q_terms:
+                total += c_i * c_j * sector.table(i, j)
 
-        return free_indices or ""
-
-    # Give the second tensor a disjoint index set before pairing corresponding free
-    # indices. Repeated indices within either tensor are internal contraction indices.
-    G_q = shift_index_2(G_q, n + ell + 1)
-    p_indices = get_free_indices(G_p)
-    q_indices = get_free_indices(G_q)
-    expected_rank = n + ell
-    if len(p_indices) != expected_rank or len(q_indices) != expected_rank:
-        raise ValueError(
-            f"mapping tensors must have rank plus weight (n + ell) = {expected_rank}, got "
-            f"{len(p_indices)} and {len(q_indices)}"
-        )
-
-    contracted = contract_mappings(G_p, G_q, p_indices, q_indices)
-    if any(term.indices for term in contracted):
-        raise ValueError("Full contraction left unpaired indices")
-
-    full_contraction = sum((term.factor for term in contracted), Fraction())
-
-    return full_contraction / (2 * ell + 1)
+    return total / (2 * sector.ell + 1)
 
 
-def get_gram_matrix(
-    ell: int, n: int, all_G: list[LinearCombination]
-) -> list[list[Fraction]]:
+def get_gram_matrix(mappings: list[Mapping]) -> list[list[Fraction]]:
     """Compute the exact Gram matrix of the mapping tensors.
 
-    Each entry comes from `get_gram_entry`.
+    Each entry comes from `get_gram_entry`. Only the lower triangle is computed; the
+    Gram matrix of real tensors is symmetric, so the rest is mirrored.
 
     Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
-        all_G: Mapping tensors spanning this weight, each of rank n + ell.
-
-    Only the lower triangle is contracted; the rest is mirrored. The Gram matrix of
-    real tensors is symmetric, and each entry costs a symbolic contraction, so
-    computing both halves would double the work for nothing.
+        mappings: Mappings of one sector.
 
     Returns:
         Symmetric matrix whose entries are exact Fraction values.
@@ -127,12 +69,12 @@ def get_gram_matrix(
     References:
         Eq. 15 of [Wen2026].
     """
-    num = len(all_G)
+    num = len(mappings)
 
     matrix = [[None] * num for _ in range(num)]
     for p in range(num):
         for q in range(p + 1):
-            entry = get_gram_entry(ell, n, all_G[p], all_G[q])
+            entry = get_gram_entry(mappings[p], mappings[q])
             matrix[p][q] = entry
             matrix[q][p] = entry
 

@@ -680,7 +680,7 @@ class Term:
         sign = 1
         triples = []
         for triple in epsilons:
-            ordered, permutation_sign = _sort_with_sign(triple)
+            ordered, permutation_sign = sort_with_sign(triple)
             sign *= permutation_sign
             triples.append(ordered)
         pairs = sorted(tuple(sorted(pair)) for pair in deltas)
@@ -903,9 +903,7 @@ class Operator:
             )
             symbols = []
             for triple in term.epsilons:
-                ordered, permutation_sign = _sort_with_sign(
-                    [letters[s] for s in triple]
-                )
+                ordered, permutation_sign = sort_with_sign([letters[s] for s in triple])
                 sign *= permutation_sign
                 symbols.append(f"{epsilon}_" + "".join(ordered))
             factors += sorted(symbols)
@@ -1000,6 +998,27 @@ class Operator:
         return f"Operator({self._signature!r}, {self.to_string()!r})"
 
 
+def sort_with_sign(items: Sequence) -> tuple[tuple, int]:
+    """Sort a short sequence of distinct items, and return the sign of the permutation.
+
+    Args:
+        items: Distinct, comparable items, such as the slots of a Levi-Civita symbol.
+
+    Returns:
+        The items in increasing order, and the sign of the permutation that sorts them.
+    """
+    ordered = list(items)
+    sign = 1
+    for i in range(1, len(ordered)):
+        j = i
+        while j > 0 and ordered[j - 1] > ordered[j]:
+            ordered[j - 1], ordered[j] = ordered[j], ordered[j - 1]
+            sign = -sign
+            j -= 1
+
+    return tuple(ordered), sign
+
+
 #: A coefficient token of a printed operator, such as `+1`, `-1/3` or `2`.
 _COEFFICIENT = re.compile(r"^[+-]?\d+(/\d+)?$")
 
@@ -1030,17 +1049,3 @@ def _parse_factors(factors: Sequence[str], signature: Signature) -> tuple[int, T
             epsilons.append(slots)
 
     return Term.from_blocks(deltas, epsilons)
-
-
-def _sort_with_sign(items: Sequence) -> tuple[tuple, int]:
-    """Sort a short sequence of distinct items, and return the permutation's sign."""
-    ordered = list(items)
-    sign = 1
-    for i in range(1, len(ordered)):
-        j = i
-        while j > 0 and ordered[j - 1] > ordered[j]:
-            ordered[j - 1], ordered[j] = ordered[j], ordered[j - 1]
-            sign = -sign
-            j -= 1
-
-    return tuple(ordered), sign

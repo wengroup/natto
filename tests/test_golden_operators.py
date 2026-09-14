@@ -40,8 +40,6 @@ from pathlib import Path
 
 import pytest
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import evaluate_tensors
 from natto.indices import letter_index
 from natto.rational import fraction_matrix
 from natto.reduction import get_dual_pair, get_independent_mappings, get_reduction
@@ -179,7 +177,7 @@ def rank_six_content(symmetry: str | None) -> dict:
     for weight in RANK_SIX_WEIGHTS:
         embedding, gram = get_independent_mappings(weight, RANK_SIX, symmetry)
         if embedding:
-            _, extraction, _, gram_inverse = get_dual_pair(embedding, gram, RANK_SIX)
+            _, extraction, _, gram_inverse = get_dual_pair(embedding, gram)
 
         if not embedding:
             content[weight] = {"multiplicity": 0}
@@ -192,13 +190,17 @@ def rank_six_content(symmetry: str | None) -> dict:
             "gram_inverse": fraction_matrix(gram_inverse),
             "embedding": [
                 _rank_six_operator(
-                    operator, "embedding", f"{upper}{lower},...{lower}->...{upper}"
+                    operator.expand(),
+                    ("rank", "weight"),
+                    f"{upper}{lower},...{lower}->...{upper}",
                 )
                 for operator in embedding
             ],
             "extraction": [
                 _rank_six_operator(
-                    operator, "extraction", f"{lower}{upper},...{upper}->...{lower}"
+                    operator,
+                    ("weight", "rank"),
+                    f"{lower}{upper},...{upper}->...{lower}",
                 )
                 for operator in extraction
             ],
@@ -207,19 +209,16 @@ def rank_six_content(symmetry: str | None) -> dict:
     return content
 
 
-def _rank_six_operator(operator, mode: str, rule: str) -> dict:
+def _rank_six_operator(operator, order: tuple[str, str], rule: str) -> dict:
     """Snapshot form of one rank-six operator, evaluated on the spot.
 
     The rank-four path takes its operators from `get_reduction`, which has already
-    simplified and evaluated them. Here they arrive raw, so both steps happen
-    here.
+    evaluated them. Here that happens on the spot, with the axes in `order`.
     """
-    simplified = simplify_linear_combination(operator)
-
     return {
-        "symbolic": str(simplified).split(TERM_SEPARATOR),
+        "symbolic": str(operator).split(TERM_SEPARATOR),
         "rule": rule,
-        "numerical": fingerprint(evaluate_tensors(simplified, mode=mode)),
+        "numerical": fingerprint(operator.evaluate(order)),
     }
 
 

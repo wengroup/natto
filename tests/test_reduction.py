@@ -4,8 +4,6 @@ from typing import NamedTuple, Optional
 import numpy as np
 import pytest
 
-from natto.evaluate import evaluate_tensors
-from natto.gram import get_gram_matrix
 from natto.intrinsic_symmetry import impose_symmetry
 from natto.reduction import get_independent_mappings, get_reduction
 
@@ -143,19 +141,14 @@ def test_weight_multiplicity(tensor_class: TensorClass):
 def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     """Check exact Gram matrices for every internally symmetric weight sector."""
     for weight in tensor_class.multiplicity:
-        Q, _ = get_independent_mappings(
+        Q, gram = get_independent_mappings(
             weight, tensor_class.rank, tensor_class.symmetry
         )
-        Q_with_zeros = [Q_p + 0 * Q_p for Q_p in Q]
-        numerical_Q = np.stack([evaluate_tensors(Q_p, mode="embedding") for Q_p in Q])
+        numerical_Q = np.stack([Q_p.expand().evaluate(("rank", "weight")) for Q_p in Q])
         flattened_Q = numerical_Q.reshape(len(Q), -1)
         numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
         symbolic = np.array(
-            [
-                [float(value) for value in row]
-                for row in get_gram_matrix(weight, tensor_class.rank, Q_with_zeros)
-            ],
-            dtype=numerical.dtype,
+            [[float(value) for value in row] for row in gram], dtype=numerical.dtype
         )
 
         # a Gram entry that is exactly zero meets a float64 residue of ~1e-17,

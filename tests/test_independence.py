@@ -45,7 +45,7 @@ def test_selection_keeps_the_earliest_independent_candidates(
     candidates = get_candidates(weight, rank)
     assert len(candidates) == n_candidates
 
-    kept, _ = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, _ = select_independent_mappings_and_gram(candidates)
 
     assert kept == expected
 
@@ -57,9 +57,9 @@ def test_selection_returns_the_gram_matrix_of_what_it_kept(
     """The Gram matrix accumulates during selection rather than in a second pass."""
     candidates = get_candidates(weight, rank)
 
-    kept, gram = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, gram = select_independent_mappings_and_gram(candidates)
 
-    assert gram == get_gram_matrix(weight, rank, [candidates[i] for i in kept])
+    assert gram == get_gram_matrix([candidates[i] for i in kept])
 
 
 @pytest.mark.parametrize("rank, weight", [(3, 2), (4, 3), (5, 0)])
@@ -70,13 +70,13 @@ def test_every_discarded_candidate_is_genuinely_dependent(rank, weight):
     rejected candidate that still raised the rank would mean a mapping was lost.
     """
     candidates = get_candidates(weight, rank)
-    kept, gram = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, gram = select_independent_mappings_and_gram(candidates)
     rejected = [i for i in range(len(candidates)) if i not in kept]
     assert rejected, "this sector is meant to be rank deficient"
 
     for index in rejected:
         subset = [candidates[i] for i in kept] + [candidates[index]]
-        enlarged = get_gram_matrix(weight, rank, subset)
+        enlarged = get_gram_matrix(subset)
 
         assert len(matrix_rank_rows(enlarged)) == len(gram)
 
@@ -107,7 +107,7 @@ def matrix_rank_rows(matrix):
 
 
 def test_no_candidates_selects_nothing():
-    assert select_independent_mappings_and_gram(2, 2, []) == ([], [])
+    assert select_independent_mappings_and_gram([]) == ([], [])
 
 
 @pytest.mark.parametrize("rank, weight, n_candidates, expected", SECTORS)
@@ -122,18 +122,10 @@ def test_numerical_schemes_agree_with_the_exact_one(
     """
     candidates = get_candidates(weight, rank)
 
-    kept, _ = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, _ = select_independent_mappings_and_gram(candidates)
 
-    assert select_independent_mappings_via_components(weight, rank, candidates) == kept
-    assert select_independent_mappings_via_embeddings(weight, rank, candidates) == kept
-
-
-def test_components_scheme_rejects_a_mapping_of_the_wrong_rank():
-    """The evaluated array must have rank n + l; a mismatch is a caller error."""
-    candidates = get_candidates(2, 4)
-
-    with pytest.raises(ValueError, match="expected"):
-        select_independent_mappings_via_components(2, 5, candidates)
+    assert select_independent_mappings_via_components(candidates) == kept
+    assert select_independent_mappings_via_embeddings(candidates) == kept
 
 
 @pytest.mark.parametrize(
@@ -144,7 +136,7 @@ def test_components_scheme_rejects_a_mapping_of_the_wrong_rank():
     ],
 )
 def test_numerical_schemes_select_nothing_from_nothing(select):
-    assert select(2, 2, []) == []
+    assert select([]) == []
 
 
 #: Sectors where the candidates really are rank deficient, so there is more than
@@ -172,9 +164,9 @@ def test_gram_schmidt_reaches_the_exact_selection(select, rank, weight):
     different arithmetic and there is no licence for them to differ.
     """
     candidates = get_candidates(weight, rank)
-    kept, _ = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, _ = select_independent_mappings_and_gram(candidates)
 
-    assert select(weight, rank, candidates, method="gram_schmidt") == kept
+    assert select(candidates, method="gram_schmidt") == kept
 
 
 @pytest.mark.parametrize(
@@ -195,14 +187,12 @@ def test_pivoted_qr_finds_a_valid_subset_of_the_same_size(select, rank, weight):
     nonsingular, both checked over the rationals.
     """
     candidates = get_candidates(weight, rank)
-    kept, _ = select_independent_mappings_and_gram(weight, rank, candidates)
+    kept, _ = select_independent_mappings_and_gram(candidates)
 
-    chosen = select(weight, rank, candidates, method="scipy_qr")
+    chosen = select(candidates, method="scipy_qr")
 
     assert len(chosen) == len(kept)
-    assert is_nonsingular(
-        get_gram_matrix(weight, rank, [candidates[i] for i in chosen])
-    )
+    assert is_nonsingular(get_gram_matrix([candidates[i] for i in chosen]))
 
 
 @pytest.mark.parametrize(
@@ -214,4 +204,4 @@ def test_pivoted_qr_finds_a_valid_subset_of_the_same_size(select, rank, weight):
 )
 def test_mapping_schemes_reject_an_unknown_method(select):
     with pytest.raises(ValueError, match="Unknown"):
-        select(2, 4, get_candidates(2, 4), method="not_a_method")
+        select(get_candidates(2, 4), method="not_a_method")

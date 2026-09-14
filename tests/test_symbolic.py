@@ -12,59 +12,18 @@ import numpy as np
 from natto.algebra import simplify_linear_combination
 from natto.evaluate import evaluate_tensors
 from natto.natural_projector import get_natural_projector
-from natto.reduction import get_dual_pair, get_independent_mappings
 from natto.symbolic import IndexGroup, Operator, Signature
 
 
 @functools.cache
 def package_operators() -> list:
-    """Operators the package builds today, with their signature and evaluation order.
+    """Letter-based operators the package still builds, with signature and order.
 
     Each entry is `(label, combination, signature, mode, order)`: `mode` is how
     `evaluate_tensors` orders the axes, and `order` names the same groups for
     `Operator.evaluate`.
     """
     cases = []
-
-    for n, symmetry in [(2, None), (3, None), (3, "ijk=ikj"), (4, None)]:
-        for ell in range(n + 1):
-            G, gram = get_independent_mappings(ell, n, symmetry)
-            if not G:
-                continue
-            G_simplified, G_tilde, S, _ = get_dual_pair(G, gram, n)
-            mapping = Signature(
-                (
-                    IndexGroup("rank", n, upper=True),
-                    IndexGroup("weight", ell, upper=False),
-                )
-            )
-            decomposition = Signature(
-                (
-                    IndexGroup("rank", n, upper=True),
-                    IndexGroup("rank_in", n, upper=True),
-                )
-            )
-            for p, (embedding, extraction, composed) in enumerate(
-                zip(G_simplified, G_tilde, S)
-            ):
-                label = f"n={n} {symmetry} ell={ell} channel {p}"
-                cases += [
-                    (f"{label} G", embedding, mapping, "embedding", ("rank", "weight")),
-                    (
-                        f"{label} G~",
-                        extraction,
-                        mapping,
-                        "extraction",
-                        ("weight", "rank"),
-                    ),
-                    (
-                        f"{label} S",
-                        composed,
-                        decomposition,
-                        "decomposition",
-                        ("rank", "rank_in"),
-                    ),
-                ]
 
     for ell in range(5):
         signature = Signature(

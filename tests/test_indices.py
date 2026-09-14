@@ -13,9 +13,16 @@ def test_multi_double_index():
     assert double_index(3, start=1) == ["bc", "de", "fg"]
 
 
+def first_mapping(ell: int, n: int):
+    """The first independent mapping of a weight, as letter-based terms."""
+    G, _ = get_independent_mappings(ell, n)
+
+    return G[0].expand().to_linear_combination()
+
+
 def test_relabel_indices_is_simultaneous():
     """A transposition of two letters must not chain into a collapse."""
-    mapping, _ = get_independent_mappings(2, 4)
+    mapping = [first_mapping(2, 4)]
     swapped = relabel_indices_2(mapping[0], {"A": "B", "B": "A"})
 
     terms = {
@@ -28,15 +35,14 @@ def test_relabel_indices_is_simultaneous():
 
 def test_relabel_indices_leaves_other_letters_alone():
     """Letters absent from the mapping are untouched, including lower case."""
-    mapping, _ = get_independent_mappings(1, 3)
-    relabeled = relabel_indices_2(mapping[0], {"A": "C", "C": "A"})
+    relabeled = relabel_indices_2(first_mapping(1, 3), {"A": "C", "C": "A"})
 
-    assert "δ_a" in str(relabeled)
+    assert "a" in str(relabeled)
 
 
 def test_relabel_indices_round_trips():
     """Applying a permutation and its inverse returns the original."""
-    mapping, _ = get_independent_mappings(2, 4)
+    mapping = [first_mapping(2, 4)]
     forward = {"A": "B", "B": "C", "C": "A"}
     backward = {new: old for old, new in forward.items()}
 

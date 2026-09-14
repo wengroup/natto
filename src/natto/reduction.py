@@ -37,8 +37,6 @@ References:
 from fractions import Fraction
 from typing import Literal
 
-from natto.algebra import simplify_linear_combination
-from natto.evaluate import evaluate_tensors
 from natto.gram import get_gram_matrix
 from natto.independence import (
     select_independent_mappings_and_gram,
@@ -47,13 +45,14 @@ from natto.independence import (
 )
 from natto.indices import letter_index
 from natto.mapping_tensors import (
+    Mapping,
     get_decomposition_operators,
     get_extraction_operators,
     get_mappings,
 )
 from natto.orthonormal import get_orthonormal_entries
 from natto.rational import float_matrix, fraction_matrix, matrix_inverse
-from natto.symbolic import LinearCombination
+from natto.symbolic import Operator
 from natto.symmetry_adaptation import get_symmetry_adapted_mappings
 
 #: What to judge the independence of the candidate mappings on; see
@@ -132,7 +131,7 @@ def get_reduction(
             # The self-dual basis needs no duals, so none are built.
             out[ell] = get_orthonormal_entries(ell, n, G)
         else:
-            G_simplified, G_tilde, S, gram_inverse = get_dual_pair(G, gram, n)
+            G_simplified, G_tilde, S, gram_inverse = get_dual_pair(G, gram)
             out[ell] = assemble_operator_entries(
                 ell,
                 n,
@@ -154,16 +153,15 @@ def get_independent_mappings(
     n: int,
     symmetry: str = None,
     selection: Selection = "symbolic",
-) -> tuple[list[LinearCombination], list[list[Fraction]]]:
+) -> tuple[list[Mapping], list[list[Fraction]]]:
     """The independent mapping tensors of one weight, and their exact Gram matrix.
 
     This is the first stage of the reduction, and the only one both bases share: it
     enumerates the candidate mappings, keeps an independent subset of them, and -- if the
     tensor has an intrinsic symmetry -- mixes those into the symmetry-adapted mappings.
 
-    The mappings are returned unsimplified. Combining like terms would reorder the index
-    patterns that `gram` contracts, so the exact Gram entries must be taken from this
-    form; `get_dual_pair` simplifies once it is done with them.
+    Each mapping is a vector over the candidates of its weight and rank; `expand`
+    gives its terms.
 
     The symmetry adaptation is exact whatever `selection` is. Its null space is what
     yields the multiplicity of the weight, and a weight that comes out empty -- as weight
@@ -190,19 +188,13 @@ def get_independent_mappings(
     candidates = get_mappings(ell, n)
 
     if selection == "symbolic":
-        independent_indices, gram = select_independent_mappings_and_gram(
-            ell, n, candidates
-        )
+        independent_indices, gram = select_independent_mappings_and_gram(candidates)
     elif selection == "components":
-        independent_indices = select_independent_mappings_via_components(
-            ell, n, candidates
-        )
-        gram = get_gram_matrix(ell, n, [candidates[i] for i in independent_indices])
+        independent_indices = select_independent_mappings_via_components(candidates)
+        gram = get_gram_matrix([candidates[i] for i in independent_indices])
     elif selection == "embeddings":
-        independent_indices = select_independent_mappings_via_embeddings(
-            ell, n, candidates
-        )
-        gram = get_gram_matrix(ell, n, [candidates[i] for i in independent_indices])
+        independent_indices = select_independent_mappings_via_embeddings(candidates)
+        gram = get_gram_matrix([candidates[i] for i in independent_indices])
     else:
         raise ValueError(
             f"Unknown selection: {selection}. Supported are: symbolic, components, embeddings."
@@ -212,22 +204,17 @@ def get_independent_mappings(
 
     # An intrinsic symmetry admits fewer mappings, and mixes them into new ones.
     if symmetry is not None:
-        G = get_symmetry_adapted_mappings(ell, n, G, matrix_inverse(gram), symmetry)
+        G = get_symmetry_adapted_mappings(G, matrix_inverse(gram), symmetry)
         if not G:
             return [], []
-        gram = get_gram_matrix(ell, n, G)
+        gram = get_gram_matrix(G)
 
     return G, gram
 
 
 def get_dual_pair(
-    G: list[LinearCombination], gram: list[list[Fraction]], n: int
-) -> tuple[
-    list[LinearCombination],
-    list[LinearCombination],
-    list[LinearCombination],
-    list[list[Fraction]],
-]:
+    G: list[Mapping], gram: list[list[Fraction]]
+) -> tuple[list[Operator], list[Operator], list[Operator], list[list[Fraction]]]:
     """Complete the mappings into an extraction-and-embedding pair, exactly.
 
     Each dual is the combination of the mappings whose coefficients are a row of the
@@ -235,33 +222,31 @@ def get_dual_pair(
     needed; composing a mapping with its dual gives the decomposition operator.
 
     Args:
-        G: The independent mappings, unsimplified, from `get_independent_mappings`.
+        G: The independent mappings, from `get_independent_mappings`.
         gram: Their exact Gram matrix.
-        n: Rank of the Cartesian tensor.
 
     Returns:
-        The mappings, their duals and the decomposition operators, all simplified, and
+        The mappings, their duals and the decomposition operators, as operators, and
         the exact inverse of the Gram matrix.
 
     References:
         Eq. 16 of [Wen2026] for the duals, Eq. 19 for the decomposition operators.
     """
     gram_inverse = matrix_inverse(gram)
-    G_tilde_raw = get_extraction_operators(gram_inverse, G)
+    duals = get_extraction_operators(gram_inverse, G)
+    S = get_decomposition_operators(G, duals)
+    G_expanded = [G_p.expand() for G_p in G]
+    G_tilde = [dual.expand() for dual in duals]
 
-    G_simplified = [simplify_linear_combination(G_p) for G_p in G]
-    G_tilde = [simplify_linear_combination(G_p) for G_p in G_tilde_raw]
-    S = get_decomposition_operators(G_simplified, G_tilde, n)
-
-    return G_simplified, G_tilde, S, gram_inverse
+    return G_expanded, G_tilde, S, gram_inverse
 
 
 def assemble_operator_entries(
     ell: int,
     n: int,
-    G: list[LinearCombination],
-    G_tilde: list[LinearCombination],
-    S: list[LinearCombination],
+    G: list[Operator],
+    G_tilde: list[Operator],
+    S: list[Operator],
     gram: list[list[Fraction]],
     gram_inverse: list[list[Fraction]],
     numerical: bool = True,
@@ -314,9 +299,7 @@ def assemble_operator_entries(
             {"symbolic": str(G_p), "rule": f"{upper}{lower},...{lower}->...{upper}"}
         )
         if numerical:
-            out_weight["embedding"][-1]["numerical"] = evaluate_tensors(
-                G_p, mode="embedding"
-            )
+            out_weight["embedding"][-1]["numerical"] = G_p.evaluate(("rank", "weight"))
 
         out_weight["extraction"].append(
             {
@@ -325,16 +308,16 @@ def assemble_operator_entries(
             }
         )
         if numerical:
-            out_weight["extraction"][-1]["numerical"] = evaluate_tensors(
-                G_tilde_p, mode="extraction"
+            out_weight["extraction"][-1]["numerical"] = G_tilde_p.evaluate(
+                ("weight", "rank")
             )
 
         out_weight["decomposition"].append(
             {"symbolic": str(S_p), "rule": f"{upper}{upper2},...{upper2}->...{upper}"}
         )
         if numerical:
-            out_weight["decomposition"][-1]["numerical"] = evaluate_tensors(
-                S_p, mode="decomposition"
+            out_weight["decomposition"][-1]["numerical"] = S_p.evaluate(
+                ("rank", "rank_in")
             )
 
     return out_weight
