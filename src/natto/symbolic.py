@@ -193,31 +193,6 @@ class Term:
         return sign, term
 
     @classmethod
-    def from_letters(
-        cls,
-        signature: Signature,
-        deltas: Iterable[str] = (),
-        epsilons: Iterable[str] = (),
-    ) -> tuple[int, "Term"]:
-        """Build the canonical term of a product written in a signature's letters.
-
-        Args:
-            signature: The signature the letters belong to.
-            deltas: Two letters per Kronecker delta, e.g. `["Aa", "BC"]`.
-            epsilons: Three letters per Levi-Civita symbol, in the symbol's order.
-
-        Returns:
-            The sign of the product relative to the canonical term, and the term.
-
-        Raises:
-            ValueError: If a letter is not in the signature.
-        """
-        return cls.from_blocks(
-            [[signature.slot_of(letter) for letter in pair] for pair in deltas],
-            [[signature.slot_of(letter) for letter in triple] for triple in epsilons],
-        )
-
-    @classmethod
     def parse(cls, text: str, signature: Signature) -> tuple[int, "Term"]:
         """Build a term from its printed factors, such as `d_Aa d_BC` or `δ_Aa δ_BC`.
 

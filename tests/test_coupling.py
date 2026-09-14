@@ -30,8 +30,11 @@ import pytest
 import scipy.special
 
 from natto.coupling import get_coupling_operator
+from natto.natural_projector import (
+    get_random_natural_tensor,
+    get_symmetric_traceless_part,
+)
 from natto.reduction import get_reduction
-from natto.symmetric_traceless import get_random_natural_tensor, remove_trace
 
 #: Weights the conditions are checked at. The operator is closed form, so this
 #: is cheap; the ceiling is only to keep the parametrization readable.
@@ -78,8 +81,8 @@ def cartesian_harmonic(direction: np.ndarray, weight: int) -> np.ndarray:
 
     The natural projector applied to the polyadic returns its traceless part,
     and the paper rescales that by `(2n - 1)!! / n!` so the result generates the
-    Legendre polynomial. `remove_trace` performs the projection, the polyadic
-    being symmetric already.
+    Legendre polynomial. The traceless part is taken numerically, which stays cheap
+    at weight six where evaluating the projector does not.
 
     Args:
         direction: A unit vector.
@@ -93,7 +96,9 @@ def cartesian_harmonic(direction: np.ndarray, weight: int) -> np.ndarray:
 
     scale = double_factorial(2 * weight - 1) / math.factorial(weight)
 
-    return scale * remove_trace(outer_power(direction, weight))
+    traceless = get_symmetric_traceless_part(outer_power(direction, weight))
+
+    return scale * traceless
 
 
 def contract_all(operator: np.ndarray, vector: np.ndarray) -> np.ndarray:

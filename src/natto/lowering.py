@@ -23,7 +23,7 @@ import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from natto.indices import get_permutations_2
+from natto.indices import get_slot_partitions
 from natto.symbolic import sort_with_sign
 
 
@@ -110,11 +110,8 @@ def get_lowering_labels_even(ell: int, n: int) -> list[LoweringLabel]:
         Eq. 3 of [Wen2026].
     """
     labels = []
-    # `get_permutations_2` puts the indices left free first and the contracted ones
-    # after them, in pairs.
-    for perm in get_permutations_2(n, num_delta=(n - ell) // 2):
-        slots = [perm.index(i) for i in range(n)]
-        labels.append(LoweringLabel(_pairs(slots[ell:])))
+    for _, pairs in get_slot_partitions([ell], (n - ell) // 2):
+        labels.append(LoweringLabel(pairs))
 
     return labels
 
@@ -140,11 +137,9 @@ def get_lowering_labels_odd(ell: int, n: int) -> list[LoweringLabel]:
         return get_lowering_labels_odd_weight_zero(ell, n)
 
     labels = []
-    for perm in get_permutations_2(n, num_delta=(n - ell - 1) // 2):
-        slots = [perm.index(i) for i in range(n)]
-        deltas = _pairs(slots[ell + 1 :])
-        for pair in itertools.combinations(slots[: ell + 1], 2):
-            labels.append(LoweringLabel(deltas, tuple(sorted(pair))))
+    for (free,), pairs in get_slot_partitions([ell + 1], (n - ell - 1) // 2):
+        for epsilon in itertools.combinations(free, 2):
+            labels.append(LoweringLabel(pairs, epsilon))
 
     return labels
 
@@ -173,15 +168,7 @@ def get_lowering_labels_odd_weight_zero(ell: int, n: int) -> list[LoweringLabel]
         raise ValueError(f"rank (n) must be at least 3, got n={n}")
 
     labels = []
-    for perm in get_permutations_2(n, num_delta=(n - 3) // 2):
-        slots = [perm.index(i) for i in range(n)]
-        labels.append(LoweringLabel(_pairs(slots[3:]), tuple(sorted(slots[:3]))))
+    for (epsilon,), pairs in get_slot_partitions([3], (n - 3) // 2):
+        labels.append(LoweringLabel(pairs, epsilon))
 
     return labels
-
-
-def _pairs(slots: Sequence[int]) -> tuple[tuple[int, int], ...]:
-    """Consecutive slots taken in pairs, each pair and the pairs sorted."""
-    return tuple(
-        sorted(tuple(sorted(slots[i : i + 2])) for i in range(0, len(slots), 2))
-    )

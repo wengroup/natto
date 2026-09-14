@@ -39,12 +39,7 @@ from typing import Literal
 
 import numpy as np
 
-from natto.indices import (
-    double_index,
-    get_permutations_delta,
-    letter_index,
-    repeat_double_index,
-)
+from natto.indices import get_slot_partitions
 from natto.symbolic import IndexGroup, Operator, Signature, Term
 from natto.utils import (
     double_factorial,
@@ -121,108 +116,6 @@ def get_coupling_symbolic(l1: int, l2: int, l3: int) -> Operator:
         return _get_coupling_symbolic_even(l1, l2, l3)
 
     return _get_coupling_symbolic_odd(l1, l2, l3)
-
-
-def get_tp_even_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    """Get the einsum rule when l1 + l2 - l3 is even.
-
-    The first input is contracted with the second over k + t indices, and the result
-    tensored with t Kronecker deltas.
-
-    After contraction the result has l1 - k - t indices from the first input, still
-    symmetric among themselves, and l2 - k - t from the second, likewise. It has 2 * t
-    indices from the deltas, symmetric in pairs. In total l3 = l1 + l2 - 2 * (k + t).
-
-    Returns:
-        rule: The einsum rule for the tensor product.
-        symmetry: The symmetry of the resulting tensor. For example `xxxyyyaa` means
-            the first three indices are symmetric, the next three are symmetric, and
-            the last two are symmetric.
-        delta_indices: The indices for the delta tensors.
-    """
-
-    # indices that are contracted
-    xy_contracted = letter_index(k + t)
-
-    # indices that are not contracted
-    x_remain = letter_index(l1 - k - t, k + t)
-    y_remain = letter_index(l2 - k - t, l1)
-
-    # indices for contracting t of I
-    delta = double_index(t, upper_case=True)
-    delta_left = "," + ",".join(delta) if delta else ""
-    delta_right = "".join(delta)
-
-    rule = (
-        f"...{xy_contracted}{x_remain},"
-        f"...{xy_contracted}{y_remain}"
-        f"{delta_left}"
-        f"->...{x_remain}{y_remain}{delta_right}"
-    )
-
-    # l1-k-t remaining symmetric indices from x
-    # l2-k-t remaining symmetric indices from y
-    # 2t indices from all deltas. Each delta has 2 symmetric indices.
-    symmetry = (
-        "".join(["a"] * len(x_remain))
-        + "".join(["b"] * len(y_remain))
-        + "".join(repeat_double_index(t, upper_case=True))
-    )
-    delta_indices = letter_index(t, upper_case=True)
-
-    return rule, symmetry, delta_indices
-
-
-def get_tp_odd_rule(l1: int, l2: int, k: int, t: int) -> tuple[str, str, str]:
-    """Get the einsum rule when l1 + l2 - l3 is odd.
-
-    As in the even case, but with a Levi-Civita symbol in front. It contracts away one
-    index from each input, so the result takes one index from the symbol itself.
-
-    After contraction the result has l1 - 1 - k - t indices from the first input, still
-    symmetric among themselves, and l2 - 1 - k - t from the second, likewise. It has
-    2 * t indices from the deltas, symmetric in pairs. In total
-    l3 = l1 + l2 - 1 - 2 * (k + t).
-
-    Returns:
-        rule: The einsum rule for the tensor product.
-        symmetry: The symmetry of the resulting tensor. For example `aabb` means the
-            first two indices are symmetric and the last two are symmetric.
-        delta_indices: The indices for the delta tensors.
-    """
-    # example: epsilon_Uvw x_vabc  y_wabd I_AB -> UcdAB
-
-    xy_contracted = letter_index(k + t)
-    x_remain = letter_index(l1 - 1 - k - t, k + t)
-    y_remain = letter_index(l2 - 1 - k - t, l1 - 1)
-
-    # indices for contracting t of I
-    delta = double_index(t, upper_case=True)
-    delta_left = "," + ",".join(delta) if delta else ""
-    delta_right = "".join(delta)
-
-    # The ... are for the batch dimensions
-    rule = (
-        f"uvw,"  # indices for epsilon
-        f"...v{xy_contracted}{x_remain},"
-        f"...w{xy_contracted}{y_remain}"
-        f"{delta_left}"
-        f"->...u{x_remain}{y_remain}{delta_right}"
-    )
-
-    # 1 index from epsilon
-    # l1-1-k-t remaining symmetric indices from x
-    # l2-1-k-t remaining symmetric indices from y
-    # 2t indices from all deltas. Each delta has 2 symmetric indices.
-    symmetry = (
-        "a"
-        + "".join(["b"] * len(x_remain))
-        + "".join(["c"] * len(y_remain))
-        + "".join(repeat_double_index(t, upper_case=True))
-    )
-    delta_indices = letter_index(t, upper_case=True)
-
-    return rule, symmetry, delta_indices
 
 
 def triangle_numbers(l1: int, l2: int, l3: int) -> tuple[int, int, int]:
@@ -455,7 +348,6 @@ def _get_coupling_blocks_even(
 
     k = (l1 + l2 - l3) // 2
 
-    a_idx = list(range(l3))
     r_idx = list(range(l3, l3 + l1))
     s_idx = list(range(l3 + l1, l3 + l1 + l2))
 
@@ -463,21 +355,14 @@ def _get_coupling_blocks_even(
     n_sa = l2 - k - t
     rs_pairs = list(zip(r_idx[n_ra:], s_idx[n_sa:]))
 
-    _, symmetry, delta_indices = get_tp_even_rule(l1, l2, k, t)
-
+    # Only the a indices, the slots of Z, are placed in every distinct way, to
+    # symmetrize the output as the curly braces ask; the r and s indices come from
+    # ICTs and are symmetric already.
     all_blocks = []
-    for perm in get_permutations_delta(symmetry, delta_indices):
-        # Only the a indices are permuted, to symmetrize the output as the curly braces
-        # ask; the r and s indices come from ICTs and are symmetric already. `p_a` is
-        # `a_idx` reordered by the inverse of `perm`, as for the rank-lowering labels.
-        p_a = [a for _, a in sorted(zip(perm, a_idx))]
-
-        ra_pairs = list(zip(r_idx[:n_ra], p_a[:n_ra]))
-        sa_pairs = list(zip(s_idx[:n_sa], p_a[n_ra : n_ra + n_sa]))
-        a_aa = p_a[n_ra + n_sa :]
-        aa_pairs = [(a_aa[2 * i], a_aa[2 * i + 1]) for i in range(t)]
-
-        all_blocks.append(ra_pairs + sa_pairs + aa_pairs + rs_pairs)
+    for (ra_slots, sa_slots), aa_pairs in get_slot_partitions([n_ra, n_sa], t):
+        ra_pairs = list(zip(r_idx[:n_ra], ra_slots))
+        sa_pairs = list(zip(s_idx[:n_sa], sa_slots))
+        all_blocks.append(ra_pairs + sa_pairs + list(aa_pairs) + rs_pairs)
 
     return all_blocks
 
@@ -512,7 +397,6 @@ def _get_coupling_blocks_odd(
 
     k = (l1 + l2 - l3 - 1) // 2
 
-    a_idx = list(range(l3))
     r_idx = list(range(l3, l3 + l1))
     s_idx = list(range(l3 + l1, l3 + l1 + l2))
 
@@ -521,19 +405,13 @@ def _get_coupling_blocks_odd(
     n_sa = l2 - k - t - 1
     rs_pairs = list(zip(r_idx[n_ra + 1 :], s_idx[n_sa + 1 :]))
 
-    _, symmetry, delta_indices = get_tp_odd_rule(l1, l2, k, t)
-
+    # As in the even case, only the a indices are placed; one goes to the symbol.
     all_blocks = []
-    for perm in get_permutations_delta(symmetry, delta_indices):
-        # As in the even case, only the a indices are permuted.
-        p_a = [a for _, a in sorted(zip(perm, a_idx))]
-
-        epsilon = (r_idx[0], s_idx[0], p_a[0])
-        ra_pairs = list(zip(r_idx[1 : n_ra + 1], p_a[1 : n_ra + 1]))
-        sa_pairs = list(zip(s_idx[1 : n_sa + 1], p_a[n_ra + 1 : n_ra + n_sa + 1]))
-        a_aa = p_a[n_ra + n_sa + 1 :]
-        aa_pairs = [(a_aa[2 * i], a_aa[2 * i + 1]) for i in range(t)]
-
-        all_blocks.append((ra_pairs + sa_pairs + aa_pairs + rs_pairs, epsilon))
+    partitions = get_slot_partitions([1, n_ra, n_sa], t)
+    for ((a_epsilon,), ra_slots, sa_slots), aa_pairs in partitions:
+        epsilon = (r_idx[0], s_idx[0], a_epsilon)
+        ra_pairs = list(zip(r_idx[1 : n_ra + 1], ra_slots))
+        sa_pairs = list(zip(s_idx[1 : n_sa + 1], sa_slots))
+        all_blocks.append((ra_pairs + sa_pairs + list(aa_pairs) + rs_pairs, epsilon))
 
     return all_blocks

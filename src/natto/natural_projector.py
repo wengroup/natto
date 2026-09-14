@@ -21,7 +21,9 @@ References:
 import itertools
 from fractions import Fraction
 
-from natto.indices import get_permutations_2
+import numpy as np
+
+from natto.indices import get_slot_partitions
 from natto.symbolic import IndexGroup, Operator, Signature, Term
 
 
@@ -60,6 +62,67 @@ def get_natural_projector(ell: int) -> Operator:
     return Operator(signature, terms)
 
 
+def get_symmetric_traceless_part(t: np.ndarray) -> np.ndarray:
+    """The symmetric traceless part of an array, computed numerically.
+
+    The array is averaged over the permutations of its axes, and its traces are then
+    subtracted as a signed sum over the number d of delta pairs taken out, each term
+    summed over the distinct placements of those deltas among the axes. The result is
+    the natural projector applied to `t`, but it works on the rank-n array rather than
+    on the rank-2n projector, so it stays cheap at high rank.
+
+    Args:
+        t: An array of shape `(3,) * n`.
+
+    Returns:
+        Its symmetric traceless part, of the same shape.
+
+    References:
+        Eq. 10 of [JCB78] J. Jerphagnon, D. Chemla, and R. Bonneville, Advances in
+        Physics 27, 609 (1978).
+    """
+    n = t.ndim
+    permuted = [np.transpose(t, perm) for perm in itertools.permutations(range(n))]
+    symmetric = np.mean(permuted, axis=0)
+
+    delta = np.eye(3)
+    traceless = symmetric
+    coefficient = 1.0
+    for d in range(1, n // 2 + 1):
+        coefficient = -coefficient / (2 * n - 2 * d + 1)
+
+        # The array is symmetric, so taking d traces over its first 2d axes is as good
+        # as over any.
+        remaining = list(range(d, n - d))
+        traced = np.einsum(
+            symmetric, [k // 2 for k in range(2 * d)] + remaining, remaining
+        )
+
+        for (free,), pairs in get_slot_partitions([n - 2 * d], d):
+            operands = [traced, list(free)]
+            for pair in pairs:
+                operands += [delta, list(pair)]
+            traceless = traceless + coefficient * np.einsum(*operands, list(range(n)))
+
+    return traceless
+
+
+def get_random_natural_tensor(n: int, seed: int = 35) -> np.ndarray:
+    """A random ICT: the symmetric traceless part of a random array.
+
+    Args:
+        n: Weight of the ICT, at least zero.
+        seed: Seed of the random array.
+
+    Returns:
+        A symmetric traceless array of shape `(3,) * n`.
+    """
+    X = np.random.default_rng(seed).standard_normal((3,) * n)
+    natural = get_symmetric_traceless_part(X)
+
+    return natural
+
+
 def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
     """The delta pairs of the terms of the natural projector with a given t.
 
@@ -83,26 +146,20 @@ def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
     if ell < 2 * t:
         raise ValueError(f"weight (ell) must be at least 2*t, got ell={ell}, t={t}")
 
-    perms = get_permutations_2(ell, num_delta=t)
-
-    # `get_permutations_2` lists the slots left unpaired first and the paired ones
-    # after them, two by two.
-    start = ell - 2 * t
+    partitions = get_slot_partitions([ell - 2 * t], t)
 
     matchings = []
-    for p_r in perms:
-        r_slots = [p_r.index(i) for i in range(ell)]
-        rr_pairs = [(r_slots[i], r_slots[i + 1]) for i in range(start, ell, 2)]
-        r_remaining_perms = list(itertools.permutations(r_slots[:start]))
+    for (r_free,), rr_pairs in partitions:
+        r_free_perms = list(itertools.permutations(r_free))
 
-        for p_s in perms:
-            s_slots = [ell + p_s.index(i) for i in range(ell)]
-            ss_pairs = [(s_slots[i], s_slots[i + 1]) for i in range(start, ell, 2)]
+        for (s_free,), s_pairs in partitions:
+            s_free = [ell + slot for slot in s_free]
+            ss_pairs = [(ell + a, ell + b) for a, b in s_pairs]
 
-            # The remaining s slots are not permuted: the r slots they meet already are.
-            for r_remaining in r_remaining_perms:
-                rs_pairs = sorted(zip(r_remaining, s_slots[:start]))
-                matchings.append(rs_pairs + rr_pairs + ss_pairs)
+            # The free s slots are not permuted: the r slots they meet already are.
+            for r_perm in r_free_perms:
+                rs_pairs = sorted(zip(r_perm, s_free))
+                matchings.append(rs_pairs + list(rr_pairs) + ss_pairs)
 
     return matchings
 

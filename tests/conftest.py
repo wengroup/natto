@@ -1,7 +1,3 @@
-import numpy as np
-import pytest
-
-
 def pytest_configure(config):
     """Let `-m full` mean the whole suite rather than a marker of that name.
 
@@ -12,36 +8,3 @@ def pytest_configure(config):
     """
     if config.option.markexpr.strip() == "full":
         config.option.markexpr = ""
-
-
-@pytest.fixture(scope="session")
-def T0():
-    return get_T(0)
-
-
-@pytest.fixture(scope="session")
-def T1():
-    return get_T(1)
-
-
-@pytest.fixture(scope="session")
-def T2():
-    return get_T(2)
-
-
-@pytest.fixture(scope="session")
-def T3():
-    return get_T(3)
-
-
-@pytest.fixture(scope="session")
-def T4():
-    return get_T(4)
-
-
-def get_T(rank: int):
-    """Create a tensor of rank `rank` for testing."""
-    if rank == 0:
-        return np.array(1.0)
-    t = np.arange(3**rank).reshape([3] * rank).astype(np.float64)
-    return t / t.mean()

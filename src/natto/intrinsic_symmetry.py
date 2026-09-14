@@ -7,7 +7,7 @@ where one is parsed from its index equalities, closed into a group, imposed on a
 tensor, or checked.
 
 This is *not* full symmetrization: `impose_symmetry` projects onto whichever
-permutation group was asked for, while `symmetric_traceless` averages over all
+permutation group was asked for, while the natural projector averages over all
 permutations and removes the traces. The two are easy to confuse, which is why
 they are named apart.
 """

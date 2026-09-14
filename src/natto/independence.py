@@ -26,9 +26,9 @@ import numpy as np
 
 from natto.gram import get_gram_entry
 from natto.mapping_tensors import Mapping
+from natto.natural_projector import get_random_natural_tensor
 from natto.qr import DEFAULT_TOLERANCE, Method, find_independent_tensors
 from natto.rational import is_nonsingular
-from natto.symmetric_traceless import get_random_natural_tensor
 
 
 def select_independent_mappings_and_gram(
