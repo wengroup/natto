@@ -7,8 +7,9 @@ survives the symmetry exactly when it lies in the null space of that matrix minu
 the generator's sign times the identity, for every generator. The surviving
 combinations are the symmetry-adapted mappings.
 
-Both steps are exact. The mixing matrices are built by symbolic contraction and
-the null space by Gaussian elimination over the rationals, so a
+Both steps are exact. The mixing matrices are built by permuting mappings and
+reading their contractions from the label table, and the null space by Gaussian
+elimination over the rationals, so a
 symmetry-adapted mapping carries no numerical tolerance -- and a multiplicity
 that comes out as zero, as weight one does for the third-order elastic tensor,
 is a statement rather than a threshold.
@@ -33,9 +34,9 @@ def get_symmetry_adapted_mappings(
 ) -> list[Mapping]:
     """Solve the exact coefficient constraints imposed by internal symmetry.
 
-    Every step is exact: the mixing matrices are built by symbolic contraction
-    and the null space by Gaussian elimination over the rationals, so the
-    symmetry-adapted mappings carry no numerical tolerance at all.
+    Every step is exact: the mixing matrices are built from permuted mappings and
+    the label table, and the null space by Gaussian elimination over the rationals,
+    so the symmetry-adapted mappings carry no numerical tolerance at all.
 
     Args:
         mappings: Independent mappings of one sector.
