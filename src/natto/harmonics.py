@@ -26,8 +26,7 @@ from typing import Literal
 
 import numpy as np
 
-from natto.natural_projector import get_projector_operator
-from natto.symbolic import Operator
+from natto.natural_projector import get_natural_projector
 from natto.utils import double_factorial
 
 #: How the harmonic operator is scaled. `legendre` applies `coeff_harmonic`, the
@@ -62,7 +61,7 @@ def get_harmonic_operator(
     if n < 0:
         raise ValueError(f"rank (n) must be at least zero, got n={n}")
 
-    H = get_harmonic_symbolic(n)
+    H = get_natural_projector(n)
     H_numerical = H.evaluate()
     lower = H.signature.letters_of("weight")
     upper = H.signature.letters_of("sigma")
@@ -80,26 +79,6 @@ def get_harmonic_operator(
     rule = f"{lower}{upper},{operands}->...{lower}" if n else "->..."
 
     return H_numerical, rule
-
-
-def get_harmonic_symbolic(n: int) -> Operator:
-    """Build the harmonic operator of one rank, symbolically.
-
-    The terms are exact, with rational coefficients, and unnormalized; the
-    normalization constant is `coeff_harmonic`.
-
-    Args:
-        n: Rank of the harmonic, which for a harmonic is also its weight. At least
-            zero.
-
-    Returns:
-        The symbolic operator. Its `weight` group carries the harmonic's indices and
-        its `sigma` group the polyadic's.
-
-    References:
-        Eq. 46 of [Wen2026].
-    """
-    return get_projector_operator(n)
 
 
 def coeff_harmonic(n: int) -> Fraction:

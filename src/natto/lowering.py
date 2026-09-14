@@ -6,10 +6,10 @@ the parity of n - ell requires it, one Levi-Civita symbol. Which indices
 are paired is a choice, and each choice leaves different information behind -- which
 is exactly why a single tensor can carry several ICTs of the same weight.
 
-Each function returns the tensors themselves, paired with the letters that tensor
-leaves unused. Those letters are not part of the rank-lowering tensor; they are what
-is left of the rank once it has taken the indices it contracts, and `mapping_tensors`
-is where they are put to work.
+A rank-lowering tensor is given by its label: the pairs of rank indices its deltas
+join, and the rank indices on its Levi-Civita symbol if it has one. The rank indices
+it leaves free, with the tau index of the symbol, are what the natural projector
+takes; `mapping_tensors` is where they are put to work.
 
 References:
     Eq. 2 of [Wen2026] for the rank lowering, Eq. 3 for even n - ell and Eq. 5 for
@@ -20,12 +20,57 @@ References:
 """
 
 import itertools
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from natto.indices import get_permutations_2, letter_index
-from natto.symbolic import IsotropicProduct, create_delta_epsilon_tensors
+from natto.indices import get_permutations_2
+from natto.symbolic import sort_with_sign
 
 
-def get_lowering_tensors(ell: int, n: int) -> tuple[list[IsotropicProduct], list[str]]:
+@dataclass(frozen=True)
+class LoweringLabel:
+    """A rank-lowering tensor, as the blocks of rank slots it contracts.
+
+    Attributes:
+        deltas: The pairs of rank slots its Kronecker deltas join, each increasing and
+            all sorted.
+        epsilon: The rank slots on its Levi-Civita symbol, increasing. Empty when
+            n - ell is even; a pair `(i, j)`, standing for the symbol with the tau index
+            first, when n - ell is odd and ell >= 1; a triple when n - ell is odd and
+            ell = 0.
+
+    References:
+        Definition 4 (Sec. 6.4) of [Wen2026Refactor].
+    """
+
+    deltas: tuple[tuple[int, int], ...]
+    epsilon: tuple[int, ...] = ()
+
+    def free_slots(self, n: int) -> tuple[int, ...]:
+        """The rank slots the tensor leaves to the natural projector, increasing."""
+        used = {slot for pair in self.deltas for slot in pair} | set(self.epsilon)
+
+        return tuple(slot for slot in range(n) if slot not in used)
+
+    def relabel(self, new_slot: Sequence[int]) -> tuple[int, "LoweringLabel"]:
+        """Rename every rank slot `s` to `new_slot[s]`.
+
+        Args:
+            new_slot: The new slot of each rank slot, a permutation of `range(n)`.
+
+        Returns:
+            The sign of the renamed tensor relative to the canonical label, and the
+            label.
+        """
+        deltas = sorted(
+            tuple(sorted((new_slot[i], new_slot[j]))) for i, j in self.deltas
+        )
+        epsilon, sign = sort_with_sign([new_slot[slot] for slot in self.epsilon])
+
+        return sign, LoweringLabel(tuple(deltas), epsilon)
+
+
+def get_lowering_labels(ell: int, n: int) -> list[LoweringLabel]:
     """The rank-lowering tensors of a weight, whichever parity applies.
 
     Which form the rank-lowering tensor takes depends on the parity of n - ell:
@@ -37,21 +82,18 @@ def get_lowering_tensors(ell: int, n: int) -> tuple[list[IsotropicProduct], list
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The rank-lowering tensors, one per choice of contracted indices, and the
-        letters each one leaves unused.
+        The rank-lowering tensors, one per choice of contracted indices.
 
     References:
         Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd.
     """
     if (n - ell) % 2 == 0:
-        return get_lowering_tensors_even(ell, n)
+        return get_lowering_labels_even(ell, n)
 
-    return get_lowering_tensors_odd(ell, n)
+    return get_lowering_labels_odd(ell, n)
 
 
-def get_lowering_tensors_even(
-    ell: int, n: int
-) -> tuple[list[IsotropicProduct], list[str]]:
+def get_lowering_labels_even(ell: int, n: int) -> list[LoweringLabel]:
     """The rank-lowering tensors of even n - ell.
 
     With the parity even the rank-lowering tensor is built from Kronecker deltas alone,
@@ -62,107 +104,66 @@ def get_lowering_tensors_even(
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The rank-lowering tensors, one per choice of contracted indices, and the
-        letters each one leaves unused.
+        The rank-lowering tensors, one per choice of contracted indices.
 
     References:
         Eq. 3 of [Wen2026].
     """
-    letters = letter_index(n, upper_case=True)
+    labels = []
+    # `get_permutations_2` puts the indices left free first and the contracted ones
+    # after them, in pairs.
+    for perm in get_permutations_2(n, num_delta=(n - ell) // 2):
+        slots = [perm.index(i) for i in range(n)]
+        labels.append(LoweringLabel(_pairs(slots[ell:])))
 
-    all_perms = get_permutations_2(n, num_delta=(n - ell) // 2)
-
-    # TODO, this depends on the order of the indices get_permutations_2 returns, where
-    #   we put the remaining indices of t at the front, and the contracted indices at
-    #   the end.
-    start = ell
-
-    tensors = []
-    remaining_letters = []
-    for perm in all_perms:  # each perm for a choice of contracted indices
-        indices = [letters[perm.index(i)] for i in range(n)]
-
-        # the delta pairs of F^p, the rank-lowering tensor
-        delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
-        tensors.append(create_delta_epsilon_tensors(delta_pairs))
-
-        # the letters this tensor does not use
-        remaining_letters.append("".join(indices[:start]))
-
-    return tensors, remaining_letters
+    return labels
 
 
-def get_lowering_tensors_odd(
-    ell: int, n: int
-) -> tuple[list[IsotropicProduct], list[str]]:
+def get_lowering_labels_odd(ell: int, n: int) -> list[LoweringLabel]:
     """The rank-lowering tensors of odd n - ell.
 
-    With the parity odd, one Levi-Civita symbol is needed alongside the Kronecker deltas.
-    Upper-case letter n + 1 is the index of that symbol which contracts with the
-    natural projector -- the tau index. For n = 3, that is the letter D.
+    With the parity odd, one Levi-Civita symbol is needed alongside the Kronecker
+    deltas. Its tau index is the one the natural projector takes; its other two
+    indices are chosen from those the deltas leave.
 
     Args:
         ell: Weight of the ICT.
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The rank-lowering tensors, one per choice of contracted indices, and the
-        letters each one leaves unused.
+        The rank-lowering tensors, one per choice of contracted indices.
 
     References:
         Eq. 5 of [Wen2026].
     """
     if ell == 0:
-        return get_lowering_tensors_odd_weight_zero(ell, n)
+        return get_lowering_labels_odd_weight_zero(ell, n)
 
-    # All s letters
-    letters = letter_index(n, upper_case=True)
+    labels = []
+    for perm in get_permutations_2(n, num_delta=(n - ell - 1) // 2):
+        slots = [perm.index(i) for i in range(n)]
+        deltas = _pairs(slots[ell + 1 :])
+        for pair in itertools.combinations(slots[: ell + 1], 2):
+            labels.append(LoweringLabel(deltas, tuple(sorted(pair))))
 
-    # The epsilon index that is not contracted with the Cartesian tensor -- the tau
-    # index, which the natural projector takes instead. The n Cartesian indices have
-    # used the first n upper-case letters, so this takes the next free one.
-    tau_letter = letter_index(1, start=n, upper_case=True)
-
-    all_perms = get_permutations_2(n, num_delta=(n - ell - 1) // 2)
-
-    # TODO, this depends on the order of the indices get_permutations_2 returns, where
-    #   we put the remaining indices of t at the front, and the contracted indices at
-    #   the end.
-    start = ell + 1
-
-    tensors = []
-    remaining_letters = []
-    for perm in all_perms:  # each perm for a choice of contracted indices
-        indices = [letters[perm.index(i)] for i in range(n)]
-
-        # the delta pairs of F^p, the rank-lowering tensor
-        delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
-
-        # remaining indices, shared out between epsilon and the natural projector
-        s_remaining = indices[:start]
-        s_remaining_set = set(s_remaining)
-
-        for comb in itertools.combinations(s_remaining, 2):
-            # two of them go to epsilon, along with tau
-            epsilon = tau_letter + "".join(sorted(comb))
-            tensors.append(create_delta_epsilon_tensors(delta_pairs, epsilon=epsilon))
-
-            # the rest, plus tau again, are left unused
-            remaining_letters.append(
-                "".join(sorted(s_remaining_set - set(comb))) + tau_letter
-            )
-
-    return tensors, remaining_letters
+    return labels
 
 
-def get_lowering_tensors_odd_weight_zero(
-    ell: int, n: int
-) -> tuple[list[IsotropicProduct], list[str]]:
-    """
-    For j = 0, and odd n, the rules for G(n|0) are different from the general case.
+def get_lowering_labels_odd_weight_zero(ell: int, n: int) -> list[LoweringLabel]:
+    """The rank-lowering tensors of weight zero and odd n.
 
-    Here we do a trivial contraction with epsilon tensor, instead of a double
-    contraction in the general case.
+    Every index the deltas leave goes to the Levi-Civita symbol, which then contracts
+    three rank indices and has no tau index.
+
+    Args:
+        ell: Weight of the ICT, which must be zero.
+        n: Rank of the Cartesian tensor, odd and at least three.
+
+    Returns:
+        The rank-lowering tensors, one per choice of contracted indices.
+
+    Raises:
+        ValueError: If `ell` is not zero, or `n` is not odd and at least three.
     """
     if ell != 0:
         raise ValueError(f"weight (ell) must be 0, got ell={ell}")
@@ -171,27 +172,16 @@ def get_lowering_tensors_odd_weight_zero(
     if n < 3:
         raise ValueError(f"rank (n) must be at least 3, got n={n}")
 
-    # All s letters
-    letters = letter_index(n, upper_case=True)
+    labels = []
+    for perm in get_permutations_2(n, num_delta=(n - 3) // 2):
+        slots = [perm.index(i) for i in range(n)]
+        labels.append(LoweringLabel(_pairs(slots[3:]), tuple(sorted(slots[:3]))))
 
-    all_perms = get_permutations_2(n, num_delta=(n - 3) // 2)
+    return labels
 
-    # TODO, this depends on the order of the indices get_permutations_2 returns, where
-    #   we put the remaining indices of t at the front, and the contracted indices at
-    #   the end.
-    start = 3
 
-    tensors = []
-    remaining_letters = []
-    for perm in all_perms:  # each perm for a choice of contracted indices
-        indices = [letters[perm.index(i)] for i in range(n)]
-
-        # the delta pairs of F^p, the rank-lowering tensor
-        delta_pairs = [indices[i] + indices[i + 1] for i in range(start, n, 2)]
-
-        # every remaining index goes to epsilon, so nothing is left unused
-        epsilon = "".join(sorted(indices[:start]))
-        tensors.append(create_delta_epsilon_tensors(delta_pairs, epsilon=epsilon))
-        remaining_letters.append("")
-
-    return tensors, remaining_letters
+def _pairs(slots: Sequence[int]) -> tuple[tuple[int, int], ...]:
+    """Consecutive slots taken in pairs, each pair and the pairs sorted."""
+    return tuple(
+        sorted(tuple(sorted(slots[i : i + 2])) for i in range(0, len(slots), 2))
+    )

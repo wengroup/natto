@@ -20,66 +20,12 @@ References:
 
 import string
 from collections.abc import Sequence
-from dataclasses import dataclass
 from fractions import Fraction
 
-from natto.algebra import multiply_2, simplify_linear_combination
-from natto.indices import (
-    letter_index,
-    relabel_indices,
-    relabel_indices_2,
-    shift_index_2,
-)
-from natto.lowering import get_lowering_tensors
+from natto.algebra import contract
+from natto.lowering import LoweringLabel, get_lowering_labels
 from natto.natural_projector import get_natural_projector
-from natto.symbolic import (
-    Delta,
-    Epsilon,
-    IndexGroup,
-    IsotropicProduct,
-    LinearCombination,
-    Operator,
-    Scalar,
-    Signature,
-    sort_with_sign,
-)
-
-
-@dataclass(frozen=True)
-class LoweringLabel:
-    """A rank-lowering tensor, as the blocks of rank slots it contracts.
-
-    Attributes:
-        deltas: The pairs of rank slots its Kronecker deltas join, each increasing and
-            all sorted.
-        epsilon: The rank slots on its Levi-Civita symbol, increasing. Empty when
-            n - ell is even; a pair `(i, j)`, standing for the symbol with the tau index
-            first, when n - ell is odd and ell >= 1; a triple when n - ell is odd and
-            ell = 0.
-
-    References:
-        Definition 4 (Sec. 6.4) of [Wen2026Refactor].
-    """
-
-    deltas: tuple[tuple[int, int], ...]
-    epsilon: tuple[int, ...] = ()
-
-    def relabel(self, new_slot: Sequence[int]) -> tuple[int, "LoweringLabel"]:
-        """Rename every rank slot `s` to `new_slot[s]`.
-
-        Args:
-            new_slot: The new slot of each rank slot, a permutation of `range(n)`.
-
-        Returns:
-            The sign of the renamed tensor relative to the canonical label, and the
-            label.
-        """
-        deltas = sorted(
-            tuple(sorted((new_slot[i], new_slot[j]))) for i, j in self.deltas
-        )
-        epsilon, sign = sort_with_sign([new_slot[slot] for slot in self.epsilon])
-
-        return sign, LoweringLabel(tuple(deltas), epsilon)
+from natto.symbolic import IndexGroup, Operator, Signature, Term
 
 
 class Sector:
@@ -100,16 +46,14 @@ class Sector:
     def __init__(self, ell: int, n: int):
         self.ell = ell
         self.n = n
-
-        tensors, remaining_letters = get_lowering_tensors(ell, n)
-        self.labels = tuple(_label_of(F, n) for F in tensors)
+        self.labels = tuple(get_lowering_labels(ell, n))
         self.signature = Signature(
             (IndexGroup("rank", n, upper=True), IndexGroup("weight", ell, upper=False))
         )
 
         self._index = {label: i for i, label in enumerate(self.labels)}
-        self._letter_forms = list(zip(tensors, remaining_letters))
-        self._candidate_terms = {}
+        self._projector = None
+        self._candidates = {}
         self._table = {}
 
     def __len__(self) -> int:
@@ -149,23 +93,55 @@ class Sector:
         """
         key = (i, j) if i <= j else (j, i)
         if key not in self._table:
-            F, sigma = self._letter_forms[key[0]]
-            product = _contract_with_lowering(F, sigma, self.ell, self._terms(key[1]))
-            contracted = simplify_linear_combination(product)
-            if any(term.indices for term in contracted):
-                raise ValueError("Full contraction left unpaired indices")
-            self._table[key] = sum((term.factor for term in contracted), Fraction())
+            sigma = [("sigma", k) for k in range(self.ell)]
+            rank = [("rank", a) for a in range(self.n)]
+            factors = [
+                (self._lowering(key[0]), sigma + rank),
+                (self._candidate(key[1]), rank + sigma),
+            ]
+            contracted = contract(factors, Signature(()))
+            self._table[key] = contracted.terms.get(Term(), Fraction(0))
 
         return self._table[key]
 
-    def _terms(self, i: int) -> LinearCombination:
-        """Candidate `i` in the letter-based form: the projector times its lowering."""
-        if i not in self._candidate_terms:
-            F, letters = self._letter_forms[i]
-            projector = get_natural_projector(self.ell, s_letters=letters)
-            self._candidate_terms[i] = multiply_2(projector, F)
+    def _candidate(self, i: int) -> Operator:
+        """Candidate `i`: the natural projector applied to rank-lowering tensor `i`."""
+        if i not in self._candidates:
+            if self._projector is None:
+                self._projector = get_natural_projector(self.ell)
+            sigma = [("sigma", k) for k in range(self.ell)]
+            weight = [self.n + k for k in range(self.ell)]
+            factors = [
+                (self._projector, weight + sigma),
+                (self._lowering(i), sigma + list(range(self.n))),
+            ]
+            self._candidates[i] = contract(factors, self.signature)
 
-        return self._candidate_terms[i]
+        return self._candidates[i]
+
+    def _lowering(self, i: int) -> Operator:
+        """Rank-lowering tensor `i`, its `sigma` indices first and its `rank` after.
+
+        The free rank slots feed the sigma indices through deltas; a Levi-Civita symbol
+        with a pair of rank slots takes the last sigma index as its tau index.
+        """
+        ell, n = self.ell, self.n
+        label = self.labels[i]
+        deltas = [(k, ell + slot) for k, slot in enumerate(label.free_slots(n))]
+        deltas += [(ell + a, ell + b) for a, b in label.deltas]
+        if len(label.epsilon) == 2:
+            epsilons = [(ell - 1, ell + label.epsilon[0], ell + label.epsilon[1])]
+        elif label.epsilon:
+            epsilons = [tuple(ell + slot for slot in label.epsilon)]
+        else:
+            epsilons = []
+
+        signature = Signature(
+            (IndexGroup("sigma", ell, upper=False), IndexGroup("rank", n, upper=True))
+        )
+        sign, term = Term.from_blocks(deltas, epsilons)
+
+        return Operator(signature, [(sign, term)])
 
 
 class Mapping:
@@ -189,7 +165,7 @@ class Mapping:
         Definition 6 and Proposition 4 (Sec. 6.4) of [Wen2026Refactor].
     """
 
-    __slots__ = ("sector", "coefficients", "_combination", "_expansion")
+    __slots__ = ("sector", "coefficients", "_expansion")
 
     def __init__(self, sector: Sector, coefficients: Sequence[int | Fraction]):
         coefficients = tuple(coefficients)
@@ -203,7 +179,6 @@ class Mapping:
 
         self.sector = sector
         self.coefficients = tuple(Fraction(c) for c in coefficients)
-        self._combination = None
         self._expansion = None
 
     def permute(self, permutation: Sequence[int]) -> "Mapping":
@@ -244,9 +219,14 @@ class Mapping:
     def expand(self) -> Operator:
         """The mapping as an operator, rank indices first and weight indices after."""
         if self._expansion is None:
-            self._expansion = Operator.from_linear_combination(
-                self._terms(), self.sector.signature
-            )
+            terms = []
+            for i, c in enumerate(self.coefficients):
+                if c:
+                    candidate = self.sector._candidate(i)
+                    terms += [
+                        (c * value, term) for term, value in candidate.terms.items()
+                    ]
+            self._expansion = Operator(self.sector.signature, terms)
 
         return self._expansion
 
@@ -300,24 +280,13 @@ class Mapping:
 
         return f"E({self.sector.ell}) · (" + "  ".join(parts) + ")"
 
-    def _terms(self) -> LinearCombination:
-        """The letter-based terms of the mapping, collected; cached."""
-        if self._combination is None:
-            terms = []
-            for i, c in enumerate(self.coefficients):
-                if c:
-                    terms.extend(multiply_2(Scalar(c), self.sector._terms(i)))
-            self._combination = simplify_linear_combination(LinearCombination(*terms))
-
-        return self._combination
-
 
 def get_mappings(ell: int, n: int) -> list[Mapping]:
     """The candidate mapping tensors of a weight.
 
     A mapping tensor is a rank-lowering tensor followed by the natural projector, so
     there is one candidate per choice of which indices the rank lowering contracts
-    away. The projector takes the letters that choice leaves unused.
+    away. The projector takes the indices that choice leaves unused.
 
     The parity of n - ell decides what the rank lowering looks like -- deltas alone,
     or deltas with one Levi-Civita symbol -- but that is `lowering`'s concern, and a
@@ -440,68 +409,22 @@ def compose(mapping: Mapping, other: Mapping) -> Operator:
     sector = mapping.sector
     if other.sector is not sector:
         raise ValueError("Mappings of different sectors cannot be composed")
-    n = sector.n
-
-    # Move the rank letters of `other` past those of `mapping`
-    shifted = shift_index_2(other._terms(), n, letter_index(24, upper_case=True))
-
-    terms = []
-    for i, c in enumerate(mapping.coefficients):
-        if c:
-            F, sigma = sector._letter_forms[i]
-            terms.extend(_contract_with_lowering(F, sigma, sector.ell, shifted, c))
+    n, ell = sector.n, sector.ell
 
     signature = Signature(
         (IndexGroup("rank", n, upper=True), IndexGroup("rank_in", n, upper=True))
     )
+    sigma = [("sigma", k) for k in range(ell)]
+    dual = other.expand()
 
-    return Operator.from_linear_combination(
-        simplify_linear_combination(LinearCombination(*terms)), signature
-    )
+    terms = []
+    for i, c in enumerate(mapping.coefficients):
+        if c:
+            factors = [
+                (sector._lowering(i), sigma + list(range(n))),
+                (dual, [n + a for a in range(n)] + sigma),
+            ]
+            part = contract(factors, signature)
+            terms += [(c * value, term) for term, value in part.terms.items()]
 
-
-def _label_of(F: IsotropicProduct, n: int) -> LoweringLabel:
-    """The label of a letter-based rank-lowering tensor from `get_lowering_tensors`."""
-    deltas, epsilon = [], ()
-    for tensor in F:
-        slots = [ord(letter) - ord("A") for letter in tensor.indices]
-        if isinstance(tensor, Delta):
-            deltas.append(tuple(sorted(slots)))
-        elif isinstance(tensor, Epsilon):
-            # The tau index, the one the projector takes, is written first.
-            epsilon = tuple(slots[1:] if slots[0] == n else slots)
-
-    if tuple(sorted(epsilon)) != epsilon:
-        raise ValueError(f"Expected the Levi-Civita slots in order, got {epsilon}")
-
-    return LoweringLabel(tuple(sorted(deltas)), epsilon)
-
-
-def _contract_with_lowering(
-    F: IsotropicProduct,
-    sigma: str,
-    ell: int,
-    other: LinearCombination,
-    coefficient: Fraction = Fraction(1),
-) -> LinearCombination:
-    """A rank-lowering tensor times `other`, over the weight indices of `other`.
-
-    The weight letters of `other` become the letters the rank lowering leaves the
-    projector, so each is contracted with the rank lowering; every other letter is
-    left as it is. The tau index is internal to the rank lowering, and `other` may use
-    the same letter, so it is renamed out of the way first.
-    """
-    other_letters = {letter for term in other for letter in term.indices}
-    taken = other_letters | set(F.indices) | set(sigma)
-    for tau in [letter for letter in sigma if letter in F.indices]:
-        if tau in other_letters:
-            fresh = next(
-                letter for letter in string.ascii_uppercase if letter not in taken
-            )
-            taken.add(fresh)
-            F = relabel_indices(F, {tau: fresh})
-            sigma = sigma.replace(tau, fresh)
-
-    relabeled = relabel_indices_2(other, dict(zip(letter_index(ell), sigma)))
-
-    return multiply_2(Scalar(coefficient), F, relabeled)
+    return Operator(signature, terms)

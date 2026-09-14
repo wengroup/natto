@@ -8,8 +8,9 @@ how a candidate is expanded symbolically.
 import numpy as np
 import pytest
 
-from natto.mapping_tensors import LoweringLabel, Sector
-from natto.natural_projector import get_projector_operator
+from natto.lowering import LoweringLabel
+from natto.mapping_tensors import Sector
+from natto.natural_projector import get_natural_projector
 from natto.utils import dij, eijk
 
 
@@ -19,7 +20,7 @@ from natto.utils import dij, eijk
 def test_candidates(n: int, ell: int):
     """Each candidate is the projector applied to its rank-lowering tensor."""
     sector = Sector(ell, n)
-    projector = get_projector_operator(ell).evaluate()
+    projector = get_natural_projector(ell).evaluate()
 
     for candidate, label in zip(sector.candidates(), sector.labels):
         expected = np.tensordot(projector, lowering_array(label, n, ell), axes=ell)

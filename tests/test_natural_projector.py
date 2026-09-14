@@ -1,223 +1,31 @@
-import numpy as np
+"""The natural projector.
+
+Its defining properties are checked directly: applying it twice is applying it once,
+exactly, and its trace counts the 2 * ell + 1 components of an ICT.
+"""
+
 import pytest
 
-from natto.evaluate import evaluate_tensors
-from natto.indices import letter_index
-from natto.natural_projector import get_natural_projector, get_projector_rules
+from natto.algebra import contract
+from natto.natural_projector import get_natural_projector
 
 
-def test_get_projector_rules():
-    def as_set(data):
-        new_data = []
-        for d in data:
-            new_data.append(frozenset({k: frozenset(v) for k, v in d.items()}.items()))
-        return set(new_data)
+@pytest.mark.parametrize("ell", range(5))
+def test_idempotent(ell: int):
+    """The projector composed with itself is the projector, term for term."""
+    projector = get_natural_projector(ell)
+    middle = [("middle", k) for k in range(ell)]
+    factors = [
+        (projector, list(range(ell)) + middle),
+        (projector, middle + [ell + k for k in range(ell)]),
+    ]
 
-    out = get_projector_rules(1, 0)
-    assert as_set(out) == as_set([{"d_rs": ["aA"], "d_rr": [], "d_ss": []}])
-
-    out = get_projector_rules(2, 0)
-    assert as_set(out) == as_set(
-        [
-            {"d_rs": ["aA", "bB"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["bA", "aB"], "d_rr": [], "d_ss": []},
-        ]
-    )
-
-    out = get_projector_rules(2, 1)
-    assert as_set(out) == as_set(
-        [
-            {"d_rs": [], "d_rr": ["ab"], "d_ss": ["AB"]},
-        ]
-    )
-
-    out = get_projector_rules(3, 0)
-    assert as_set(out) == as_set(
-        [
-            {"d_rs": ["aA", "bB", "cC"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["aA", "bC", "cB"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["aB", "bA", "cC"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["aB", "bC", "cA"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["aC", "bA", "cB"], "d_rr": [], "d_ss": []},
-            {"d_rs": ["aC", "bB", "cA"], "d_rr": [], "d_ss": []},
-        ]
-    )
-
-    out = get_projector_rules(3, 1)
-    assert as_set(out) == as_set(
-        [
-            {"d_rs": ["cC"], "d_rr": ["ab"], "d_ss": ["AB"]},
-            {"d_rs": ["cB"], "d_rr": ["ab"], "d_ss": ["AC"]},
-            {"d_rs": ["cA"], "d_rr": ["ab"], "d_ss": ["BC"]},
-            {"d_rs": ["bC"], "d_rr": ["ac"], "d_ss": ["AB"]},
-            {"d_rs": ["bB"], "d_rr": ["ac"], "d_ss": ["AC"]},
-            {"d_rs": ["bA"], "d_rr": ["ac"], "d_ss": ["BC"]},
-            {"d_rs": ["aC"], "d_rr": ["bc"], "d_ss": ["AB"]},
-            {"d_rs": ["aB"], "d_rr": ["bc"], "d_ss": ["AC"]},
-            {"d_rs": ["aA"], "d_rr": ["bc"], "d_ss": ["BC"]},
-        ]
-    )
+    assert contract(factors, projector.signature) == projector
 
 
-def test_natural_projector():
-    e = get_natural_projector(1)
-    assert e.to_str_list() == ["+1 δ_aA"]
+@pytest.mark.parametrize("ell", range(5))
+def test_trace(ell: int):
+    """The trace of the projector is the number of components of an ICT."""
+    array = get_natural_projector(ell).evaluate()
 
-    e = get_natural_projector(2)
-    assert set(e.to_str_list()) == {
-        "+1/2 δ_aA δ_bB",
-        "+1/2 δ_aB δ_bA",
-        "-1/3 δ_ab δ_AB",
-    }
-
-    e = get_natural_projector(3)
-    assert set(e.to_str_list()) == {
-        "+1/6 δ_aA δ_bB δ_cC",
-        "+1/6 δ_aA δ_bC δ_cB",
-        "+1/6 δ_aB δ_bA δ_cC",
-        "+1/6 δ_aB δ_bC δ_cA",
-        "+1/6 δ_aC δ_bA δ_cB",
-        "+1/6 δ_aC δ_bB δ_cA",
-        "-1/15 δ_cC δ_ab δ_AB",
-        "-1/15 δ_cB δ_ab δ_AC",
-        "-1/15 δ_cA δ_ab δ_BC",
-        "-1/15 δ_bC δ_ac δ_AB",
-        "-1/15 δ_bB δ_ac δ_AC",
-        "-1/15 δ_bA δ_ac δ_BC",
-        "-1/15 δ_aC δ_bc δ_AB",
-        "-1/15 δ_aB δ_bc δ_AC",
-        "-1/15 δ_aA δ_bc δ_BC",
-    }
-
-    e = get_natural_projector(4)
-    assert set(e.to_str_list()) == {
-        ## t = 0
-        "+1/24 δ_aA δ_bB δ_cC δ_dD",
-        "+1/24 δ_aA δ_bB δ_cD δ_dC",
-        "+1/24 δ_aA δ_bC δ_cB δ_dD",
-        "+1/24 δ_aA δ_bC δ_cD δ_dB",
-        "+1/24 δ_aA δ_bD δ_cB δ_dC",
-        "+1/24 δ_aA δ_bD δ_cC δ_dB",
-        #
-        "+1/24 δ_aB δ_bA δ_cC δ_dD",
-        "+1/24 δ_aB δ_bA δ_cD δ_dC",
-        "+1/24 δ_aB δ_bC δ_cA δ_dD",
-        "+1/24 δ_aB δ_bC δ_cD δ_dA",
-        "+1/24 δ_aB δ_bD δ_cA δ_dC",
-        "+1/24 δ_aB δ_bD δ_cC δ_dA",
-        #
-        "+1/24 δ_aC δ_bA δ_cB δ_dD",
-        "+1/24 δ_aC δ_bA δ_cD δ_dB",
-        "+1/24 δ_aC δ_bB δ_cA δ_dD",
-        "+1/24 δ_aC δ_bB δ_cD δ_dA",
-        "+1/24 δ_aC δ_bD δ_cA δ_dB",
-        "+1/24 δ_aC δ_bD δ_cB δ_dA",
-        #
-        "+1/24 δ_aD δ_bA δ_cB δ_dC",
-        "+1/24 δ_aD δ_bA δ_cC δ_dB",
-        "+1/24 δ_aD δ_bB δ_cA δ_dC",
-        "+1/24 δ_aD δ_bB δ_cC δ_dA",
-        "+1/24 δ_aD δ_bC δ_cA δ_dB",
-        "+1/24 δ_aD δ_bC δ_cB δ_dA",
-        ## t = 1
-        "-1/84 δ_cC δ_dD δ_ab δ_AB",
-        "-1/84 δ_cD δ_dC δ_ab δ_AB",
-        "-1/84 δ_cB δ_dD δ_ab δ_AC",
-        "-1/84 δ_cD δ_dB δ_ab δ_AC",
-        "-1/84 δ_cB δ_dC δ_ab δ_AD",
-        "-1/84 δ_cC δ_dB δ_ab δ_AD",
-        "-1/84 δ_cA δ_dD δ_ab δ_BC",
-        "-1/84 δ_cD δ_dA δ_ab δ_BC",
-        "-1/84 δ_cA δ_dC δ_ab δ_BD",
-        "-1/84 δ_cC δ_dA δ_ab δ_BD",
-        "-1/84 δ_cA δ_dB δ_ab δ_CD",
-        "-1/84 δ_cB δ_dA δ_ab δ_CD",
-        #
-        "-1/84 δ_bC δ_dD δ_ac δ_AB",
-        "-1/84 δ_bD δ_dC δ_ac δ_AB",
-        "-1/84 δ_bB δ_dD δ_ac δ_AC",
-        "-1/84 δ_bD δ_dB δ_ac δ_AC",
-        "-1/84 δ_bB δ_dC δ_ac δ_AD",
-        "-1/84 δ_bC δ_dB δ_ac δ_AD",
-        "-1/84 δ_bA δ_dD δ_ac δ_BC",
-        "-1/84 δ_bD δ_dA δ_ac δ_BC",
-        "-1/84 δ_bA δ_dC δ_ac δ_BD",
-        "-1/84 δ_bC δ_dA δ_ac δ_BD",
-        "-1/84 δ_bA δ_dB δ_ac δ_CD",
-        "-1/84 δ_bB δ_dA δ_ac δ_CD",
-        #
-        "-1/84 δ_bC δ_cD δ_ad δ_AB",
-        "-1/84 δ_bD δ_cC δ_ad δ_AB",
-        "-1/84 δ_bB δ_cD δ_ad δ_AC",
-        "-1/84 δ_bD δ_cB δ_ad δ_AC",
-        "-1/84 δ_bB δ_cC δ_ad δ_AD",
-        "-1/84 δ_bC δ_cB δ_ad δ_AD",
-        "-1/84 δ_bA δ_cD δ_ad δ_BC",
-        "-1/84 δ_bD δ_cA δ_ad δ_BC",
-        "-1/84 δ_bA δ_cC δ_ad δ_BD",
-        "-1/84 δ_bC δ_cA δ_ad δ_BD",
-        "-1/84 δ_bA δ_cB δ_ad δ_CD",
-        "-1/84 δ_bB δ_cA δ_ad δ_CD",
-        #
-        "-1/84 δ_aC δ_dD δ_bc δ_AB",
-        "-1/84 δ_aD δ_dC δ_bc δ_AB",
-        "-1/84 δ_aB δ_dD δ_bc δ_AC",
-        "-1/84 δ_aD δ_dB δ_bc δ_AC",
-        "-1/84 δ_aB δ_dC δ_bc δ_AD",
-        "-1/84 δ_aC δ_dB δ_bc δ_AD",
-        "-1/84 δ_aA δ_dD δ_bc δ_BC",
-        "-1/84 δ_aD δ_dA δ_bc δ_BC",
-        "-1/84 δ_aA δ_dC δ_bc δ_BD",
-        "-1/84 δ_aC δ_dA δ_bc δ_BD",
-        "-1/84 δ_aA δ_dB δ_bc δ_CD",
-        "-1/84 δ_aB δ_dA δ_bc δ_CD",
-        #
-        "-1/84 δ_aC δ_cD δ_bd δ_AB",
-        "-1/84 δ_aD δ_cC δ_bd δ_AB",
-        "-1/84 δ_aB δ_cD δ_bd δ_AC",
-        "-1/84 δ_aD δ_cB δ_bd δ_AC",
-        "-1/84 δ_aB δ_cC δ_bd δ_AD",
-        "-1/84 δ_aC δ_cB δ_bd δ_AD",
-        "-1/84 δ_aA δ_cD δ_bd δ_BC",
-        "-1/84 δ_aD δ_cA δ_bd δ_BC",
-        "-1/84 δ_aA δ_cC δ_bd δ_BD",
-        "-1/84 δ_aC δ_cA δ_bd δ_BD",
-        "-1/84 δ_aA δ_cB δ_bd δ_CD",
-        "-1/84 δ_aB δ_cA δ_bd δ_CD",
-        #
-        "-1/84 δ_aC δ_bD δ_cd δ_AB",
-        "-1/84 δ_aD δ_bC δ_cd δ_AB",
-        "-1/84 δ_aB δ_bD δ_cd δ_AC",
-        "-1/84 δ_aD δ_bB δ_cd δ_AC",
-        "-1/84 δ_aB δ_bC δ_cd δ_AD",
-        "-1/84 δ_aC δ_bB δ_cd δ_AD",
-        "-1/84 δ_aA δ_bD δ_cd δ_BC",
-        "-1/84 δ_aD δ_bA δ_cd δ_BC",
-        "-1/84 δ_aA δ_bC δ_cd δ_BD",
-        "-1/84 δ_aC δ_bA δ_cd δ_BD",
-        "-1/84 δ_aA δ_bB δ_cd δ_CD",
-        "-1/84 δ_aB δ_bA δ_cd δ_CD",
-        # t = 3
-        "+1/105 δ_ab δ_cd δ_AB δ_CD",
-        "+1/105 δ_ab δ_cd δ_AC δ_BD",
-        "+1/105 δ_ab δ_cd δ_AD δ_BC",
-        #
-        "+1/105 δ_ac δ_bd δ_AB δ_CD",
-        "+1/105 δ_ac δ_bd δ_AC δ_BD",
-        "+1/105 δ_ac δ_bd δ_AD δ_BC",
-        #
-        "+1/105 δ_ad δ_bc δ_AB δ_CD",
-        "+1/105 δ_ad δ_bc δ_AC δ_BD",
-        "+1/105 δ_ad δ_bc δ_AD δ_BC",
-    }
-
-
-@pytest.mark.parametrize("m", range(5))
-def test_projector_is_traceless(m):
-    """Verify that the full contraction of E_(m|m) with I_(m|m) is 2m + 1."""
-    projector = evaluate_tensors(get_natural_projector(m), mode="extraction")
-    indices = letter_index(m)
-    contraction_rule = indices * 2
-    trace = np.einsum(contraction_rule, projector)
-
-    np.testing.assert_allclose(trace, np.array(float(2 * m + 1)), atol=1e-12)
+    assert array.reshape(3**ell, 3**ell).trace() == pytest.approx(2 * ell + 1)

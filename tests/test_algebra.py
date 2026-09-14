@@ -1,171 +1,68 @@
-from pytest import fixture
+"""Contraction of operators.
 
-from natto.algebra import (
-    contract_epsilon_delta,
-    contract_two_epsilon,
-    contract_with_delta,
-    simplify_isotropic_product,
-)
-from natto.symbolic import (
-    Delta,
-    Epsilon,
-    IsotropicProduct,
-    IsotropicTensor,
-    LinearCombination,
-    Scalar,
-    Zero,
-)
+The reference for every case is `numpy.einsum` on the evaluated operators, which
+shares nothing with the walk that reduces the terms.
+"""
+
+import numpy as np
+import pytest
+
+from natto.algebra import contract
+from natto.symbolic import IndexGroup, Operator, Signature
 
 
-@fixture
-def T4():
-    return IsotropicTensor("ijkl")
+def operator(text: str, size: int) -> Operator:
+    """An operator over one group of lower-case indices."""
+    return Operator.parse(text, Signature((IndexGroup("x", size, upper=False),)))
 
 
-@fixture
-def delta_ij():
-    return Delta("ij")
+#: (factors as (printed operator, slot count, labels), free slots of the result)
+CASES = {
+    "delta chain": (
+        [("d_ab", 2, [0, "i"]), ("d_ab", 2, ["i", "j"]), ("d_ab", 2, ["j", 1])],
+        2,
+    ),
+    "closed loop": ([("d_ab", 2, ["i", "j"]), ("d_ab", 2, ["j", "i"])], 0),
+    "trace": ([("d_ab", 2, ["i", "i"])], 0),
+    "symbol renamed": ([("e_abc", 3, [0, 1, "i"]), ("d_ab", 2, ["i", 2])], 3),
+    "symbol vanishes": ([("e_abc", 3, [0, "i", "j"]), ("d_ab", 2, ["i", "j"])], 1),
+    "symbols share one": ([("e_abc", 3, [0, 1, "i"]), ("e_abc", 3, ["i", 2, 3])], 4),
+    "symbols share two": (
+        [("e_abc", 3, [0, "i", "j"]), ("e_abc", 3, ["j", "i", 1])],
+        2,
+    ),
+    "symbols share three": (
+        [("e_abc", 3, ["i", "j", "k"]), ("e_abc", 3, ["j", "i", "k"])],
+        0,
+    ),
+    "symbols through a delta": (
+        [("e_abc", 3, [0, 1, "i"]), ("d_ab", 2, ["i", "j"]), ("e_abc", 3, ["j", 2, 3])],
+        4,
+    ),
+    "symbols apart": ([("e_abc", 3, [0, 1, 2]), ("e_abc", 3, [3, 4, 5])], 6),
+    "sums of terms": (
+        [
+            ("+1/2 d_ab d_cd  +1/2 d_ac d_bd  -1/3 d_ad d_bc", 4, [0, 1, "i", "j"]),
+            ("+2 d_ab d_cd  -1 d_ac d_bd", 4, ["i", "j", 2, 3]),
+        ],
+        4,
+    ),
+}
 
 
-@fixture
-def delta_ik():
-    return Delta("ik")
+@pytest.mark.parametrize("factors, size", CASES.values(), ids=CASES.keys())
+def test_contract(factors, size):
+    """The reduced product evaluates to the product summed over its shared labels."""
+    built = [(operator(text, slots), labels) for text, slots, labels in factors]
+    result = contract(built, Signature((IndexGroup("x", size, upper=False),)))
 
+    ids = {}
+    operands = []
+    for op, labels in built:
+        operands += [
+            op.evaluate(),
+            [ids.setdefault(label, len(ids)) for label in labels],
+        ]
+    expected = np.einsum(*operands, [ids[slot] for slot in range(size)])
 
-@fixture
-def delta_ai():
-    return Delta("ai")
-
-
-@fixture
-def epsilon_ijk():
-    return Epsilon("ijk")
-
-
-@fixture
-def epsilon_kij():
-    return Epsilon("kij")
-
-
-@fixture
-def epsilon_jik():
-    return Epsilon("jik")
-
-
-@fixture
-def epsilon_ijl():
-    return Epsilon("ijl")
-
-
-@fixture
-def epsilon_ilm():
-    return Epsilon("ilm")
-
-
-def test_cartesian_tensor():
-    assert IsotropicTensor("ijjl") == IsotropicTensor("ikkl")
-
-
-def test_delta():
-    assert Delta("ij") == Delta("ji")
-    assert Delta("ij") != Delta("ik")
-
-
-def test_epsilon(epsilon_ijk, epsilon_kij, epsilon_jik):
-    assert epsilon_ijk == epsilon_kij
-    assert epsilon_ijk != epsilon_jik
-
-
-def test_contract_with_delta(T4, delta_ij, delta_ik, delta_ai):
-    assert contract_with_delta(delta_ij, T4) == IsotropicTensor("jjkl")
-    assert contract_with_delta(delta_ik, T4) == IsotropicTensor("kjkl")
-    assert contract_with_delta(delta_ai, T4) == IsotropicTensor("ajkl")
-
-    assert contract_with_delta(delta_ij, delta_ik) == Delta("jk")
-
-
-def test_contract_epsilon_delta(epsilon_ijk, delta_ij, delta_ai):
-    assert contract_epsilon_delta(epsilon_ijk, delta_ij) == Zero()
-    assert contract_epsilon_delta(epsilon_ijk, delta_ai) == Epsilon("ajk")
-
-
-def test_contract_two_epsilon(epsilon_ijk, epsilon_ijl, epsilon_ilm):
-    assert contract_two_epsilon(epsilon_ijl, epsilon_ijl) == Scalar(6)
-    assert contract_two_epsilon(epsilon_ijk, epsilon_ijl) == Delta("kl", factor=2)
-    assert contract_two_epsilon(epsilon_ijk, epsilon_ilm) == LinearCombination(
-        IsotropicProduct(Delta("jl"), Delta("km")),
-        IsotropicProduct(Delta("jm"), Delta("kl"), factor=-1),
-    )
-
-
-def test_simplify():
-    d1 = Delta("ij", factor=2)
-    d2 = Delta("jk", factor=2)
-    e1 = Epsilon("ijk", factor=3)
-    e2 = Epsilon("ikl", factor=3)
-    e3 = Epsilon("ilm", factor=3)
-    T1 = IsotropicTensor("ijkl", factor=4)
-
-    tp = IsotropicProduct(d1, d2)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+4 δ_ik"]
-
-    tp = IsotropicProduct(d1, e1)
-    tp_s = simplify_isotropic_product(tp)
-    assert len(tp_s) == 0
-
-    tp = IsotropicProduct(d1, e2)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+6 ε_jkl"]
-
-    tp = IsotropicProduct(d2, e2)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+6 ε_ijl"]
-
-    tp = IsotropicProduct(e1, e2)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["-18 δ_jl"]
-
-    tp = IsotropicProduct(e1, e3)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+9 δ_jl δ_km", "-9 δ_jm δ_kl"]
-
-    tp = IsotropicProduct(d1, e1, e3)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+18 δ_km δ_il", "-18 δ_kl δ_im"]
-
-    tp = IsotropicProduct(d1, T1)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+8 T_jjkl"]
-
-    tp = IsotropicProduct(d1, e1, e2, T1)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["-144 T_ljkl"]
-
-    tp = IsotropicProduct(d1, e1, e3, T1)
-    tp_s = simplify_isotropic_product(tp)
-    assert tp_s.to_str_list() == ["+72 T_ljml", "-72 T_mjll"]
-
-
-# def test_symmetrize():
-#     indices = "ijkl"  # symmetrizing indices
-#     tensors = [
-#         IsotropicTensor("".join(p), factor=Fraction(1, 24))
-#         for p in itertools.permutations(indices)
-#     ]
-#     assert symmetrize(IsotropicTensor(indices)) == LinearCombination(*tensors)
-#
-#     indices = "akl"  # symmetrizing indices
-#     tensors = []
-#     for p in itertools.permutations(indices):
-#         t = IsotropicProduct(
-#             Epsilon(f"{p[0]}ij"),
-#             IsotropicTensor(f"ij{p[1]}{p[2]}"),
-#             factor=Fraction(1, 6),
-#         )
-#         tensors.append(t)
-#     lin_comb = LinearCombination(*tensors)
-#
-#     t = IsotropicProduct(Epsilon("aij"), IsotropicTensor("ijkl"))
-#     s = symmetrize(t)
-#     assert s == lin_comb
+    np.testing.assert_allclose(result.evaluate(), expected, atol=1e-12)

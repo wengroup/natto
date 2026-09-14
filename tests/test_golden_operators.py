@@ -52,7 +52,7 @@ from tests.golden import (
 )
 from tests.test_reduction import get_reduction_cached, get_tensor_class_params
 
-#: `LinearCombination.__str__` joins the terms of an operator with two spaces.
+#: `Operator.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "
 
 #: The fingerprint of a rank-8 operator sums a few thousand float64 entries, and
@@ -228,8 +228,8 @@ def _operator(entry: dict) -> dict:
     The symbolic form is stored as one string per term rather than as the single
     joined string, which is what makes a diff worth reading: a changed
     coefficient rewrites one short line instead of one line of several thousand
-    characters. `LinearCombination.__str__` joins `to_str_list()` with two
-    spaces, so splitting on two spaces recovers exactly those terms.
+    characters. `Operator.__str__` joins the terms with two spaces, so splitting
+    on two spaces recovers exactly those terms.
     """
     return {
         "symbolic": entry["symbolic"].split(TERM_SEPARATOR),

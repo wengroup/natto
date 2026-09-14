@@ -1,27 +1,15 @@
-"""Index letters, and the renaming of them.
+"""Index letters, and the permutations built from them.
 
-Every operator in this package is built as a symbolic expression over named indices,
-and then contracted through an `einsum` rule written in those same letters. Two kinds
-of bookkeeping recur often enough to live together here:
-
-- naming a fresh run of letters for a tensor of a given rank, where lower-case
-  letters carry the indices of the generic Cartesian tensor and upper-case ones the
-  indices of the ICT;
-- renaming the letters of an expression already built, either by a shift or by an
-  explicit map, so that two expressions can be contracted without their indices
-  colliding.
-
-A third kind joins them: enumerating the index *permutations* that symmetrize a
-tensor, or that pair its indices off against deltas, and writing those out as
-`einsum` rules.
+Two kinds of bookkeeping recur often enough to live together here: naming a fresh run
+of letters for the indices of a tensor, lower-case for one group and upper-case for
+another, and enumerating the index permutations that symmetrize a tensor or pair its
+indices off against deltas, written out as `einsum` rules.
 
 Nothing here knows what the operators mean; it is the plumbing they share.
 """
 
 import itertools
 import string
-
-from natto.symbolic import IsotropicProduct, IsotropicTensor, LinearCombination
 
 
 def letter_index(n: int, start: int = 0, upper_case: bool = False) -> str:
@@ -76,114 +64,6 @@ def repeat_double_index(n: int, start: int = 0, upper_case: bool = False) -> lis
     indices = letter_index(n, start, upper_case)
 
     return [s + s for s in indices]
-
-
-def shift_index(
-    tensor: IsotropicTensor | IsotropicProduct, shift: int, letters: str = None
-) -> IsotropicTensor | IsotropicProduct:
-    """
-    Shift the index of a tensor by a certain amount.
-
-    For example, for T_ijk, and shift=1, the new tensor is T_jkl.
-
-    Args:
-        tensor: The tensor to shift the index.
-        shift: The amount to shift the index.
-        letters: The letters signifying the indices to shift. If None, shift all the
-            indices. For example, if T_ijAB, and letters = 'AB', then the new tensor
-            would be T_ijCD, where C and D are the new letters.
-
-    Returns:
-        The new tensor with the shifted index.
-    """
-
-    # The zero tensor has no meaningful indices to shift. In particular, a zero
-    # IsotropicProduct stores a Zero component whose constructor does not accept the
-    # general IsotropicTensor arguments used below.
-    if tensor.factor == 0:
-        return tensor
-
-    def _shift(t: IsotropicTensor):
-        if letters is None:
-            indices = "".join([chr(ord(i) + shift) for i in t.indices])
-        else:
-            indices = "".join(
-                [chr(ord(i) + shift) if i in letters else i for i in t.indices]
-            )
-        return t.__class__(indices, factor=t.factor, symbol=t.symbol)
-
-    if isinstance(tensor, IsotropicTensor):
-        return _shift(tensor)
-
-    elif isinstance(tensor, IsotropicProduct):
-        components = [_shift(t) for t in tensor]
-        return tensor.__class__(*components, factor=tensor.factor)
-
-    else:
-        raise ValueError(f"Unknown tensor type: {type(tensor)}")
-
-
-def relabel_indices(
-    tensor: IsotropicTensor | IsotropicProduct, mapping: dict[str, str]
-) -> IsotropicTensor | IsotropicProduct:
-    """Rename the indices of a tensor according to `mapping`.
-
-    The substitution is simultaneous, so a mapping may permute letters among
-    themselves. Applying it one letter at a time would chain the replacements,
-    turning a transposition into a collapse.
-
-    Args:
-        tensor: The tensor whose indices to rename.
-        mapping: Old index letter to new. Letters absent from it are left alone.
-
-    Returns:
-        The tensor with its indices renamed.
-    """
-    # A zero tensor carries no meaningful indices, and a zero IsotropicProduct holds
-    # a component whose constructor does not take the arguments used below.
-    if tensor.factor == 0:
-        return tensor
-
-    def _relabel(t: IsotropicTensor):
-        indices = "".join(mapping.get(index, index) for index in t.indices)
-
-        return t.__class__(indices, factor=t.factor, symbol=t.symbol)
-
-    if isinstance(tensor, IsotropicTensor):
-        return _relabel(tensor)
-
-    if isinstance(tensor, IsotropicProduct):
-        return tensor.__class__(*[_relabel(t) for t in tensor], factor=tensor.factor)
-
-    raise ValueError(f"Unknown tensor type: {type(tensor)}")
-
-
-def relabel_indices_2(
-    tensor: LinearCombination, mapping: dict[str, str]
-) -> LinearCombination:
-    """Rename the indices of every term of a linear combination.
-
-    Args:
-        tensor: The linear combination whose indices to rename.
-        mapping: Old index letter to new, applied simultaneously.
-
-    Returns:
-        The linear combination with its indices renamed.
-    """
-    return LinearCombination(*[relabel_indices(t, mapping) for t in tensor])
-
-
-def shift_index_2(
-    tensor: LinearCombination, shift: int, letters: str = None
-) -> LinearCombination:
-    """
-    Shift all the index of a Tensors object by a certain amount.
-
-    Returns:
-        The new tensor with the shifted index.
-    """
-    components = [shift_index(t, shift, letters) for t in tensor]
-    return LinearCombination(*components)
 
 
 def get_permutations(symmetry: str, start_dim: int = 0) -> list[list[int]]:

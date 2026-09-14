@@ -23,12 +23,11 @@ from fractions import Fraction
 import pytest
 
 from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_symbolic
-from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
+from natto.harmonics import coeff_harmonic
 from natto.mapping_tensors import Mapping
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_null_space
 from natto.reduction import get_dual_pair, get_independent_mappings
-from natto.symbolic import Operator
 from natto.symmetry_adaptation import get_symmetry_action_matrix
 
 #: `Fraction` is the exact type. A plain `int` is exact too; `bool` is an `int` by
@@ -52,22 +51,11 @@ def assert_exact(label: str, values):
 
 
 def coefficients(combination):
-    """Every scalar in a linear combination or an operator.
-
-    A float can hide in a term's own factor or in any of its tensors', so both are
-    collected.
-    """
-    if isinstance(combination, Operator):
-        return list(combination.terms.values())
+    """Every coefficient of an operator or a mapping."""
     if isinstance(combination, Mapping):
         return list(combination.coefficients)
 
-    values = []
-    for term in combination:
-        values.append(term.factor)
-        values.extend(tensor.factor for tensor in term)
-
-    return values
+    return list(combination.terms.values())
 
 
 def entries(matrix):
@@ -144,10 +132,7 @@ def test_natural_projector_is_exact(weight: int):
 
 @pytest.mark.parametrize("weight", range(4))
 def test_harmonic_is_exact(weight: int):
-    """The harmonic operator, and the constant that normalizes it."""
-    H = get_harmonic_symbolic(weight)
-
-    assert_exact(f"V({weight})", coefficients(H))
+    """The constant that normalizes the harmonic operator."""
     assert isinstance(coeff_harmonic(weight), Fraction)
 
 

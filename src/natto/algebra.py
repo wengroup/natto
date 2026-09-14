@@ -1,568 +1,145 @@
-"""Algebra of the symbolic Cartesian tensors.
+"""Contraction of operators.
 
-Contraction, simplification and multiplication of products of Kronecker deltas
-and Levi-Civita symbols. `operators` builds the package's operators out of these
-operations, and `symbolic` defines the terms they act on.
+Every operator of the package is a sum of products of Kronecker deltas and Levi-Civita
+symbols, so multiplying operators and summing over the indices they share is the one
+algebraic operation the package needs. `contract` does it: it multiplies terms, lets
+each shared index close a chain of deltas or join two symbols, and returns the result
+as an operator whose terms are canonical and collected.
 """
 
 import itertools
-from collections import defaultdict
+from collections import Counter
+from collections.abc import Hashable, Sequence
 from fractions import Fraction
 
-from natto.symbolic import (
-    Delta,
-    Epsilon,
-    IsotropicProduct,
-    IsotropicTensor,
-    LinearCombination,
-    Scalar,
-    Zero,
-)
+from natto.symbolic import Operator, Signature, Term, sort_with_sign
 
 
-def contract_with_delta(delta: Delta, tensor: IsotropicTensor) -> IsotropicTensor:
-    """
-    Contract a tensor with a delta tensor.
+def contract(
+    factors: Sequence[tuple[Operator, Sequence[Hashable]]], signature: Signature
+) -> Operator:
+    """Multiply operators and sum over the indices they share.
 
-    For example,
-    delta_ij T_ijk -> T_iik
-    delta_ai T_ijk -> T_ajk
+    Each operator comes with one label per slot. A label on two slots is summed over;
+    a label on one slot is a free index of the result and must be one of its slots,
+    given by number. Every term of the product is reduced by the rules of the walk:
+    a chain of deltas collapses to one delta, a closed loop of them is a factor of 3,
+    a Levi-Civita symbol with a repeated index vanishes, and two symbols sharing an
+    index expand into deltas by their determinant identity.
 
     Args:
-        delta: The delta tensor.
-        tensor: A Cartesian tensor.
+        factors: The operators, each with the labels of its slots in order.
+        signature: The signature of the result.
 
     Returns:
-        The contracted tensor.
-    """
-    # check at least one of the indices is in common
-    if not (set(tensor.indices) & set(delta.indices)):
-        raise ValueError("Delta tensor does not have common indices with the tensor")
+        The product, its terms canonical and collected.
 
-    for p, i in enumerate(delta):
-        if i in tensor:
-            other = delta[1] if p == 0 else delta[0]
-            return tensor.__class__(
-                tensor.indices.replace(i, other), tensor.factor, tensor.symbol
+    Raises:
+        ValueError: If a label occurs more than twice, if the free labels are not
+            exactly the slots of `signature`, or if an operator gets the wrong
+            number of labels.
+
+    References:
+        Proposition 6 (Sec. 6.7) of [Wen2026Refactor] for the walk, and Theorems 1
+        and 2 (Sec. 4.5) for its full contractions.
+    """
+    counts = Counter()
+    for operator, labels in factors:
+        if len(labels) != operator.signature.size:
+            raise ValueError(
+                f"An operator with {operator.signature.size} slots got {len(labels)} "
+                "labels"
             )
-
-    raise ValueError("Delta tensor does not have common indices with the tensor")
-
-
-def contract_with_epsilon(
-    epsilon: Epsilon, tensor: IsotropicTensor
-) -> IsotropicProduct:
-    """
-    Contract a tensor with an epsilon tensor.
-
-    For example,
-    epsilon_aij T_ijk...n
-    epsilon_abi T_ijk...n
-
-    Args:
-        epsilon: The epsilon tensor.
-        tensor: A Cartesian tensor.
-
-    Returns:
-        The contracted tensor.
-    """
-    # check at least one of the indices is in common
-    if not (set(tensor.indices) & set(epsilon.indices)):
-        raise ValueError("Epsilon tensor does not have common indices with the tensor")
-    return IsotropicProduct(epsilon, tensor)
-
-
-def contract_epsilon_delta(epsilon: Epsilon, delta: Delta) -> Zero | IsotropicTensor:
-    """
-    Contract an epsilon tensor with a delta tensor.
-
-    For example,
-    epsilon_ijk delta_ij = epsilon_iik = 0
-    epsilon_ijk delta_il = epsilon_ljk
-
-    The two tensors should share at least one common index.
-
-    Args:
-        epsilon: The epsilon tensor, given by three indices.
-        delta: The delta tensor, given by a pair of indices.
-
-    Returns:
-        The contracted tensor.
-    """
-    if len(set(epsilon) & set(delta)) == 2:
-        return Zero()
-
-    return contract_with_delta(delta, epsilon)
-
-
-def contract_two_epsilon(
-    epsilon1: Epsilon, epsilon2: Epsilon
-) -> Scalar | Delta | LinearCombination:
-    """
-    Contract two epsilon tensors.
-
-    This implements the following rules:
-    1. e_ijk e_pqk = d_ip d_jq - d_iq d_jp
-    2. e_ijk e_pjk = 2 d_ip
-    3. e_ijk e_ijk = 6, e_ijk e_jik = -6
-
-    Args:
-        epsilon1: The first epsilon tensor.
-        epsilon2: The second epsilon tensor.
-
-    Returns:
-        The contracted delta tensor.
-    """
-
-    def canonicalize_one(eps, idx):
-        """
-        Canonicalize the order of the indices.
-
-        Does not change relative order of the three indices, but put the provided index
-        at the last position.
-
-        For example,
-            (ijk, k) -> ijk
-            (ijk, j) -> kij
-            (ijk, i) -> jki
-        """
-        if idx == eps[0]:
-            indices = eps[1] + eps[2] + eps[0]
-            return Epsilon(indices, eps.factor)
-        elif idx == eps[1]:
-            indices = eps[2] + eps[0] + eps[1]
-            return Epsilon(indices, eps.factor)
-        else:
-            return eps
-
-    def canonicalize_two(eps, idx1, idx2):
-        """
-        Canonicalize the order of the indices.
-
-        Put idx1 at the second position, idx2 at the third position.
-        If relative order of the indices is changed, the sign is flipped.
-
-        For example,
-        (ijk, i, j) -> kij
-        (ijk, j, i) -> -kij
-        (ijk, j, k) -> ijk
-        (ijk, k, j) -> -ijk
-        (ijk, k, i) -> jki
-        (ijk, i, k) -> -jki
-        """
-        if idx1 == eps[0] and idx2 == eps[1]:
-            indices = eps[2] + eps[0] + eps[1]
-            sign = 1
-
-        elif idx1 == eps[1] and idx2 == eps[2]:
-            indices = eps[0] + eps[1] + eps[2]
-            sign = 1
-
-        elif idx1 == eps[2] and idx2 == eps[0]:
-            indices = eps[1] + eps[2] + eps[0]
-            sign = 1
-
-        elif idx1 == eps[1] and idx2 == eps[0]:
-            indices = eps[2] + eps[1] + eps[0]
-            sign = -1
-
-        elif idx1 == eps[2] and idx2 == eps[1]:
-            indices = eps[0] + eps[2] + eps[1]
-            sign = -1
-
-        elif idx1 == eps[0] and idx2 == eps[2]:
-            indices = eps[1] + eps[0] + eps[2]
-            sign = -1
-
-        else:
-            raise ValueError("Invalid indices")
-
-        return Epsilon(indices, sign * eps.factor)
-
-    # get number of repeated indices
-    repeated = set(epsilon1) & set(epsilon2)
-
-    if len(repeated) == 3:
-        # Canonicalize the indices of epsilon2 such that it has the same indices as
-        # epsilon1, and change the sign if necessary
-        idx1 = epsilon1.indices[1]
-        idx2 = epsilon1.indices[2]
-        eps2 = canonicalize_two(epsilon2, idx1, idx2)
-        factor = epsilon1.factor * eps2.factor
-        return Scalar(6 * factor)
-
-    elif len(repeated) == 2:
-        idx1, idx2 = sorted(repeated)
-        eps1 = canonicalize_two(epsilon1, idx1, idx2)
-        eps2 = canonicalize_two(epsilon2, idx1, idx2)
-        return Delta(eps1[0] + eps2[0], 2 * eps1.factor * eps2.factor)
-
-    elif len(repeated) == 1:
-        idx = repeated.pop()
-        eps1 = canonicalize_one(epsilon1, idx)
-        eps2 = canonicalize_one(epsilon2, idx)
-        d1 = Delta(eps1[0] + eps2[0])
-        d2 = Delta(eps1[1] + eps2[1])
-        d3 = Delta(eps1[0] + eps2[1])
-        d4 = Delta(eps1[1] + eps2[0])
-        return LinearCombination(
-            IsotropicProduct(d1, d2), IsotropicProduct(d3, d4, factor=-1)
+        counts.update(labels)
+    if any(count > 2 for count in counts.values()):
+        raise ValueError("A label occurs more than twice")
+    free = {label for label, count in counts.items() if count == 1}
+    if free != set(range(signature.size)):
+        raise ValueError(
+            f"The free labels {sorted(free, key=str)} are not the slots of the result"
         )
 
-    else:
-        raise ValueError("No repeated indices")
+    terms = []
+    choices = [list(operator.terms.items()) for operator, _ in factors]
+    for choice in itertools.product(*choices):
+        coefficient = Fraction(1)
+        deltas, epsilons = [], []
+        for (term, value), (_, labels) in zip(choice, factors):
+            coefficient *= value
+            deltas += [[labels[i], labels[j]] for i, j in term.deltas]
+            epsilons += [[labels[slot] for slot in triple] for triple in term.epsilons]
+
+        for factor, kept_deltas, kept_epsilons in _reduce(deltas, epsilons):
+            sign, reduced = Term.from_blocks(kept_deltas, kept_epsilons)
+            terms.append((sign * factor * coefficient, reduced))
+
+    return Operator(signature, terms)
 
 
-def simplify_delta(product: IsotropicProduct) -> tuple[IsotropicProduct, bool]:
-    """
-    Evaluate delta tensors in an isotropic product.
-
-    This will recursively contract all possible delta tensors in the product.
-
-    Tensors like delta_ii will evaluate to 3.
-
-    Returns:
-        product: The simplified isotropic product.
-        performed: True if any contraction was performed, False otherwise.
-    """
-    # Positions of delta tensors in the product
-    delta_pos = [i for i, t in enumerate(product) if isinstance(t, Delta)]
-
-    # This is the dictionary of components, which will be updated as we contract
-    components = {i: t for i, t in enumerate(product)}
-
-    performed = False
-
-    n = len(components)
-
-    while delta_pos:
-        i = delta_pos.pop()
-        delta = components[i]
-
-        new_components = components.copy()
-
-        # delta_ii
-        if delta.indices[0] == delta.indices[1]:
-            out = Scalar(3)
-
-            # Remove the delta from the components
-            new_components.pop(i)
-
-            # Add the resulting scalar to the components
-            new_components[n] = out
-
-            performed = True
-            n += 1
-            components = new_components
-            continue
-
-        # delta_ij
-        for j, t in components.items():
-            if j == i:
-                continue
-
-            # Perform contraction if delta and t share common indices
-            if set(delta.indices) & set(t.indices):
-                if isinstance(t, Epsilon):
-                    out = contract_epsilon_delta(t, delta)
-                else:
-                    out = contract_with_delta(delta, t)
-
-                # Remove the delta and t from the components
-                new_components.pop(i)
-                new_components.pop(j)
-
-                # Add the contracted result, create a new index
-                new_components[n] = out
-
-                # Update delta_pos: if t is a delta tensor, remove it; if the contracted
-                # out is a delta tensor, add it
-                if isinstance(t, Delta):
-                    delta_pos.remove(j)
-                if isinstance(out, Delta):
-                    delta_pos.append(n)
-
-                performed = True
-                n += 1
-                break
-
-        components = new_components
-
-    if performed:
-        return IsotropicProduct(*components.values(), factor=product.factor), True
-    else:
-        return product, False
-
-
-def simplify_epsilon(
-    product: IsotropicProduct,
-) -> tuple[IsotropicProduct | LinearCombination, bool]:
-    """
-    Evaluate product of epsilon tensors.
-
-    This only considers products between epsilon tensors, and not with other tensors.
-    It will consider all possible combinations of epsilon tensors in the product.
-
-    Returns:
-        product: The simplified isotropic product.
-        performed: True if any contraction was performed, False otherwise.
-    """
-
-    epsilon_pos = [i for i, t in enumerate(product) if isinstance(t, Epsilon)]
-
-    for i, j in itertools.combinations(epsilon_pos, 2):
-        # check if they share at least one index
-        if set(product[i].indices) & set(product[j].indices):
-            out = contract_two_epsilon(product[i], product[j])
-
-            # Remaining components after the two epsilon tensors are contracted
-            remaining = [t for p, t in enumerate(product) if p not in [i, j]]
-
-            # three identical indices, resulting in a scalar
-            if isinstance(out, Scalar):
-                return (
-                    IsotropicProduct(out, *remaining, factor=product.factor),
-                    True,
-                )
-
-            # two identical indices, resulting in a delta tensor
-            elif isinstance(out, Delta):
-                return (
-                    IsotropicProduct(out, *remaining, factor=product.factor),
-                    True,
-                )
-
-            # one identical index, resulting in linear combination of isotropic products
-            # of delta tensors e_ijk e_ilm = d_jl d_km - d_jm d_kl
-            elif isinstance(out, LinearCombination):
-                all_tp = []
-                for tp in out:
-                    new_tp = IsotropicProduct(
-                        *tp.components,
-                        *remaining,
-                        factor=tp.factor * product.factor,
-                    )
-                    all_tp.append(new_tp)
-
-                return LinearCombination(*all_tp), True
-
-            else:
-                raise ValueError("Invalid output")
-
-    return product, False
-
-
-def simplify_isotropic_product(tp: IsotropicProduct) -> LinearCombination:
-    """
-    Simplify an isotropic product by applying the delta and epsilon rules.
-
-    The simplification is done iteratively until no more simplification can be done.
-    Zeros resulting from the simplification are removed.
-
-    For example,
-    d_ij e_imn d_nq T_qpr -> e_jmq T_qpr
-
-    Returns:
-        The simplified output as a linear combination.
-    """
-
-    # Iteratively simplify the isotropic product
-    performed = True
-    simplified = LinearCombination(tp)
-    while performed:
-        double_epsilon = None
-        double_epsilon_pos = None
-        new_simplified = []
-        performed = []
-        for i, tp in enumerate(simplified):
-            # Step 1: simplify epsilon first
-            sim, perf = simplify_epsilon(tp)
-
-            # Double epsilon contraction will return a LinearCombination
-            if isinstance(sim, LinearCombination):
-                if double_epsilon is not None:
-                    raise ValueError(
-                        "Double epsilon simplification already done. The current "
-                        "Implementation does not support multiple double epsilon."
-                    )
-                double_epsilon_pos = i
-                double_epsilon = sim
-
-            # Step 2: If no epsilon simplification performed, then simplify delta
-            if not perf:
-                sim, perf = simplify_delta(tp)
-
-            new_simplified.append(sim)
-            performed.append(perf)
-
-        # Double epsilon contraction will return a LinearCombination of sum of two
-        # isotropic products. We need to expand it to be produced with other components
-        # in the input tp.
-        if double_epsilon is not None:
-            linear_comb = []
-            for de in double_epsilon:
-                # list of isotropic products
-                comb = new_simplified.copy()
-                comb[double_epsilon_pos] = de
-                new_tp = multiply(*comb)
-                linear_comb.append(new_tp)
-        else:
-            linear_comb = new_simplified
-
-        # prepare for the next iteration
-        performed = any(performed)
-        simplified = LinearCombination(*linear_comb)
-
-    # Step 3: remove zeros
-    simplified = LinearCombination(*[t for t in simplified if t.factor != 0])
-
-    return simplified
-
-
-def simplify_linear_combination(tensor: LinearCombination) -> LinearCombination:
-    """Simplify a linear combination of tensors.
-
-    1. Applying delta and epsilon rules.
-    2. Removing zero tensors or isotropic products.
-    3. Combine isotropic products that are of the same form.
-    """
-    simplified = []
-    for t in tensor:
-        if t.factor == 0:  # remove zeros
-            continue
-        if isinstance(t, IsotropicTensor):
-            simplified.append(t)
-        elif isinstance(t, IsotropicProduct):
-            out = simplify_isotropic_product(t)
-            simplified.extend(out)
-        else:
-            raise ValueError("Unexpected type")
-
-    # Combine isotropic products that are of the same form
-    categorized = defaultdict(list)
-    for t in simplified:
-        if isinstance(t, IsotropicTensor):
-            raise ValueError(
-                "Not implemented, should modify the `for tp_list in "
-                "categorized.values()` block too"
-            )
-        elif isinstance(t, IsotropicProduct):
-            t = t.canonize()
-            rep = t.str_rep_without_factor()
-            categorized[rep].append(t)
-        else:
-            raise ValueError("Unexpected type")
-
-    lin_comb = []
-    for tp_list in categorized.values():
-        factor = sum(tp.factor for tp in tp_list)
-        if factor == 0:  # remove zeros
-            continue
-        components = tp_list[0].components
-        tp = IsotropicProduct(*components, factor=factor)
-        lin_comb.append(tp)
-    simplified = LinearCombination(*lin_comb)
-
-    return LinearCombination(*simplified)
-
-
-def multiply(
-    *tensors: IsotropicTensor | IsotropicProduct, factor: int | Fraction = 1
-) -> IsotropicProduct:
-    """
-    Multiple tensors, isotropic products to create a new isotropic product.
+def _reduce(deltas: list, epsilons: list) -> list[tuple[int, list, list]]:
+    """Sum over the repeated labels of one product of deltas and Levi-Civita symbols.
 
     Args:
-        *tensors: the tensors or isotropic products to multiply.
-        factor: Additional factor to be multiplied to the isotropic product, default is 1.
+        deltas: Pairs of labels, as mutable lists.
+        epsilons: Triples of labels, as mutable lists.
 
     Returns:
-        The new isotropic product.
+        `(factor, deltas, epsilons)` for each product the sum leaves, every label in it
+        occurring once; empty when the product vanishes.
     """
-    new_tensors = []
-    factor = Fraction(factor)
-    for t in tensors:
-        if isinstance(t, IsotropicTensor):
-            new_tensors.append(t)
-        elif isinstance(t, IsotropicProduct):
-            new_tensors.extend(t.components)
-            factor *= t.factor
-        else:
-            raise ValueError("Unexpected type")
+    factor, deltas, epsilons = _contract_deltas(deltas, epsilons)
 
-    tp = IsotropicProduct(*new_tensors, factor=factor)
+    if any(len(set(triple)) < 3 for triple in epsilons):
+        return []
 
-    return tp
+    for first, second in itertools.combinations(range(len(epsilons)), 2):
+        if set(epsilons[first]) & set(epsilons[second]):
+            a, b = epsilons[first], epsilons[second]
+            others = [e for k, e in enumerate(epsilons) if k not in (first, second)]
+            reduced = []
+            for permutation in itertools.permutations(range(3)):
+                sign = sort_with_sign(permutation)[1]
+                expanded = [pair[:] for pair in deltas]
+                expanded += [[a[i], b[permutation[i]]] for i in range(3)]
+                remaining = [triple[:] for triple in others]
+                for inner, kept, symbols in _reduce(expanded, remaining):
+                    reduced.append((sign * factor * inner, kept, symbols))
+
+            return reduced
+
+    return [(factor, deltas, epsilons)]
 
 
-def multiply_2(
-    *tensors: IsotropicTensor | IsotropicProduct | LinearCombination,
-    factor: int | Fraction = 1,
-) -> LinearCombination:
-    """
-    Multiply tensors, isotropic products, linearly combined tensors.
+def _contract_deltas(deltas: list, epsilons: list) -> tuple[int, list, list]:
+    """Collapse every delta that carries a repeated label.
 
-    Args:
-        *tensors: the tensors or isotropic products to multiply.
-        factor: Additional factor to be multiplied to the isotropic product, default is 1.
+    A delta with a label that occurs elsewhere moves its other label there and
+    disappears; a delta whose two labels coincide is a closed loop, a factor of 3.
 
     Returns:
-        The new isotropic product.
+        The integer factor, the deltas left (each label in them free), and the
+        Levi-Civita symbols with their labels renamed.
     """
-    # First, convert input to Tensors
-    new_tensors = []
-    for t in tensors:
-        if isinstance(t, (IsotropicTensor, IsotropicProduct)):
-            new_tensors.append(LinearCombination(t))
-        elif isinstance(t, LinearCombination):
-            new_tensors.append(t)
-        else:
-            raise ValueError("Unexpected type")
+    pending = [pair[:] for pair in deltas]
+    symbols = [triple[:] for triple in epsilons]
+    factor = 1
+    kept = []
+    while pending:
+        a, b = pending.pop()
+        if a == b:
+            factor *= 3
+        elif not (_replace(a, b, pending, symbols) or _replace(b, a, pending, symbols)):
+            kept.append([a, b])
 
-    all_tp = []
-    for prod in itertools.product(*new_tensors):
-        all_tp.append(multiply(*prod, factor=factor))
-
-    return LinearCombination(*all_tp)
+    return factor, kept, symbols
 
 
-# def symmetrize(
-#     tensor: IsotropicTensor | IsotropicProduct, indices: str = None
-# ) -> LinearCombination:
-#     """
-#     Symmetrize a tensor or isotropic product over the given indices.
-#
-#     Args:
-#         tensor: The tensor or isotropic product to symmetrize.
-#         indices: The indices to symmetrize over. If None, all non-repeated indices are
-#             symmetrized.
-#
-#     Returns:
-#         A `LinearCombination` of tensors/isotropic products, each with a different
-#         permutation of the indices, and each is normalized by the number of total
-#         permutations.
-#     """
-#
-#     if indices is None:
-#         indices = [i for i, c in Counter(tensor.indices).items() if c == 1]
-#     else:
-#         # check provided indices are not repeated in the tensor
-#         for i in indices:
-#             if tensor.indices.count(i) != 1:
-#                 raise ValueError(f"Index {i} must appear exactly once in the tensor")
-#
-#     moveable_pos = [i for i, x in enumerate(tensor.indices) if x in indices]
-#
-#     all_tensors = []
-#     permutations = list(itertools.permutations(moveable_pos))
-#     for perm in permutations:
-#         # candidate permute
-#         permute = list(range(len(tensor.indices)))
-#         # update permute positions
-#         for i, p in zip(moveable_pos, perm):
-#             permute[i] = p
-#
-#         t = tensor.permute_indices(permute, factor=Fraction(1, len(permutations)))
-#         all_tensors.append(t)
-#
-#     return LinearCombination(*all_tensors)
+def _replace(old: Hashable, new: Hashable, deltas: list, epsilons: list) -> bool:
+    """Replace one occurrence of a label among the blocks; whether one was found."""
+    for block in (*deltas, *epsilons):
+        for position, label in enumerate(block):
+            if label == old:
+                block[position] = new
+                return True
+
+    return False

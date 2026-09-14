@@ -22,70 +22,14 @@ import itertools
 from fractions import Fraction
 
 from natto.indices import get_permutations_2, letter_index
-from natto.symbolic import (
-    IndexGroup,
-    LinearCombination,
-    Operator,
-    Signature,
-    Term,
-    create_delta_epsilon_tensors,
-)
+from natto.symbolic import IndexGroup, Operator, Signature, Term
 
 
-def get_natural_projector(
-    ell: int, s_letters: str = None, verbose: int = 0
-) -> LinearCombination:
-    """The natural projector of one weight.
-
-    Args:
-        ell: Weight of the ICT the projector belongs to.
-        s_letters: Letters for the upper case indices. If None, use the default:
-            A, B, C, etc.
-        verbose: Verbosity level for debugging.
-
-    Returns:
-        A linear combination of delta products. Lower case letters a, b, c, etc. carry
-        the r indices and upper case A, B, C, etc. the s indices.
-
-    References:
-        Eq. 7 of [Wen2026], with the coefficients built by the recursion of Eq. S27.
-    """
-    out = []
-    for t, c in enumerate(_projector_coefficients(ell)):
-        # get all rules
-        all_rules = get_projector_rules(ell, t, s_letters)
-
-        # Total factor: c / len(all_rules), where len(all_rules) averages over all
-        # the rules.
-        factor = c / len(all_rules)
-
-        # create isotropic products of deltas for each rule
-        delta_tensors = [
-            create_delta_epsilon_tensors(
-                rule["d_rs"] + rule["d_rr"] + rule["d_ss"], factor=factor
-            )
-            for rule in all_rules
-        ]
-
-        out.extend(delta_tensors)
-
-        if verbose > 0:
-            tmp = []
-            tmp.extend(delta_tensors)
-            print(
-                f"@ debug E: ell={ell}, t={t}, c={c}, "
-                f"num terms: {len(tmp)}, terms: {LinearCombination(*tmp)}"
-            )
-
-    return LinearCombination(*out)
-
-
-def get_projector_operator(ell: int) -> Operator:
+def get_natural_projector(ell: int) -> Operator:
     """The natural projector of one weight, as an operator over index slots.
 
     Its signature is the `weight` group, printing as a, b, c, ..., followed by the
-    `sigma` group, printing as A, B, C, ...; its terms come in the order
-    `get_natural_projector` builds them.
+    `sigma` group, printing as A, B, C, ....
 
     Args:
         ell: Weight of the ICT the projector belongs to.
