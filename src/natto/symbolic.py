@@ -17,8 +17,6 @@ from types import MappingProxyType
 
 import numpy as np
 
-from natto.utils import dij, eijk
-
 
 @dataclass(frozen=True)
 class IndexGroup:
@@ -361,18 +359,20 @@ class Operator:
             raise ValueError(f"The order must name the groups {names}, got {order}")
         axes = [slot for name in order for slot in self._signature.slots(name)]
 
-        delta, epsilon = dij(), eijk()
-        result = np.zeros((3,) * self._signature.size)
+        # The stride of each slot in the flattened array, with the axes in `order`
+        size = self._signature.size
+        stride = [0] * size
+        for position, slot in enumerate(axes):
+            stride[slot] = 3 ** (size - 1 - position)
+
+        # A product of deltas and Levi-Civita symbols is zero almost everywhere, so each
+        # term adds its coefficient only where it is nonzero. Every entry receives the
+        # same additions in the same order as summing the dense terms would give.
+        flat = np.zeros(3**size)
         for term, coefficient in self._terms.items():
-            operands = []
-            for pair in term.deltas:
-                operands += [delta, list(pair)]
-            for triple in term.epsilons:
-                operands += [epsilon, list(triple)]
-            if operands:
-                result = result + float(coefficient) * np.einsum(*operands, axes)
-            else:
-                result = result + float(coefficient)
+            indices, signs = _nonzero_entries(term, stride)
+            flat[indices] += float(coefficient) * signs
+        result = flat.reshape((3,) * size)
 
         return result
 
@@ -449,7 +449,43 @@ _COEFFICIENT = re.compile(r"^[+-]?\d+(/\d+)?$")
 #: A factor token: a tensor name, an underscore and the index letters.
 _FACTOR = re.compile(r"^(δ|ε|delta|epsilon|eps|d|e)_([A-Za-z]+)$")
 
+#: The index values at which a Levi-Civita symbol is nonzero, and its value there.
+_PERMUTATIONS = np.array(
+    [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]
+)
+_PERMUTATION_SIGNS = np.array([1.0, -1.0, -1.0, 1.0, 1.0, -1.0])
+
 _DELTA_NAMES = {"δ", "d", "delta"}
+
+
+def _nonzero_entries(
+    term: Term, stride: Sequence[int]
+) -> tuple[np.ndarray, np.ndarray]:
+    """The flat positions and values of the nonzero entries of one term.
+
+    A delta is nonzero, and one, where its two indices agree; a Levi-Civita symbol where
+    its three indices are a permutation of 0, 1 and 2, with that permutation's sign.
+    The nonzero entries of the product are every combination of those.
+
+    Args:
+        term: A term using every slot of its signature once.
+        stride: The stride of each slot in the flattened array.
+
+    Returns:
+        The flat positions, distinct, and the value at each, 1 or -1.
+    """
+    indices = np.zeros(1, dtype=np.int64)
+    signs = np.ones(1)
+    for a, b in term.deltas:
+        offsets = np.arange(3) * (stride[a] + stride[b])
+        indices = (indices[:, None] + offsets[None, :]).ravel()
+        signs = np.repeat(signs, 3)
+    for triple in term.epsilons:
+        offsets = _PERMUTATIONS @ np.array([stride[slot] for slot in triple])
+        indices = (indices[:, None] + offsets[None, :]).ravel()
+        signs = (signs[:, None] * _PERMUTATION_SIGNS[None, :]).ravel()
+
+    return indices, signs
 
 
 def _parse_factors(factors: Sequence[str], signature: Signature) -> tuple[int, Term]:
