@@ -6,7 +6,10 @@ from typing import NamedTuple, Optional
 import numpy as np
 import pytest
 
+from natto.gram import get_gram_entry
 from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
+from natto.mapping_tensors import get_extraction_operators
+from natto.rational import matrix_inverse
 from natto.reduction import get_independent_mappings, get_reduction
 
 
@@ -98,6 +101,12 @@ def get_tensor_class_params(
 def get_reduction_cached(rank: int, symmetry: str) -> dict:
     """`get_reduction`, computed once per class; rank 4 costs seconds."""
     return get_reduction(rank, symmetry)
+
+
+@functools.lru_cache(maxsize=None)
+def get_orthonormal_cached(rank: int, symmetry: str) -> dict:
+    """`get_reduction` in the orthonormal basis, computed once per class."""
+    return get_reduction(rank, symmetry, basis="orthonormal")
 
 
 def cycle_index_multiplicities(n: int, symmetry: Optional[str]) -> dict[int, int]:
@@ -193,6 +202,53 @@ def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
     assert found == cycle_index_multiplicities(tensor_class.rank, tensor_class.symmetry)
 
 
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params())
+def test_duality_is_exact(tensor_class: TensorClass):
+    """Each dual contracts to one with its own mapping and to zero with the others.
+
+    The contractions are exact Gram entries, so the identity holds as a fact rather
+    than to within a tolerance.
+    """
+    for weight in tensor_class.multiplicity:
+        G, gram = get_independent_mappings(
+            weight, tensor_class.rank, tensor_class.symmetry
+        )
+        duals = get_extraction_operators(matrix_inverse(gram), G)
+
+        for p, dual in enumerate(duals):
+            entries = [get_gram_entry(dual, G_q) for G_q in G]
+
+            assert entries == [Fraction(int(p == q)) for q in range(len(G))]
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params())
+def test_weight_projector_is_basis_independent(tensor_class: TensorClass):
+    """Summed over channels, both bases give the same projector onto each weight.
+
+    The dual basis builds its decomposition operators symbolically and exactly; the
+    orthonormal basis rotates the mappings by a numerical inverse square root. The
+    projector onto a weight does not depend on the basis within it, so the two routes
+    must agree.
+    """
+    rank = tensor_class.rank
+    dual = get_reduction_cached(rank, tensor_class.symmetry)
+    orthonormal = get_orthonormal_cached(rank, tensor_class.symmetry)
+
+    assert sorted(dual) == sorted(orthonormal)
+    for weight, data in dual.items():
+        summed = sum(entry["numerical"] for entry in data["decomposition"])
+
+        weight_axes = list(range(rank, rank + weight))
+        expected = sum(
+            np.tensordot(
+                entry["numerical"], entry["numerical"], axes=(weight_axes,) * 2
+            )
+            for entry in orthonormal[weight]["embedding"]
+        )
+
+        np.testing.assert_allclose(summed, expected, rtol=0, atol=1e-12)
+
+
 @pytest.mark.parametrize(
     "tensor_class",
     get_tensor_class_params(
@@ -260,7 +316,7 @@ def test_reduction_round_trip(tensor_class: TensorClass):
             T_p_2 = np.einsum(decomposition["rule"], decomposition["numerical"], T)
 
             # T_p_1 and T_p_2 should be equal
-            assert np.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+            assert np.allclose(T_p_1, T_p_2, rtol=0, atol=1e-10), (
                 f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
             )
 
@@ -268,4 +324,4 @@ def test_reduction_round_trip(tensor_class: TensorClass):
 
     sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 
-    assert np.allclose(sum_T_prime, T, rtol=1e-5, atol=1e-6)
+    assert np.allclose(sum_T_prime, T, rtol=0, atol=1e-10)
