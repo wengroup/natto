@@ -1,0 +1,158 @@
+{
+  "0": {
+    "embedding": [
+      [
+        "+1 δ_AB δ_CD",
+        "+1 δ_AC δ_BD",
+        "+1 δ_AD δ_BC"
+      ]
+    ],
+    "gram": [
+      [
+        "45"
+      ]
+    ]
+  },
+  "2": {
+    "embedding": [
+      [
+        "+1/2 δ_Aa δ_Bb δ_CD",
+        "+1/2 δ_Ab δ_Ba δ_CD",
+        "-2/3 δ_AB δ_CD δ_ab",
+        "+1/2 δ_Aa δ_BD δ_Cb",
+        "+1/2 δ_Ab δ_BD δ_Ca",
+        "-2/3 δ_AC δ_BD δ_ab",
+        "+1/2 δ_Aa δ_BC δ_Db",
+        "+1/2 δ_Ab δ_BC δ_Da",
+        "-2/3 δ_AD δ_BC δ_ab",
+        "+1/2 δ_AD δ_Ba δ_Cb",
+        "+1/2 δ_AD δ_Bb δ_Ca",
+        "+1/2 δ_AC δ_Ba δ_Db",
+        "+1/2 δ_AC δ_Bb δ_Da",
+        "+1/2 δ_AB δ_Ca δ_Db",
+        "+1/2 δ_AB δ_Cb δ_Da"
+      ]
+    ],
+    "gram": [
+      [
+        "42"
+      ]
+    ]
+  },
+  "4": {
+    "embedding": [
+      [
+        "+1/24 δ_Aa δ_Bb δ_Cc δ_Dd",
+        "+1/24 δ_Aa δ_Bb δ_Cd δ_Dc",
+        "+1/24 δ_Aa δ_Bc δ_Cb δ_Dd",
+        "+1/24 δ_Aa δ_Bc δ_Cd δ_Db",
+        "+1/24 δ_Aa δ_Bd δ_Cb δ_Dc",
+        "+1/24 δ_Aa δ_Bd δ_Cc δ_Db",
+        "+1/24 δ_Ab δ_Ba δ_Cc δ_Dd",
+        "+1/24 δ_Ab δ_Ba δ_Cd δ_Dc",
+        "+1/24 δ_Ab δ_Bc δ_Ca δ_Dd",
+        "+1/24 δ_Ab δ_Bc δ_Cd δ_Da",
+        "+1/24 δ_Ab δ_Bd δ_Ca δ_Dc",
+        "+1/24 δ_Ab δ_Bd δ_Cc δ_Da",
+        "+1/24 δ_Ac δ_Ba δ_Cb δ_Dd",
+        "+1/24 δ_Ac δ_Ba δ_Cd δ_Db",
+        "+1/24 δ_Ac δ_Bb δ_Ca δ_Dd",
+        "+1/24 δ_Ac δ_Bb δ_Cd δ_Da",
+        "+1/24 δ_Ac δ_Bd δ_Ca δ_Db",
+        "+1/24 δ_Ac δ_Bd δ_Cb δ_Da",
+        "+1/24 δ_Ad δ_Ba δ_Cb δ_Dc",
+        "+1/24 δ_Ad δ_Ba δ_Cc δ_Db",
+        "+1/24 δ_Ad δ_Bb δ_Ca δ_Dc",
+        "+1/24 δ_Ad δ_Bb δ_Cc δ_Da",
+        "+1/24 δ_Ad δ_Bc δ_Ca δ_Db",
+        "+1/24 δ_Ad δ_Bc δ_Cb δ_Da",
+        "-1/84 δ_Aa δ_Bb δ_CD δ_cd",
+        "-1/84 δ_Ab δ_Ba δ_CD δ_cd",
+        "-1/84 δ_Aa δ_BD δ_Cb δ_cd",
+        "-1/84 δ_Ab δ_BD δ_Ca δ_cd",
+        "-1/84 δ_Aa δ_BC δ_Db δ_cd",
+        "-1/84 δ_Ab δ_BC δ_Da δ_cd",
+        "-1/84 δ_AD δ_Ba δ_Cb δ_cd",
+        "-1/84 δ_AD δ_Bb δ_Ca δ_cd",
+        "-1/84 δ_AC δ_Ba δ_Db δ_cd",
+        "-1/84 δ_AC δ_Bb δ_Da δ_cd",
+        "-1/84 δ_AB δ_Ca δ_Db δ_cd",
+        "-1/84 δ_AB δ_Cb δ_Da δ_cd",
+        "-1/84 δ_Aa δ_Bc δ_CD δ_bd",
+        "-1/84 δ_Ac δ_Ba δ_CD δ_bd",
+        "-1/84 δ_Aa δ_BD δ_Cc δ_bd",
+        "-1/84 δ_Ac δ_BD δ_Ca δ_bd",
+        "-1/84 δ_Aa δ_BC δ_Dc δ_bd",
+        "-1/84 δ_Ac δ_BC δ_Da δ_bd",
+        "-1/84 δ_AD δ_Ba δ_Cc δ_bd",
+        "-1/84 δ_AD δ_Bc δ_Ca δ_bd",
+        "-1/84 δ_AC δ_Ba δ_Dc δ_bd",
+        "-1/84 δ_AC δ_Bc δ_Da δ_bd",
+        "-1/84 δ_AB δ_Ca δ_Dc δ_bd",
+        "-1/84 δ_AB δ_Cc δ_Da δ_bd",
+        "-1/84 δ_Aa δ_Bd δ_CD δ_bc",
+        "-1/84 δ_Ad δ_Ba δ_CD δ_bc",
+        "-1/84 δ_Aa δ_BD δ_Cd δ_bc",
+        "-1/84 δ_Ad δ_BD δ_Ca δ_bc",
+        "-1/84 δ_Aa δ_BC δ_Dd δ_bc",
+        "-1/84 δ_Ad δ_BC δ_Da δ_bc",
+        "-1/84 δ_AD δ_Ba δ_Cd δ_bc",
+        "-1/84 δ_AD δ_Bd δ_Ca δ_bc",
+        "-1/84 δ_AC δ_Ba δ_Dd δ_bc",
+        "-1/84 δ_AC δ_Bd δ_Da δ_bc",
+        "-1/84 δ_AB δ_Ca δ_Dd δ_bc",
+        "-1/84 δ_AB δ_Cd δ_Da δ_bc",
+        "-1/84 δ_Ab δ_Bc δ_CD δ_ad",
+        "-1/84 δ_Ac δ_Bb δ_CD δ_ad",
+        "-1/84 δ_Ab δ_BD δ_Cc δ_ad",
+        "-1/84 δ_Ac δ_BD δ_Cb δ_ad",
+        "-1/84 δ_Ab δ_BC δ_Dc δ_ad",
+        "-1/84 δ_Ac δ_BC δ_Db δ_ad",
+        "-1/84 δ_AD δ_Bb δ_Cc δ_ad",
+        "-1/84 δ_AD δ_Bc δ_Cb δ_ad",
+        "-1/84 δ_AC δ_Bb δ_Dc δ_ad",
+        "-1/84 δ_AC δ_Bc δ_Db δ_ad",
+        "-1/84 δ_AB δ_Cb δ_Dc δ_ad",
+        "-1/84 δ_AB δ_Cc δ_Db δ_ad",
+        "-1/84 δ_Ab δ_Bd δ_CD δ_ac",
+        "-1/84 δ_Ad δ_Bb δ_CD δ_ac",
+        "-1/84 δ_Ab δ_BD δ_Cd δ_ac",
+        "-1/84 δ_Ad δ_BD δ_Cb δ_ac",
+        "-1/84 δ_Ab δ_BC δ_Dd δ_ac",
+        "-1/84 δ_Ad δ_BC δ_Db δ_ac",
+        "-1/84 δ_AD δ_Bb δ_Cd δ_ac",
+        "-1/84 δ_AD δ_Bd δ_Cb δ_ac",
+        "-1/84 δ_AC δ_Bb δ_Dd δ_ac",
+        "-1/84 δ_AC δ_Bd δ_Db δ_ac",
+        "-1/84 δ_AB δ_Cb δ_Dd δ_ac",
+        "-1/84 δ_AB δ_Cd δ_Db δ_ac",
+        "-1/84 δ_Ac δ_Bd δ_CD δ_ab",
+        "-1/84 δ_Ad δ_Bc δ_CD δ_ab",
+        "-1/84 δ_Ac δ_BD δ_Cd δ_ab",
+        "-1/84 δ_Ad δ_BD δ_Cc δ_ab",
+        "-1/84 δ_Ac δ_BC δ_Dd δ_ab",
+        "-1/84 δ_Ad δ_BC δ_Dc δ_ab",
+        "-1/84 δ_AD δ_Bc δ_Cd δ_ab",
+        "-1/84 δ_AD δ_Bd δ_Cc δ_ab",
+        "-1/84 δ_AC δ_Bc δ_Dd δ_ab",
+        "-1/84 δ_AC δ_Bd δ_Dc δ_ab",
+        "-1/84 δ_AB δ_Cc δ_Dd δ_ab",
+        "-1/84 δ_AB δ_Cd δ_Dc δ_ab",
+        "+1/105 δ_AB δ_CD δ_ab δ_cd",
+        "+1/105 δ_AC δ_BD δ_ab δ_cd",
+        "+1/105 δ_AD δ_BC δ_ab δ_cd",
+        "+1/105 δ_AB δ_CD δ_ac δ_bd",
+        "+1/105 δ_AC δ_BD δ_ac δ_bd",
+        "+1/105 δ_AD δ_BC δ_ac δ_bd",
+        "+1/105 δ_AB δ_CD δ_ad δ_bc",
+        "+1/105 δ_AC δ_BD δ_ad δ_bc",
+        "+1/105 δ_AD δ_BC δ_ad δ_bc"
+      ]
+    ],
+    "gram": [
+      [
+        "1"
+      ]
+    ]
+  }
+}

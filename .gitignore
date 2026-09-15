@@ -135,7 +135,3 @@ dmypy.json
 git_commit.txt
 TODO.md
 .codegraph/
-
-# Golden snapshots too large to commit. Generated on demand with
-# NATTO_REGOLD=1; the tests that use them skip when they are absent.
-tests/snapshots/local/

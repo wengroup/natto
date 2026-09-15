@@ -11,6 +11,7 @@ from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
 from natto.mapping_tensors import compose, get_dual_mappings
 from natto.rational import matrix_inverse
 from natto.reduction import (
+    _get_channels,
     get_composed_operators,
     get_independent_mappings,
     get_reduction,
@@ -37,7 +38,7 @@ class TensorClass(NamedTuple):
 
     @property
     def test_id(self) -> str:
-        """Identifier of this class, unique because two rows share an example."""
+        """Identifier of this class, used for test ids and snapshot names."""
         return f"rank{self.rank}_{self.example.replace(' ', '_')}"
 
 
@@ -46,11 +47,14 @@ PHYSICAL_TENSOR_CLASSES = [
     TensorClass("spontaneous polarization", 1, None, 3, {1: 1}),
     TensorClass("optical activity", 2, None, 9, {0: 1, 1: 1, 2: 1}),
     TensorClass("stress and strain", 2, "ij=ji", 6, {0: 1, 2: 1}),
-    TensorClass("rate-of-rotation tensor", 2, "ij=-ji", 3, {1: 1}),
-    TensorClass("optical mixing", 3, None, 27, {0: 1, 1: 3, 2: 2, 3: 1}),
+    TensorClass("rotation rate", 2, "ij=-ji", 3, {1: 1}),
+    TensorClass("second-order optical mixing", 3, None, 27, {0: 1, 1: 3, 2: 2, 3: 1}),
     TensorClass("piezoelectric effect", 3, "ijk=ikj", 18, {1: 2, 2: 1, 3: 1}),
     TensorClass("Kleinman symmetry in SHG", 3, "ijk=ikj=jik", 10, {1: 1, 3: 1}),
-    TensorClass("optical mixing", 4, None, 81, {0: 3, 1: 6, 2: 6, 3: 3, 4: 1}),
+    TensorClass("Hall effect", 3, "ijk=-jik", 9, {0: 1, 1: 1, 2: 1}),
+    TensorClass(
+        "third-order optical mixing", 4, None, 81, {0: 3, 1: 6, 2: 6, 3: 3, 4: 1}
+    ),
     # the j=1 sector of the photoelastic class is what the unpivoted-QR selection in
     # `natto.qr` used to get wrong, see tests/test_qr.py
     TensorClass(
@@ -58,14 +62,23 @@ PHYSICAL_TENSOR_CLASSES = [
     ),
     TensorClass("Kerr effect", 4, "ijkl=jikl=ijlk", 36, {0: 2, 1: 1, 2: 3, 3: 1, 4: 1}),
     TensorClass(
-        "third harmonic generation",
+        "third-harmonic generation",
         4,
         "ijkl=ikjl=jikl",
         30,
         {0: 1, 1: 1, 2: 2, 3: 1, 4: 1},
     ),
-    TensorClass("elasticity", 4, "ijkl=jikl=klij", 21, {0: 2, 2: 2, 4: 1}),
+    TensorClass("second-order elasticity", 4, "ijkl=jikl=klij", 21, {0: 2, 2: 2, 4: 1}),
     TensorClass("Cauchy relations", 4, "ijkl=jikl=kjil=ljki", 15, {0: 1, 2: 1, 4: 1}),
+    # ((ij)(kl)(mn)): exchange within the first pair, and of the first pair with the
+    # second and of the second with the third
+    TensorClass(
+        "third-order elasticity",
+        6,
+        "ijklmn=jiklmn=klijmn=ijmnkl",
+        56,
+        {0: 3, 2: 3, 3: 1, 4: 2, 6: 1},
+    ),
 ]
 
 #: The symbolic Gram matrix is exact, so a structural zero in it meets a float64
@@ -118,6 +131,18 @@ def get_orthonormal_cached(rank: int, symmetry: str) -> dict:
 def get_composed_operators_cached(rank: int, symmetry: str) -> dict:
     """`get_composed_operators`, computed once per class."""
     return get_composed_operators(rank, symmetry=symmetry)
+
+
+def get_independent_mappings_cached(weight: int, rank: int, symmetry: str) -> tuple:
+    """The independent mappings of a sector and their Gram matrix, selected once.
+
+    Read from the package's own cache, which `get_reduction` fills, so a sector already
+    reduced is not selected again; rank six costs seconds.
+    """
+    G, _, gram = _get_channels(weight, rank, symmetry)
+    mappings = (list(G), [list(row) for row in gram])
+
+    return mappings
 
 
 def count_channels(operators: dict) -> dict[int, int]:
@@ -224,7 +249,12 @@ def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
     assert found == cycle_index_multiplicities(tensor_class.rank, tensor_class.symmetry)
 
 
-@pytest.mark.parametrize("tensor_class", get_tensor_class_params())
+@pytest.mark.parametrize(
+    "tensor_class",
+    # The float selection evaluates every candidate in full, which at rank six takes
+    # seconds; the lower ranks already compare it with the exact one.
+    get_tensor_class_params([tc for tc in PHYSICAL_TENSOR_CLASSES if tc.rank <= 4]),
+)
 def test_qr_selection_spans_the_same_weights(tensor_class: TensorClass):
     """Algorithm 1 of the paper may keep other mappings, but spans the same spaces.
 
@@ -249,7 +279,7 @@ def test_duality_is_exact(tensor_class: TensorClass):
     than to within a tolerance.
     """
     for weight in tensor_class.multiplicity:
-        G, gram = get_independent_mappings(
+        G, gram = get_independent_mappings_cached(
             weight, tensor_class.rank, tensor_class.symmetry
         )
         duals = get_dual_mappings(matrix_inverse(gram), G)
@@ -298,7 +328,7 @@ def test_weight_projector_is_basis_independent(tensor_class: TensorClass):
 def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
     """Check exact Gram matrices for every internally symmetric weight sector."""
     for weight in tensor_class.multiplicity:
-        Q, gram = get_independent_mappings(
+        Q, gram = get_independent_mappings_cached(
             weight, tensor_class.rank, tensor_class.symmetry
         )
         numerical_Q = np.stack([Q_p.expand().evaluate() for Q_p in Q])
