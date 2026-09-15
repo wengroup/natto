@@ -1,22 +1,19 @@
 """The reduction of a Cartesian tensor into irreducible Cartesian tensors.
 
 This is the public entry point. `get_reduction` returns, for each weight and channel
-of a tensor of some rank, the operators that move between the two spaces: the
-embedding operator, the extraction operator dual to it, and their composition, the
-decomposition operator.
+of a tensor of some rank, the two operators that move between the two spaces: the
+embedding operator, and the extraction operator dual to it.
 
 Contracting the extraction operator with a Cartesian tensor gives the ICT of that
 weight and channel. Contracting the embedding operator back with that ICT returns
-the tensor's part of this weight and channel. The decomposition operator is the two
-composed, so it takes the tensor straight to that part without forming the ICT on
-the way, and summing those parts over every weight and channel returns the tensor.
+the tensor's part of this weight and channel, and summing those parts over every
+weight and channel returns the tensor. They are published under the keys
+`embedding` and `extraction`.
 
-They are published under the keys `embedding`, `extraction` and `decomposition`.
-`decomposition` is the awkward one: it names the whole reduction in ordinary use,
-while each of these is one channel of it, so a set of them reads as several
-decompositions. The alternatives lost for worse reasons -- `projector` collides with
-the natural projector, `component` and `part` are too general, `composition` reads as
-stoichiometry in a materials context, and `filter` shadows a builtin.
+`get_composed_operators` gives, on request, the two composed into one rank-2n operator
+that takes the tensor straight to its part of a weight and channel. The paper applies
+the two operators in turn instead, and at rank n the composed operator has 3^(2n)
+entries per channel, so the reduction does not build it.
 
 The work is staged, because the two bases need different amounts of it.
 `get_independent_mappings` is common to both: it keeps an independent subset of the
@@ -102,11 +99,10 @@ def get_reduction(
             fixes which duals are canonical.
 
     Returns:
-        The embedding, extraction and decomposition operators keyed by weight,
-        each with the einsum rule that applies it. A weight the symmetry
-        extinguishes is absent rather than empty. The Gram matrix comes with its
-        inverse in the dual basis and with its inverse square root in the
-        orthonormal one.
+        The embedding and extraction operators keyed by weight, each with the einsum
+        rule that applies it. A weight the symmetry extinguishes is absent rather
+        than empty. The Gram matrix comes with its inverse in the dual basis and with
+        its inverse square root in the orthonormal one.
 
     Raises:
         ValueError: If `basis` is neither `dual` nor `orthonormal`, or if
@@ -114,7 +110,7 @@ def get_reduction(
             `embeddings`.
 
     References:
-        Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the decomposition, and
+        Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the embedding, and
         Eq. 20 for the sum that returns the tensor.
     """
     if basis not in ("dual", "orthonormal"):
@@ -132,19 +128,75 @@ def get_reduction(
             # The self-dual basis needs no duals, so none are built.
             out[ell] = get_orthonormal_entries(ell, n, G, gram)
         else:
-            G_simplified, G_tilde, S, gram_inverse = get_dual_pair(G, gram)
+            G_expanded, G_tilde, gram_inverse = get_dual_pair(G, gram)
             out[ell] = assemble_operator_entries(
                 ell,
                 n,
-                G_simplified,
+                G_expanded,
                 G_tilde,
-                S,
                 gram,
                 gram_inverse,
                 numerical,
                 include_gram=True,
                 include_gram_inverse=True,
             )
+
+    return out
+
+
+def get_composed_operators(
+    n: int,
+    symmetry: str = None,
+    numerical: bool = True,
+    selection: Selection = "symbolic",
+) -> dict:
+    """The composed operators of a Cartesian tensor space, in the dual basis.
+
+    Each is the embedding operator of one weight and channel composed with its
+    extraction dual over the weight indices: a rank-2n operator that takes a tensor
+    straight to its part of that weight and channel. The paper applies the two
+    operators in turn, Eq. 18 and then Eq. 19, and never forms this one; at rank n
+    it has 3^(2n) entries per channel, which is why `get_reduction` leaves it out.
+
+    Args:
+        n: Rank of the Cartesian tensor.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any, as for
+            `get_reduction`.
+        numerical: Whether to evaluate the operators as well as building them
+            symbolically.
+        selection: What to judge the independence of the candidate mappings on, as
+            for `get_reduction`.
+
+    Returns:
+        One list of operators per weight, one per channel, each with its symbolic
+        form, the einsum rule that applies it and, if asked for, its array. A weight
+        the symmetry extinguishes is absent.
+
+    Raises:
+        ValueError: If `selection` is not recognized.
+
+    References:
+        Eq. 18 and Eq. 19 of [Wen2026], composed. Computed as in A.2 of
+        [Wen2026Refactor].
+    """
+    upper = letter_index(n, upper_case=True)
+    upper2 = letter_index(n, start=n, upper_case=True)
+    rule = f"{upper}{upper2},...{upper2}->...{upper}"
+
+    out = {}
+    for ell in range(n + 1):
+        G, gram = get_independent_mappings(ell, n, symmetry, selection)
+        if not G:
+            continue
+
+        duals = get_extraction_operators(matrix_inverse(gram), G)
+        entries = []
+        for S_p in get_decomposition_operators(G, duals):
+            entry = {"symbolic": str(S_p), "rule": rule}
+            if numerical:
+                entry["numerical"] = S_p.evaluate(("rank", "rank_in"))
+            entries.append(entry)
+        out[ell] = entries
 
     return out
 
@@ -225,31 +277,30 @@ def get_independent_mappings(
 
 def get_dual_pair(
     G: list[Mapping], gram: list[list[Fraction]]
-) -> tuple[list[Operator], list[Operator], list[Operator], list[list[Fraction]]]:
+) -> tuple[list[Operator], list[Operator], list[list[Fraction]]]:
     """Complete the mappings into an extraction-and-embedding pair, exactly.
 
     Each dual is the combination of the mappings whose coefficients are a row of the
     inverse Gram matrix, so inverting that matrix over the rationals is all that is
-    needed; composing a mapping with its dual gives the decomposition operator.
+    needed.
 
     Args:
         G: The independent mappings, from `get_independent_mappings`.
         gram: Their exact Gram matrix.
 
     Returns:
-        The mappings, their duals and the decomposition operators, as operators, and
-        the exact inverse of the Gram matrix.
+        The mappings and their duals, as operators, and the exact inverse of the Gram
+        matrix.
 
     References:
-        Eq. 16 of [Wen2026] for the duals, Eq. 19 for the decomposition operators.
+        Eq. 16 of [Wen2026].
     """
     gram_inverse = matrix_inverse(gram)
     duals = get_extraction_operators(gram_inverse, G)
-    S = get_decomposition_operators(G, duals)
     G_expanded = [G_p.expand() for G_p in G]
     G_tilde = [dual.expand() for dual in duals]
 
-    return G_expanded, G_tilde, S, gram_inverse
+    return G_expanded, G_tilde, gram_inverse
 
 
 def assemble_operator_entries(
@@ -257,7 +308,6 @@ def assemble_operator_entries(
     n: int,
     G: list[Operator],
     G_tilde: list[Operator],
-    S: list[Operator],
     gram: list[list[Fraction]],
     gram_inverse: list[list[Fraction]],
     numerical: bool = True,
@@ -275,7 +325,6 @@ def assemble_operator_entries(
         n: Rank of the Cartesian tensor.
         G: Embedding operators, one per channel.
         G_tilde: Extraction operators dual to them.
-        S: Their composition, one per channel.
         gram: Gram matrix of the embedding operators.
         gram_inverse: Its exact inverse.
         numerical: Whether to evaluate each operator as well as recording it
@@ -284,10 +333,10 @@ def assemble_operator_entries(
         include_gram_inverse: Whether to report its inverse.
 
     Returns:
-        The operators under the keys `embedding`, `extraction` and
-        `decomposition`, plus `gram` and `gram_inverse` when asked for.
+        The operators under the keys `embedding` and `extraction`, plus `gram` and
+        `gram_inverse` when asked for.
     """
-    out_weight = {"embedding": [], "extraction": [], "decomposition": []}
+    out_weight = {"embedding": [], "extraction": []}
 
     if include_gram:
         out_weight["gram"] = {
@@ -303,9 +352,8 @@ def assemble_operator_entries(
 
     lower = letter_index(ell)
     upper = letter_index(n, upper_case=True)
-    upper2 = letter_index(n, start=n, upper_case=True)
 
-    for G_p, G_tilde_p, S_p in zip(G, G_tilde, S):
+    for G_p, G_tilde_p in zip(G, G_tilde):
         out_weight["embedding"].append(
             {"symbolic": str(G_p), "rule": f"{upper}{lower},...{lower}->...{upper}"}
         )
@@ -321,14 +369,6 @@ def assemble_operator_entries(
         if numerical:
             out_weight["extraction"][-1]["numerical"] = G_tilde_p.evaluate(
                 ("weight", "rank")
-            )
-
-        out_weight["decomposition"].append(
-            {"symbolic": str(S_p), "rule": f"{upper}{upper2},...{upper2}->...{upper}"}
-        )
-        if numerical:
-            out_weight["decomposition"][-1]["numerical"] = S_p.evaluate(
-                ("rank", "rank_in")
             )
 
     return out_weight

@@ -69,10 +69,12 @@ into its natural tensor components and reconstruct it back. Specifically:
 
 - `extraction` extracts a natural tensor component from the physical tensor.
 - `embedding` embeds a natural tensor component back into the physical tensor space.
-- `decomposition` is their composition, taking the physical tensor straight to its
-  weight-`l`, channel-`p` part without forming the natural tensor.
 
-The file contains the symbolic and numerical values of the three for each
+Their composition, taking the physical tensor straight to its weight-`l`,
+channel-`p` part without forming the natural tensor, is not in the file; build it
+with `natto.reduction.get_composed_operators` when needed.
+
+The file contains the symbolic and numerical values of the two for each
 physical tensor and each natural tensor component (labeled by its weight).
 
 The data is organized in the following way:
@@ -85,8 +87,6 @@ The data is organized in the following way:
             {"embedding": [{"symbolic": symbolic expression,
                    "numerical": numerical values }],
              "extraction": [{"symbolic": symbolic expression,
-                   "numerical": numerical values }],
-             "decomposition": [{"symbolic": symbolic expression,
                    "numerical": numerical values }]
             }
     }

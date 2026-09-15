@@ -8,6 +8,7 @@ its terms contracted as dense arrays.
 import numpy as np
 
 from natto.coupling import get_coupling_symbolic
+from natto.mapping_tensors import get_decomposition_operators, get_extraction_operators
 from natto.natural_projector import get_natural_projector
 from natto.reduction import get_dual_pair, get_independent_mappings
 from natto.symbolic import Operator
@@ -22,7 +23,9 @@ def package_operators() -> list[Operator]:
     for ell in range(4):
         G, gram = get_independent_mappings(ell, 3, "ijk=ikj")
         if G:
-            embedding, extraction, decomposition, _ = get_dual_pair(G, gram)
+            embedding, extraction, gram_inverse = get_dual_pair(G, gram)
+            duals = get_extraction_operators(gram_inverse, G)
+            decomposition = get_decomposition_operators(G, duals)
             operators += embedding + extraction + decomposition
 
     return operators

@@ -7,9 +7,10 @@ embedding operator puts it back into the Cartesian space as `T'`, the part of
 `T` that this weight and channel accounts for. Summing those parts over every
 weight and channel returns `T`.
 
-The example also shows the third operator at work: `decomposition` is the
-composition of the other two, taking `T` straight to `T'` without forming `X`,
-which is what you want when the natural tensor itself is not of interest.
+The example also shows the composed operator, which `get_composed_operators`
+builds on request: the composition of the other two, taking `T` straight to `T'`
+without forming `X`, which is what you want when the natural tensor itself is not
+of interest.
 
 Change the `rank` and `symmetry` arguments at the bottom to try other classes;
 `symmetry=None` means a tensor with no assumed symmetry. The elastic tensor,
@@ -19,7 +20,7 @@ Change the `rank` and `symmetry` arguments at the bottom to try other classes;
 import numpy as np
 
 from natto.intrinsic_symmetry import impose_symmetry
-from natto.reduction import get_reduction
+from natto.reduction import get_composed_operators, get_reduction
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 
@@ -38,11 +39,12 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
         T = impose_symmetry(T, symmetry)
 
     output = get_reduction(rank, symmetry)
+    decompositions = get_composed_operators(rank, symmetry)
 
     all_T_prime = []
     for j, out_j in output.items():
         for p, (extraction, embedding, decomposition) in enumerate(
-            zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
+            zip(out_j["extraction"], out_j["embedding"], decompositions[j])
         ):
             # Extract the natural tensor of this weight and channel
             X = np.einsum(extraction["rule"], extraction["numerical"], T)

@@ -24,7 +24,11 @@ import pytest
 
 from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_symbolic
 from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
-from natto.mapping_tensors import Mapping
+from natto.mapping_tensors import (
+    Mapping,
+    get_decomposition_operators,
+    get_extraction_operators,
+)
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_null_space
 from natto.reduction import get_dual_pair, get_independent_mappings
@@ -72,7 +76,8 @@ def reduce_weight(rank: int, symmetry: str, weight: int):
     if not G:
         return None
 
-    _, G_tilde, S, gram_inverse = get_dual_pair(G, gram)
+    _, G_tilde, gram_inverse = get_dual_pair(G, gram)
+    S = get_decomposition_operators(G, get_extraction_operators(gram_inverse, G))
 
     return G, gram, G_tilde, S, gram_inverse
 

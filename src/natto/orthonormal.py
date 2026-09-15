@@ -89,14 +89,10 @@ def get_orthonormal_entries(
 
     lower = letter_index(ell)
     upper = letter_index(n, upper_case=True)
-    upper2 = letter_index(n, start=n, upper_case=True)
 
     rules = {
         "embedding": f"{upper}{lower},...{lower}->...{upper}",
         "extraction": f"{upper}{lower},...{upper}->...{lower}",
-        # the decomposition is not a single array here; applying it means
-        # extracting and embedding back through the same operator
-        "decomposition": f"{upper}{lower},{upper2}{lower},...{upper2}->...{upper}",
     }
 
     # One array per channel, shared between the keys rather than copied into

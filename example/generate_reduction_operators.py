@@ -1,7 +1,7 @@
 """Precompute the reduction operators of named physical tensor classes.
 
-Writes `reduction_operators.yaml` holding, for each class below, the embedding,
-extraction and decomposition operators of every weight and channel: the exact
+Writes `reduction_operators.yaml` holding, for each class below, the embedding
+and extraction operators of every weight and channel: the exact
 symbolic form of each, the einsum rule that applies it, and its evaluated
 values. The operators depend only on rank and symmetry, so a consumer that
 always works with the same handful of physical tensors can build this file once

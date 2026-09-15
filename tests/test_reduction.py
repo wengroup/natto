@@ -10,7 +10,11 @@ from natto.gram import get_gram_entry
 from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
 from natto.mapping_tensors import get_extraction_operators
 from natto.rational import matrix_inverse
-from natto.reduction import get_independent_mappings, get_reduction
+from natto.reduction import (
+    get_composed_operators,
+    get_independent_mappings,
+    get_reduction,
+)
 
 
 class TensorClass(NamedTuple):
@@ -107,6 +111,12 @@ def get_reduction_cached(rank: int, symmetry: str) -> dict:
 def get_orthonormal_cached(rank: int, symmetry: str) -> dict:
     """`get_reduction` in the orthonormal basis, computed once per class."""
     return get_reduction(rank, symmetry, basis="orthonormal")
+
+
+@functools.lru_cache(maxsize=None)
+def get_composed_operators_cached(rank: int, symmetry: str) -> dict:
+    """`get_composed_operators`, computed once per class."""
+    return get_composed_operators(rank, symmetry)
 
 
 def cycle_index_multiplicities(n: int, symmetry: Optional[str]) -> dict[int, int]:
@@ -257,12 +267,12 @@ def test_weight_projector_is_basis_independent(tensor_class: TensorClass):
     must agree.
     """
     rank = tensor_class.rank
-    dual = get_reduction_cached(rank, tensor_class.symmetry)
+    decomposition = get_composed_operators_cached(rank, tensor_class.symmetry)
     orthonormal = get_orthonormal_cached(rank, tensor_class.symmetry)
 
-    assert sorted(dual) == sorted(orthonormal)
-    for weight, data in dual.items():
-        summed = sum(entry["numerical"] for entry in data["decomposition"])
+    assert sorted(decomposition) == sorted(orthonormal)
+    for weight, operators in decomposition.items():
+        summed = sum(entry["numerical"] for entry in operators)
 
         weight_axes = list(range(rank, rank + weight))
         expected = sum(
@@ -326,11 +336,12 @@ def test_reduction_round_trip(tensor_class: TensorClass):
         T = impose_symmetry(T, symmetry)
 
     output = get_reduction_cached(rank, symmetry)
+    decompositions = get_composed_operators_cached(rank, symmetry)
 
     all_T_prime = []
     for j, out_j in output.items():
         for p, (extraction, embedding, decomposition) in enumerate(
-            zip(out_j["extraction"], out_j["embedding"], out_j["decomposition"])
+            zip(out_j["extraction"], out_j["embedding"], decompositions[j])
         ):
             # X = G~ . T
             X = np.einsum(extraction["rule"], extraction["numerical"], T)

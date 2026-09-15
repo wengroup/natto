@@ -155,9 +155,8 @@ def rank_six_content(symmetry: str | None) -> dict:
     """Collect the affordable rank-six sectors of one class into snapshot form.
 
     `get_reduction` cannot be used here. It walks every weight, which would pull in
-    the two that cost minutes, and it evaluates `S`, which at rank six is a
-    rank-12 array of half a million entries per channel. This goes weight by
-    weight instead and builds only what is snapshotted.
+    the ones that cost the most. This goes weight by weight instead and builds only
+    what is snapshotted.
 
     Args:
         symmetry: Intrinsic symmetry of the class, or None for a generic tensor.
@@ -174,7 +173,7 @@ def rank_six_content(symmetry: str | None) -> dict:
     for weight in RANK_SIX_WEIGHTS:
         embedding, gram = get_independent_mappings(weight, RANK_SIX, symmetry)
         if embedding:
-            _, extraction, _, gram_inverse = get_dual_pair(embedding, gram)
+            _, extraction, gram_inverse = get_dual_pair(embedding, gram)
 
         if not embedding:
             content[weight] = {"multiplicity": 0}
