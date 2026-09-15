@@ -67,18 +67,11 @@ GRAM_ATOL = 1e-12
 # above so that it stays a statement about the physics, not about the code.
 NOT_SUPPORTED = {}
 
-#: Constructing a rank-four class costs a few seconds and a rank-three one a
-#: fraction of that, so the rank-four rows are what make the suite slow. They are
-#: marked `slow` and left out of the default run -- all but this one, which stays
-#: so that the default still exercises the rank-four path, symmetry adaptation
-#: included. Elasticity is the class the paper leads with.
-DEFAULT_RANK_FOUR_CLASS = "rank4_elasticity"
-
 
 def get_tensor_class_params(
     tensor_classes: Optional[list[TensorClass]] = None,
 ) -> list:
-    """Parametrize over tensor classes, xfailing the unsupported and marking the slow.
+    """Parametrize over tensor classes, xfailing the unsupported.
 
     Args:
         tensor_classes: classes to parametrize over, all of Table III by default.
@@ -94,8 +87,6 @@ def get_tensor_class_params(
             marks.append(
                 pytest.mark.xfail(raises=AssertionError, strict=True, reason=reason)
             )
-        if tc.rank >= 4 and tc.test_id != DEFAULT_RANK_FOUR_CLASS:
-            marks.append(pytest.mark.slow)
         params.append(pytest.param(tc, id=tc.test_id, marks=marks))
 
     return params

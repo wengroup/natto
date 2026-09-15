@@ -104,7 +104,7 @@ def test_coefficient_matches_the_paper(weight: int):
     assert coeff_harmonic(weight) == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("weight", [1, 2, 3, pytest.param(4, marks=pytest.mark.slow)])
+@pytest.mark.parametrize("weight", [1, 2, 3, 4])
 def test_matches_reduction(weight: int):
     """Without normalization, the harmonic is what the general reduction gives.
 

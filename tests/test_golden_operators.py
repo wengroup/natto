@@ -22,11 +22,8 @@ restated here, so the table stays one statement about the physics.
 Rank six is snapshotted too, since it carries the paper's new result, but only
 at weights zero to three; the rest cost minutes each.
 
-Most of these snapshots are marked `slow` and left out of the default run: the
-rank-six pair, and every rank-four class but the elastic one. Regolding is
-therefore something to do with `pytest -m full`, since a plain `NATTO_REGOLD=1
-pytest` rewrites only the snapshots the default run reaches and leaves the rest
-holding their old values.
+Regolding is `NATTO_REGOLD=1 pytest`, which rewrites every snapshot the run
+reaches.
 
 Nothing above rank four is committed. Those snapshots are large -- a megabyte
 for the generic rank-six class -- and slow to produce, so they live in the
@@ -266,7 +263,6 @@ def test_orthonormal_operator_content(tensor_class):
     )
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "name,symmetry", [("generic", None), ("third_order_elastic", THIRD_ORDER_ELASTIC)]
 )
@@ -284,7 +280,7 @@ def test_rank_six_operator_content(name: str, symmetry: str | None):
         pytest.skip(
             f"No local snapshot for {snapshot}. Rank-six snapshots are not "
             f"committed; create them with "
-            f"NATTO_REGOLD=1 pytest -m full {TEST_FILE}::test_rank_six_operator_content"
+            f"NATTO_REGOLD=1 pytest {TEST_FILE}::test_rank_six_operator_content"
         )
 
     assert_snapshot(

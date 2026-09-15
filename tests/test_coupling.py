@@ -52,10 +52,6 @@ LIMIT_RTOL = 1e-3
 #: factor of order one, so it stays far from anything the check needs to catch.
 OPERATOR_RTOL = 1e-11
 
-#: Largest product rank, l1 + l2, compared against the general reduction in the default
-#: run. Reducing a rank-four tensor takes seconds, so those triples are marked slow.
-FAST_PRODUCT_RANK = 3
-
 
 def double_factorial(n: int) -> float:
     """Double factorial `n!!`, with `(-1)!! = 1`."""
@@ -149,18 +145,14 @@ def reduction(rank: int) -> dict:
 
 
 def product_triples() -> list:
-    """Weight triples with nonzero input weights and a product of rank at most four.
-
-    Triples whose product has rank above `FAST_PRODUCT_RANK` are marked slow.
-    """
-    params = []
+    """Weight triples with nonzero input weights and a product of rank at most four."""
+    triples = []
     for l1 in range(1, 4):
         for l2 in range(1, 5 - l1):
             for l3 in range(abs(l1 - l2), l1 + l2 + 1):
-                marks = pytest.mark.slow if l1 + l2 > FAST_PRODUCT_RANK else ()
-                params.append(pytest.param(l1, l2, l3, marks=marks))
+                triples.append((l1, l2, l3))
 
-    return params
+    return triples
 
 
 def couple_unnormalized(l1: int, l2: int, l3: int, X: np.ndarray, Y: np.ndarray):
@@ -277,16 +269,7 @@ def test_matches_mapping_tensors(l1: int, l2: int, l3: int):
     assert "coupling" in outcomes, outcomes
 
 
-@pytest.mark.parametrize(
-    "l1,l2",
-    [
-        (1, 1),
-        (2, 1),
-        (1, 2),
-        pytest.param(2, 2, marks=pytest.mark.slow),
-        pytest.param(3, 1, marks=pytest.mark.slow),
-    ],
-)
+@pytest.mark.parametrize("l1,l2", [(1, 1), (2, 1), (1, 2), (2, 2), (3, 1)])
 def test_top_weight_matches_extraction(l1: int, l2: int):
     """At l3 = l1 + l2 the single mapping tensor is its own dual.
 
