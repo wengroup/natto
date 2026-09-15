@@ -10,6 +10,7 @@ import pytest
 
 from natto.gram import get_gram_matrix
 from natto.independence import (
+    get_multiplicity,
     select_independent_mappings_and_gram,
     select_independent_mappings_via_components,
     select_independent_mappings_via_embeddings,
@@ -108,6 +109,16 @@ def matrix_rank_rows(matrix):
 
 def test_no_candidates_selects_nothing():
     assert select_independent_mappings_and_gram([]) == ([], [])
+
+
+def test_multiplicity():
+    """The multiplicities of all weights fill the 3^n components of a rank-n tensor."""
+    for n in range(9):
+        dimension = sum(
+            (2 * ell + 1) * get_multiplicity(n, ell) for ell in range(n + 1)
+        )
+
+        assert dimension == 3**n
 
 
 @pytest.mark.parametrize("rank, weight, n_candidates, expected", SECTORS)

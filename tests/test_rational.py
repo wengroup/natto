@@ -2,7 +2,34 @@ from fractions import Fraction
 
 import pytest
 
-from natto.rational import is_nonsingular, matrix_null_space
+from natto.rational import (
+    bordered_inverse,
+    is_nonsingular,
+    matrix_inverse,
+    matrix_null_space,
+)
+
+
+def test_bordered_inverse():
+    """Bordering row by row gives the whole inverse, and None once it is singular."""
+    matrix = [
+        [Fraction(4), Fraction(1), Fraction(2)],
+        [Fraction(1), Fraction(3), Fraction(0)],
+        [Fraction(2), Fraction(0), Fraction(5)],
+    ]
+    inverse = []
+    for k in range(3):
+        border = [matrix[j][k] for j in range(k)]
+        inverse = bordered_inverse(inverse, border, matrix[k][k])
+
+    assert inverse == matrix_inverse(matrix)
+
+    # The third row is the sum of the first two
+    two = bordered_inverse(
+        bordered_inverse([], [], Fraction(1)), [Fraction(1)], Fraction(2)
+    )
+
+    assert bordered_inverse(two, [Fraction(2), Fraction(3)], Fraction(5)) is None
 
 
 def test_matrix_null_space_exact_relations():

@@ -147,6 +147,42 @@ def is_nonsingular(matrix: list[list[Fraction]]) -> bool:
     return True
 
 
+def bordered_inverse(
+    inverse: list[list[Fraction]], border: list[Fraction], diagonal: Fraction
+) -> list[list[Fraction]] | None:
+    """The inverse of a symmetric matrix bordered by one more row and column.
+
+    For the symmetric matrix `[[A, b], [b^T, d]]` with `A` invertible, the Schur
+    complement `s = d - b^T A^-1 b` decides the answer, since the determinant is
+    `det(A) s`. When `s` is not zero the inverse is
+    `[[A^-1 + p p^T / s, -p / s], [-p^T / s, 1 / s]]` with `p = A^-1 b`, which costs a
+    product with the border rather than a fresh elimination.
+
+    Args:
+        inverse: The exact inverse of `A`, empty when `A` has no rows.
+        border: The new column `b`, one entry per row of `A`.
+        diagonal: The new diagonal entry `d`.
+
+    Returns:
+        The exact inverse of the bordered matrix, or None when it is singular.
+    """
+    projection = [
+        sum((value * b for value, b in zip(row, border)), Fraction(0))
+        for row in inverse
+    ]
+    schur = diagonal - sum((b * p for b, p in zip(border, projection)), Fraction(0))
+    if schur == 0:
+        return None
+
+    bordered = [
+        [value + p * q / schur for value, q in zip(row, projection)] + [-p / schur]
+        for row, p in zip(inverse, projection)
+    ]
+    bordered.append([-p / schur for p in projection] + [1 / schur])
+
+    return bordered
+
+
 def matrix_null_space(
     matrix: list[list[Fraction]], n_columns: int
 ) -> list[list[Fraction]]:

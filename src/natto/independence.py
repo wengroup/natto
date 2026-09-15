@@ -20,6 +20,7 @@ The two numerical schemes hand the actual independence test to `qr`, and are kep
 cross-check the exact one. All three agree on every sector through rank six.
 """
 
+import functools
 from fractions import Fraction
 
 import numpy as np
@@ -28,7 +29,7 @@ from natto.gram import get_gram_entry
 from natto.mapping_tensors import Mapping
 from natto.natural_projector import get_random_natural_tensor
 from natto.qr import DEFAULT_TOLERANCE, Method, find_independent_tensors
-from natto.rational import is_nonsingular
+from natto.rational import bordered_inverse
 
 
 def select_independent_mappings_and_gram(
@@ -52,30 +53,58 @@ def select_independent_mappings_and_gram(
 
     Only the contractions against the kept set are needed, not the full
     candidate-by-candidate matrix, and the kept set's own Gram matrix accumulates as a
-    by-product rather than needing a second pass.
+    by-product rather than needing a second pass. Its inverse accumulates beside it, so
+    each residual is one product with the border rather than a fresh elimination.
+
+    The number of mappings to keep is known in advance, `get_multiplicity`, so the scan
+    stops once it is reached: every later candidate would be rejected. Reaching it is
+    also a check that the selection found every channel of the weight.
 
     Args:
-        candidates: Candidate mapping tensors of one sector, in the order they are
+        candidates: All candidate mapping tensors of one sector, in the order they are
             preferred.
 
     Returns:
         The indices of the kept candidates, and their exact Gram matrix.
 
+    Raises:
+        RuntimeError: If the candidates span fewer mappings than the weight has.
+
     References:
-        Eq. 15 of [Wen2026] for the Gram matrix this decides on.
+        Eq. 15 of [Wen2026] for the Gram matrix this decides on, and Table II for the
+        number of mappings. B.1 of [Wen2026Refactor] for stopping the scan.
     """
     kept: list[int] = []
     gram: list[list[Fraction]] = []
+    if not candidates:
+        return kept, gram
 
+    sector = candidates[0].sector
+    multiplicity = get_multiplicity(sector.n, sector.ell)
+
+    inverse: list[list[Fraction]] = []
     for i, c in enumerate(candidates):
+        if len(kept) == multiplicity:
+            break
+
         border = [get_gram_entry(candidates[k], c) for k in kept]
         diagonal = get_gram_entry(c, c)
-        bordered = [row + [b] for row, b in zip(gram, border)]
-        bordered.append(border + [diagonal])
 
-        if is_nonsingular(bordered):
-            kept.append(i)
-            gram = bordered
+        # Singular exactly when the Schur complement of the border, proportional to the
+        # squared norm of the candidate's residual, is zero.
+        bordered = bordered_inverse(inverse, border, diagonal)
+        if bordered is None:
+            continue
+
+        kept.append(i)
+        gram = [row + [b] for row, b in zip(gram, border)] + [border + [diagonal]]
+        inverse = bordered
+
+    if len(kept) != multiplicity:
+        raise RuntimeError(
+            f"Kept {len(kept)} mappings of weight {sector.ell} and rank {sector.n}, "
+            f"expected {multiplicity}"
+        )
 
     return kept, gram
 
@@ -172,3 +201,38 @@ def select_independent_mappings_via_embeddings(
     _, indices = find_independent_tensors(embedded, tolerance=tolerance, method=method)
 
     return indices
+
+
+@functools.cache
+def get_multiplicity(n: int, ell: int) -> int:
+    """The number of independent mapping tensors of a weight, in a generic tensor.
+
+    Coupling one more vector index to weight j gives weights j - 1, j and j + 1 for
+    j >= 1, and weight 1 alone for j = 0, so the multiplicities of rank n follow from
+    those of rank n - 1:
+
+        N(n, ell) = N(n - 1, ell + 1) + [ell >= 1] (N(n - 1, ell - 1) + N(n - 1, ell)),
+
+    with N(0, ell) one for ell = 0 and zero otherwise. The arithmetic is exact.
+
+    Args:
+        n: Rank of the Cartesian tensor, at least zero.
+        ell: Weight of the ICT.
+
+    Returns:
+        The multiplicity, zero when `ell` is negative or above `n`.
+
+    References:
+        Table II of [Wen2026] for the values. B.1 of [Wen2026Refactor] for the
+        recursion.
+    """
+    if ell < 0 or ell > n:
+        return 0
+    if n == 0:
+        return 1
+
+    multiplicity = get_multiplicity(n - 1, ell + 1)
+    if ell >= 1:
+        multiplicity += get_multiplicity(n - 1, ell - 1) + get_multiplicity(n - 1, ell)
+
+    return multiplicity
