@@ -148,7 +148,7 @@ def select_independent_mappings_via_components(
     if not candidates:
         return []
 
-    evaluated = [c.expand().evaluate(("rank", "weight")) for c in candidates]
+    evaluated = [c.expand().evaluate(("gct", "ict")) for c in candidates]
 
     _, indices = find_independent_tensors(evaluated, tolerance=tolerance, method=method)
 
@@ -196,7 +196,7 @@ def select_independent_mappings_via_embeddings(
 
     # The weight axes come last, and are contracted with the ICT in order.
     embedded = [
-        np.tensordot(c.expand().evaluate(("rank", "weight")), X, axes=ell)
+        np.tensordot(c.expand().evaluate(("gct", "ict")), X, axes=ell)
         for c in candidates
     ]
 

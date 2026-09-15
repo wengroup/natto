@@ -19,8 +19,8 @@ Change the `rank` and `symmetry` arguments at the bottom to try other classes;
 
 import numpy as np
 
+from natto import act, get_composed_operators, get_reduction
 from natto.intrinsic_symmetry import impose_symmetry
-from natto.reduction import get_composed_operators, get_reduction
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 
@@ -38,38 +38,36 @@ def extract_and_embed(rank: int = 3, symmetry: str = None):
     if symmetry is not None:
         T = impose_symmetry(T, symmetry)
 
-    output = get_reduction(rank, symmetry)
-    decompositions = get_composed_operators(rank, symmetry)
+    # Both are keyed by (ell, p): the weight and the channel of that weight
+    reduction = get_reduction(rank, symmetry=symmetry)
+    composed = get_composed_operators(rank, symmetry=symmetry)
 
     all_T_prime = []
-    for j, out_j in output.items():
-        for p, (extraction, embedding, decomposition) in enumerate(
-            zip(out_j["extraction"], out_j["embedding"], decompositions[j])
-        ):
-            # Extract the natural tensor of this weight and channel
-            X = np.einsum(extraction["rule"], extraction["numerical"], T)
-            assert is_symmetric_traceless(X), (
-                "X is not symmetric traceless for j={j}, p={p}"
-            )
+    for (ell, p), operators in reduction.items():
+        # Extract the natural tensor of this weight and channel
+        X = act(operators["extraction"], T)
+        assert is_symmetric_traceless(X), (
+            f"X is not symmetric traceless for ell={ell}, p={p}"
+        )
 
-            # Embed it back into the Cartesian space
-            T_p_1 = np.einsum(embedding["rule"], embedding["numerical"], X)
-            print(
-                f"T' (j={j}, p={p}), symmetric:",
-                is_symmetric(T_p_1),
-                "traceless:",
-                is_traceless(T_p_1),
-            )
+        # Embed it back into the Cartesian space
+        T_p_1 = act(operators["embedding"], X)
+        print(
+            f"T' (ell={ell}, p={p}), symmetric:",
+            is_symmetric(T_p_1),
+            "traceless:",
+            is_traceless(T_p_1),
+        )
 
-            # The same thing in one step
-            T_p_2 = np.einsum(decomposition["rule"], decomposition["numerical"], T)
+        # The same thing in one step
+        T_p_2 = act(composed[ell, p], T)
 
-            # T_p_1 and T_p_2 should be equal
-            assert np.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
-                f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
-            )
+        # T_p_1 and T_p_2 should be equal
+        assert np.allclose(T_p_1, T_p_2, rtol=1e-5, atol=1e-6), (
+            f"T_p_1 and T_p_2 are not equal for ell={ell}, p={p}"
+        )
 
-            all_T_prime.append(T_p_1)
+        all_T_prime.append(T_p_1)
 
     sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 

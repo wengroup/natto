@@ -1,16 +1,18 @@
 """The self-dual basis of Eq. 21.
 
-`get_reduction(..., basis="orthonormal")` returns one array per channel that
-both extracts and embeds. These tests assert the property that makes that
-possible -- the mappings of a weight are orthonormal under the Cartesian inner
-product -- and that extraction followed by embedding still recovers the tensor.
+`get_reduction(..., basis="orthonormal")` returns, per channel, an embedding and an
+extraction operator with the same terms, differing only in their input. These tests
+assert the property that makes that possible -- the mappings of a weight are
+orthonormal under the Cartesian inner product -- and that extraction followed by
+embedding still recovers the tensor.
 """
 
 import numpy as np
 import pytest
 
 from natto.intrinsic_symmetry import check_symmetry, impose_symmetry
-from natto.reduction import get_reduction
+from natto.reduction import get_gram_matrices, get_reduction
+from natto.symbolic import act, evaluate
 
 #: The operators are built in double precision and the identity they satisfy is
 #: exact, so what is left is rounding in the eigendecomposition.
@@ -20,16 +22,15 @@ ORTHONORMAL_ATOL = 1e-12
 RECONSTRUCTION_TOL = 1e-10
 
 
-def orthonormal(rank: int, symmetry: str = None, weight: int = None) -> dict:
-    """The reduction in the self-dual basis, in double precision."""
-    output = get_reduction(rank, symmetry, basis="orthonormal")
-
-    return output if weight is None else output[weight]
-
-
-def assert_orthonormal(data: dict, weight: int):
+def assert_orthonormal(output: dict, weight: int):
     """Assert the mappings of one weight are orthonormal, as Eq. 22 states."""
-    stacked = np.stack([entry["numerical"] for entry in data["embedding"]])
+    stacked = np.stack(
+        [
+            operators["embedding"].evaluate()
+            for (ell, _), operators in output.items()
+            if ell == weight
+        ]
+    )
     flattened = stacked.reshape(len(stacked), -1)
     gram = flattened @ flattened.T / (2 * weight + 1)
 
@@ -40,41 +41,43 @@ def assert_orthonormal(data: dict, weight: int):
 
 def reconstruct(output: dict, tensor: np.ndarray) -> list[np.ndarray]:
     """Extract and embed back through each channel, returning the parts."""
-    parts = []
-    for data in output.values():
-        for embedding, extraction in zip(data["embedding"], data["extraction"]):
-            natural = np.einsum(extraction["rule"], extraction["numerical"], tensor)
-            parts.append(np.einsum(embedding["rule"], embedding["numerical"], natural))
+    parts = [
+        act(operators["embedding"], act(operators["extraction"], tensor))
+        for operators in output.values()
+    ]
 
     return parts
 
 
 def test_the_same_array_extracts_and_embeds():
     """The self-duality that makes `basis="orthonormal"` one operator, not two."""
-    data = orthonormal(3, "ijk=ikj", weight=1)
+    output = get_reduction(3, symmetry="ijk=ikj", basis="orthonormal")
 
-    for embedding, extraction in zip(data["embedding"], data["extraction"]):
-        assert embedding["numerical"] is extraction["numerical"]
-        assert embedding["rule"] != extraction["rule"]
+    for operators in output.values():
+        embedding, embedding_rule = evaluate(operators["embedding"])
+        extraction, extraction_rule = evaluate(operators["extraction"])
+
+        np.testing.assert_array_equal(embedding, extraction)
+        assert embedding_rule != extraction_rule
 
 
 def test_piezoelectric_gram_matrix():
     """Pin the piezoelectric weight-1 Gram matrix, and its orthonormal mappings."""
-    data = orthonormal(3, "ijk=ikj", weight=1)
+    gram = get_gram_matrices(3, ell=1, symmetry="ijk=ikj")[1]
 
-    expected_gram = np.array([[3.0, 2.0], [2.0, 8.0]], dtype=np.float64)
-    np.testing.assert_allclose(data["gram"], expected_gram, atol=1e-12)
-    assert_orthonormal(data, weight=1)
+    assert gram == [[3, 2], [2, 8]]
+    output = get_reduction(3, ell=1, symmetry="ijk=ikj", basis="orthonormal")
+    assert_orthonormal(output, weight=1)
 
 
 @pytest.mark.parametrize("rank", [1, 2])
 def test_reconstructs_a_general_tensor(rank: int):
     """Unrestricted orthonormal mappings, and their self-dual reconstruction."""
     tensor = np.random.default_rng(35).standard_normal((3,) * rank)
-    output = orthonormal(rank)
+    output = get_reduction(rank, basis="orthonormal")
 
-    for weight, data in output.items():
-        assert_orthonormal(data, weight)
+    for weight in {ell for ell, _ in output}:
+        assert_orthonormal(output, weight)
 
     reconstructed = np.stack(reconstruct(output, tensor)).sum(axis=0)
     np.testing.assert_allclose(
@@ -92,7 +95,7 @@ def test_reconstructs_a_symmetric_tensor(rank: int, symmetry: str):
     tensor = impose_symmetry(
         np.random.default_rng(35).standard_normal((3,) * rank), symmetry
     )
-    output = orthonormal(rank, symmetry)
+    output = get_reduction(rank, symmetry=symmetry, basis="orthonormal")
 
     parts = reconstruct(output, tensor)
     for part in parts:

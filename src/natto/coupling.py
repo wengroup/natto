@@ -29,8 +29,6 @@ candidates with it separately, and the result is the single operator built here.
 from fractions import Fraction
 from typing import Literal
 
-import numpy as np
-
 from natto.indices import get_slot_partitions
 from natto.symbolic import IndexGroup, Operator, Signature, Term
 from natto.utils import (
@@ -45,27 +43,30 @@ Normalization = Literal["legendre", "none"]
 
 def get_coupling_operator(
     l1: int, l2: int, l3: int, normalize: Normalization = "legendre"
-) -> tuple[np.ndarray, str]:
-    """Build the coupling operator `K` of one weight triple, evaluated.
+) -> Operator:
+    """Build the coupling operator `K` of one weight triple.
+
+    The groups `z`, `x` and `y` carry the indices of Z, X and Y, and X and Y are the
+    inputs, so that `act(K, X, Y)` gives Z.
 
     Args:
         l1: Weight of the first natural tensor X.
         l2: Weight of the second natural tensor Y.
         l3: Weight of the output natural tensor Z.
         normalize: `legendre` applies the normalization constant `C` of the paper,
-            fixing the scale by the condition for the parity of
+            exactly, fixing the scale by the condition for the parity of
             `L = l1 + l2 + l3`; `none` leaves the operator unscaled.
 
     Returns:
-        The evaluated operator, and the einsum rule that applies it, so that
-        `Z = numpy.einsum(rule, K, X, Y)`.
+        The exact operator.
 
     Raises:
         ValueError: If `normalize` is not recognized.
 
     References:
-        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, with the
-        normalization constant of Eq. 53 for even and Eq. 54 for odd.
+        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
+        coefficient of Eq. 49, and the normalization constant of Eq. 53 for even and
+        Eq. 54 for odd.
     """
     if normalize not in ("legendre", "none"):
         supported = ["legendre", "none"]
@@ -73,49 +74,17 @@ def get_coupling_operator(
             f"Unknown normalization method: {normalize}. Supported are: {supported}."
         )
 
-    K = get_coupling_symbolic(l1, l2, l3)
-
-    # The signature orders the axes as Z, X, Y, which is what the rule contracts.
-    K_numerical = K.evaluate()
+    if (l1 + l2 - l3) % 2 == 0:
+        K = _get_coupling_operator_even(l1, l2, l3)
+        constant = coeff_C_even(l1, l2, l3)
+    else:
+        K = _get_coupling_operator_odd(l1, l2, l3)
+        constant = coeff_C_odd(l1, l2, l3)
 
     if normalize == "legendre":
-        if (l1 + l2 - l3) % 2 == 0:
-            constant = coeff_C_even(l1, l2, l3)
-        else:
-            constant = coeff_C_odd(l1, l2, l3)
-        K_numerical = K_numerical * float(constant)
+        K = K * constant
 
-    X_idx = K.signature.letters_of("x")
-    Y_idx = K.signature.letters_of("y")
-    Z_idx = K.signature.letters_of("z")
-    rule = f"{Z_idx}{X_idx}{Y_idx},...{X_idx},...{Y_idx}->...{Z_idx}"
-
-    return K_numerical, rule
-
-
-def get_coupling_symbolic(l1: int, l2: int, l3: int) -> Operator:
-    """Build the coupling operator `K` of one weight triple, symbolically.
-
-    The terms are exact, with rational coefficients, and unnormalized; the
-    normalization constants are `coeff_C_even` and `coeff_C_odd`.
-
-    Args:
-        l1: Weight of the first natural tensor X.
-        l2: Weight of the second natural tensor Y.
-        l3: Weight of the output natural tensor Z.
-
-    Returns:
-        The symbolic operator, whose groups `z`, `x` and `y` carry the Z, X and Y
-        indices.
-
-    References:
-        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
-        coefficient of Eq. 49.
-    """
-    if (l1 + l2 - l3) % 2 == 0:
-        return _get_coupling_symbolic_even(l1, l2, l3)
-
-    return _get_coupling_symbolic_odd(l1, l2, l3)
+    return K
 
 
 def triangle_numbers(l1: int, l2: int, l3: int) -> tuple[int, int, int]:
@@ -253,8 +222,8 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
     return Fraction(numerator, denominator)
 
 
-def _get_coupling_symbolic_even(l1: int, l2: int, l3: int) -> Operator:
-    """Build `K` symbolically for even `l1 + l2 - l3`; see `get_coupling_symbolic`."""
+def _get_coupling_operator_even(l1: int, l2: int, l3: int) -> Operator:
+    """Build `K` unscaled for even `l1 + l2 - l3`; see `get_coupling_operator`."""
     if (l1 + l2 - l3) % 2 != 0:
         raise ValueError(
             f"the weight sum (l1 + l2 - l3) must be even, got l1={l1}, l2={l2}, l3={l3}"
@@ -279,8 +248,8 @@ def _get_coupling_symbolic_even(l1: int, l2: int, l3: int) -> Operator:
     return Operator(signature, terms)
 
 
-def _get_coupling_symbolic_odd(l1: int, l2: int, l3: int) -> Operator:
-    """Build `K` symbolically for odd `l1 + l2 - l3`; see `get_coupling_symbolic`."""
+def _get_coupling_operator_odd(l1: int, l2: int, l3: int) -> Operator:
+    """Build `K` unscaled for odd `l1 + l2 - l3`; see `get_coupling_operator`."""
     if (l1 + l2 - l3) % 2 != 1:
         raise ValueError(
             f"the weight sum (l1 + l2 - l3) must be odd, got l1={l1}, l2={l2}, l3={l3}"
@@ -308,13 +277,14 @@ def _coupling_signature(l1: int, l2: int, l3: int) -> Signature:
     """The Z indices, printing as a, b, ..., then those of X and Y, as A, B, ...
 
     Z takes slots 0 to l3 - 1, X the next l1 and Y the last l2; these are the slots
-    `_get_coupling_blocks_even` and `_get_coupling_blocks_odd` write the terms in.
+    `_get_coupling_blocks_even` and `_get_coupling_blocks_odd` write the terms in. X
+    and Y are the inputs.
     """
     return Signature(
         (
             IndexGroup("z", l3, upper=False),
-            IndexGroup("x", l1, upper=True),
-            IndexGroup("y", l2, upper=True),
+            IndexGroup("x", l1, upper=True, input=True),
+            IndexGroup("y", l2, upper=True, input=True),
         )
     )
 

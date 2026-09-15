@@ -22,7 +22,6 @@ here, against the Legendre polynomials it must reproduce, so it cannot drift
 into agreeing with a wrong operator.
 """
 
-import functools
 import math
 
 import numpy as np
@@ -34,7 +33,8 @@ from natto.natural_projector import (
     get_random_natural_tensor,
     get_symmetric_traceless_part,
 )
-from natto.reduction import get_reduction
+from natto.reduction import get_embedding_operators, get_extraction_operators
+from natto.symbolic import act
 
 #: Weights the conditions are checked at. The operator is closed form, so this
 #: is cheap; the ceiling is only to keep the parametrization readable.
@@ -138,12 +138,6 @@ def weight_triples(parity: int) -> list[tuple[int, int, int]]:
     return triples
 
 
-@functools.lru_cache(maxsize=None)
-def reduction(rank: int) -> dict:
-    """The general reduction of a generic tensor of this rank, built once."""
-    return get_reduction(rank)
-
-
 def product_triples() -> list:
     """Weight triples with nonzero input weights and a product of rank at most four."""
     triples = []
@@ -157,9 +151,7 @@ def product_triples() -> list:
 
 def couple_unnormalized(l1: int, l2: int, l3: int, X: np.ndarray, Y: np.ndarray):
     """The coupling of `X` and `Y` to weight `l3`, without its normalization."""
-    operator, rule = get_coupling_operator(l1, l2, l3, normalize="none")
-
-    return np.einsum(rule, operator.astype(np.float64), X, Y)
+    return act(get_coupling_operator(l1, l2, l3, normalize="none"), X, Y)
 
 
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
@@ -185,11 +177,8 @@ def test_even_parity_normalization(l1: int, l2: int, l3: int):
     This is the condition that fixes `coeff_C_even`.
     """
     a = random_unit_vector(0)
-    operator, rule = get_coupling_operator(l1, l2, l3, normalize="legendre")
-
-    coupled = np.einsum(
-        rule,
-        operator.astype(np.float64),
+    coupled = act(
+        get_coupling_operator(l1, l2, l3, normalize="legendre"),
         cartesian_harmonic(a, l1),
         cartesian_harmonic(a, l2),
     )
@@ -213,10 +202,8 @@ def test_odd_parity_normalization(l1: int, l2: int, l3: int):
     b = a + LIMIT_SEPARATION * perpendicular / np.linalg.norm(perpendicular)
     b = b / np.linalg.norm(b)
 
-    operator, rule = get_coupling_operator(l1, l2, l3, normalize="legendre")
-    coupled = np.einsum(
-        rule,
-        operator.astype(np.float64),
+    coupled = act(
+        get_coupling_operator(l1, l2, l3, normalize="legendre"),
         cartesian_harmonic(a, l1),
         cartesian_harmonic(b, l2),
     )
@@ -252,12 +239,8 @@ def test_matches_mapping_tensors(l1: int, l2: int, l3: int):
     rank = l1 + l2
     product = np.multiply.outer(X, Y)
     outcomes = []
-    for entry in reduction(rank)[l3]["embedding"]:
-        mapped = np.tensordot(
-            np.asarray(entry["numerical"], dtype=np.float64),
-            product,
-            axes=(list(range(rank)), list(range(rank))),
-        )
+    for embedding in get_embedding_operators(rank, ell=l3).values():
+        mapped = np.tensordot(embedding.evaluate(), product, axes=rank)
         if np.allclose(mapped, coupled, rtol=OPERATOR_RTOL, atol=1e-12):
             outcomes.append("coupling")
         elif np.allclose(mapped, 0.0, atol=1e-12):
@@ -281,12 +264,8 @@ def test_top_weight_matches_extraction(l1: int, l2: int):
     X = get_random_natural_tensor(l1, seed=3)
     Y = get_random_natural_tensor(l2, seed=7)
 
-    (extraction,) = reduction(l3)[l3]["extraction"]
-    extracted = np.einsum(
-        extraction["rule"],
-        np.asarray(extraction["numerical"], dtype=np.float64),
-        np.multiply.outer(X, Y),
-    )
+    (extraction,) = get_extraction_operators(l3, ell=l3).values()
+    extracted = act(extraction, np.multiply.outer(X, Y))
 
     np.testing.assert_allclose(
         extracted, couple_unnormalized(l1, l2, l3, X, Y), rtol=OPERATOR_RTOL, atol=1e-12

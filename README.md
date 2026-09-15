@@ -32,7 +32,7 @@ import textwrap
 
 import numpy as np
 
-from natto.reduction import get_reduction
+from natto import act, get_extraction_operators
 
 T = np.array([
     [1.0, 2.0, 3.0],
@@ -40,32 +40,31 @@ T = np.array([
     [7.0, 8.0, 12.0]
 ])
 
-# the operators of every rank-2 tensor, keyed by weight
-operators = get_reduction(n=2)
+# the extraction operators of every rank-2 tensor, keyed by (weight, channel);
+# a weight can occur more than once, each occurrence a channel, and at rank 2
+# every weight has exactly one
+operators = get_extraction_operators(n=2)
 
-for weight, data in operators.items():
-    # a weight can occur more than once; each occurrence is a channel, and at
-    # rank 2 every weight has exactly one
-    for extraction in data["extraction"]:
-        # contract T with the operator to get the ICT of this weight
-        X = np.einsum(extraction["rule"], extraction["numerical"], T)
+for (weight, p), extraction in operators.items():
+    # contract T with the operator to get the ICT of this weight and channel
+    X = act(extraction, T)
 
-        print(f"weight {weight}:")
-        print(f"  operator: {extraction['symbolic']}")
-        print(f"  X{weight}:")
-        print(textwrap.indent(str(X), "    "))
+    print(f"weight {weight}, channel {p}:")
+    print(f"  operator: {extraction}")
+    print(f"  X{weight}:")
+    print(textwrap.indent(str(X), "    "))
 ```
 
 ```
-weight 0:
+weight 0, channel 1:
   operator: +1/3 δ_AB
   X0:
     6.0
-weight 1:
+weight 1, channel 1:
   operator: +1/2 ε_ABa
   X1:
     [-1.  2. -1.]
-weight 2:
+weight 2, channel 1:
   operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
   X2:
     [[-5.  3.  5.]
@@ -73,9 +72,22 @@ weight 2:
      [ 5.  7.  6.]]
 ```
 
-Each operator is printed beside its result, as `natto` built it. `1/3 δ_AB`
+Each operator is printed beside its result, as `natto` built it, exactly. `1/3 δ_AB`
 takes a third of the trace, `18 / 3`; `1/2 ε_ABa` the antisymmetric part; the
 three terms of `X2` symmetrize `T` and subtract that trace.
+
+`act` evaluates the operator and contracts it with `T`. To keep the array instead,
+`evaluate` returns it together with the einsum rule that applies it:
+
+```python
+from natto import evaluate
+
+array, rule = evaluate(operators[2, 1])  # rule: "abAB,...AB->...ab"
+X2 = np.einsum(rule, array, T)
+```
+
+`get_embedding_operators` gives the operators that embed each ICT back, and
+`get_reduction` gives both kinds together.
 
 ### Intrinsic symmetry
 
@@ -86,24 +98,23 @@ rank-2 tensor has no antisymmetric part, so weight 1 is gone, leaving two ICTs:
 # a symmetric tensor of the same class
 T = (T + T.T) / 2
 
-operators = get_reduction(n=2, symmetry="ij=ji")
+operators = get_extraction_operators(n=2, symmetry="ij=ji")
 
-for weight, data in operators.items():
-    for extraction in data["extraction"]:
-        X = np.einsum(extraction["rule"], extraction["numerical"], T)
+for (weight, p), extraction in operators.items():
+    X = act(extraction, T)
 
-        print(f"weight {weight}:")
-        print(f"  operator: {extraction['symbolic']}")
-        print(f"  X{weight}:")
-        print(textwrap.indent(str(X), "    "))
+    print(f"weight {weight}, channel {p}:")
+    print(f"  operator: {extraction}")
+    print(f"  X{weight}:")
+    print(textwrap.indent(str(X), "    "))
 ```
 
 ```
-weight 0:
+weight 0, channel 1:
   operator: +1/3 δ_AB
   X0:
     6.0
-weight 2:
+weight 2, channel 1:
   operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
   X2:
     [[-5.  3.  5.]

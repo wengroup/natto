@@ -23,8 +23,8 @@ from natto.symbolic import IndexGroup, Operator, Signature, Term
 def get_natural_projector(ell: int) -> Operator:
     """The natural projector of one weight, as an operator over index slots.
 
-    Its signature is the `weight` group, printing as a, b, c, ..., followed by the
-    `sigma` group, printing as A, B, C, ....
+    Its signature is the `ict` group, printing as a, b, c, ..., followed by the `gct`
+    group, printing as A, B, C, ..., which takes the tensor it projects.
 
     Args:
         ell: Weight of the ICT the projector belongs to.
@@ -37,7 +37,10 @@ def get_natural_projector(ell: int) -> Operator:
         Eq. S27. Definition 3 (C.3) of [Wen2026Refactor] for the operator.
     """
     signature = Signature(
-        (IndexGroup("weight", ell, upper=False), IndexGroup("sigma", ell, upper=True))
+        (
+            IndexGroup("ict", ell, upper=False),
+            IndexGroup("gct", ell, upper=True, input=True),
+        )
     )
 
     terms = []
@@ -143,9 +146,9 @@ def get_projector_coefficients(ell: int) -> list[Fraction]:
 def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
     """The delta pairs of the terms of the natural projector with a given t.
 
-    Slots 0 to ell - 1 are the weight indices and ell to 2 * ell - 1 the sigma indices.
-    Each term pairs ell - 2t weight slots with sigma slots, t weight slots among
-    themselves and t sigma slots among themselves.
+    Slots 0 to ell - 1 are the ICT indices and ell to 2 * ell - 1 the tensor indices.
+    Each term pairs ell - 2t ICT slots with tensor slots, t ICT slots among themselves
+    and t tensor slots among themselves.
 
     Args:
         ell: Weight of the ICT the projector belongs to.

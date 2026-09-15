@@ -6,113 +6,129 @@ root of their Gram matrix removes that distinction: an orthonormal mapping is it
 dual, and the same tensor both extracts and embeds.
 
 This is the one place in the package where the arithmetic cannot stay exact. The Gram
-matrix is rational, but its inverse square root generally is not, so the
-eigendecomposition here is irreducibly numerical; everything upstream of it is done
-over the rationals.
+matrix is rational, but its inverse square root generally is not, so an
+`OrthonormalOperator` carries float coefficients where an `Operator` carries exact
+ones, and does nothing but evaluate.
 
 The same construction serves the symmetry-adapted mappings, as Section IV of
 [Wen2026] notes it must. That is why this is a basis rather than a pair of entry
-points: `get_reduction(..., basis="orthonormal")` returns these in place of the
-mappings and their duals, whether or not a symmetry was asked for.
+points: `natto.reduction` returns these in place of the mappings and their duals when
+asked for `basis="orthonormal"`, whether or not a symmetry was asked for.
 """
 
+from collections.abc import Sequence
 from fractions import Fraction
+from types import MappingProxyType
 
 import numpy as np
 
-from natto.indices import letter_index
 from natto.mapping_tensors import Mapping
 from natto.rational import float_matrix
+from natto.symbolic import Signature, Term, evaluate_terms
 
 
-def orthonormalize_mappings(
-    mappings: list[Mapping], gram: list[list[Fraction]]
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Orthonormalize mapping tensors with their exact Gram matrix.
+class OrthonormalOperator:
+    """An orthonormal mapping tensor: a sum of terms with float coefficients.
 
-    The Gram matrix is the exact one the selection or the symmetry adaptation already
-    built. Only its unique symmetric positive-definite inverse square root is taken
-    numerically, since it is irrational in general, and it rotates the evaluated
-    mappings into an orthonormal set.
+    It holds what an `Operator` holds, a signature and its terms, but its coefficients
+    are floats, so it offers evaluation only. Build them with
+    `get_orthonormal_operators`.
 
     Args:
-        mappings: Independent mappings of one weight.
+        signature: The index groups of the operator, including which is the input.
+        terms: Each term with its float coefficient.
+
+    References:
+        Eq. 21 of [Wen2026].
+    """
+
+    __slots__ = ("_signature", "_terms")
+
+    def __init__(self, signature: Signature, terms: dict[Term, float]):
+        self._signature = signature
+        self._terms = dict(terms)
+
+    @property
+    def signature(self) -> Signature:
+        """The index groups of the operator."""
+        return self._signature
+
+    @property
+    def terms(self) -> MappingProxyType:
+        """The terms and their float coefficients; read-only."""
+        return MappingProxyType(self._terms)
+
+    def evaluate(self, order: Sequence[str] | None = None) -> np.ndarray:
+        """Evaluate the operator into an array.
+
+        Args:
+            order: Group names in the order their axes should appear. Defaults to the
+                signature's own order.
+
+        Returns:
+            An array with one axis of length 3 per slot, in the requested group order.
+        """
+        result = evaluate_terms(self._signature, self._terms, order)
+
+        return result
+
+
+def get_orthonormal_operators(
+    mappings: Sequence[Mapping], gram: list[list[Fraction]], signature: Signature
+) -> list[OrthonormalOperator]:
+    """The orthonormal mappings of one weight, one per channel.
+
+    Each is a row of the inverse square root of the Gram matrix times the mappings.
+    The mappings are vectors over the candidates of one sector, so the rotation mixes
+    those vectors, in floats, and each result is expanded once into its terms, as a
+    dual is.
+
+    Args:
+        mappings: The independent mappings of one weight, of one sector.
         gram: Their exact Gram matrix.
+        signature: The signature to give the operators, which marks their input.
 
     Returns:
-        The Gram matrix as floats, its symmetric inverse square root, and the
-        orthonormal numerical mappings.
+        One orthonormal operator per mapping.
+
+    References:
+        Eq. 21 of [Wen2026].
+    """
+    vectors = np.array([[float(c) for c in G_q.coefficients] for G_q in mappings])
+    rotated = get_inverse_square_root(gram) @ vectors
+    sector = mappings[0].sector
+
+    operators = [
+        OrthonormalOperator(signature, sector.combine_terms(row.tolist()))
+        for row in rotated
+    ]
+
+    return operators
+
+
+def get_inverse_square_root(
+    gram: list[list[Fraction]], rtol: float = 1e-10, atol: float = 1e-12
+) -> np.ndarray:
+    """The symmetric inverse square root of an exact Gram matrix.
+
+    Only this step is numerical, since the square root is irrational in general.
+
+    Args:
+        gram: The exact Gram matrix of independent mappings.
+        rtol: Relative tolerance of the symmetry and positive-definiteness checks.
+        atol: Absolute tolerance of the same checks.
+
+    Returns:
+        The unique symmetric positive-definite inverse square root. Its rows are the
+        weights of the orthonormal mappings.
 
     Raises:
-        ValueError: If `mappings` is empty or its Gram matrix is not symmetric positive
-            definite.
+        ValueError: If the matrix is not symmetric positive definite.
 
     References:
-        Eq. 15 of [Wen2026] for the Gram matrix, Eq. 21 for the rotation.
+        Eq. 21 of [Wen2026].
     """
-    if not mappings:
-        raise ValueError("At least one mapping tensor is required")
-
-    gram_float = np.array(float_matrix(gram))
-    gram_inverse_sqrt = _symmetric_inverse_square_root(gram_float)
-    numerical = np.stack(
-        [mapping.expand().evaluate(("rank", "weight")) for mapping in mappings]
-    )
-    orthonormal = np.einsum("pq,q...->p...", gram_inverse_sqrt, numerical)
-
-    return gram_float, gram_inverse_sqrt, orthonormal
-
-
-def get_orthonormal_entries(
-    ell: int, n: int, G: list[Mapping], gram: list[list[Fraction]]
-) -> dict:
-    """Pack one weight's operators in the self-dual basis of Eq. 21.
-
-    One array both extracts and embeds, so it appears under both keys and only the
-    einsum rule tells them apart. There is no symbolic form: the inverse square root
-    of a rational Gram matrix is generally irrational.
-
-    Args:
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor.
-        G: The independent mappings of this weight.
-        gram: Their exact Gram matrix.
-
-    Returns:
-        The operators of this weight, in the form the package publishes.
-
-    References:
-        Eq. 21 of [Wen2026] for the orthonormal mappings, Eq. 22 for the self-duality
-        that makes them a basis.
-    """
-    gram_float, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, gram)
-
-    lower = letter_index(ell)
-    upper = letter_index(n, upper_case=True)
-
-    rules = {
-        "embedding": f"{upper}{lower},...{lower}->...{upper}",
-        "extraction": f"{upper}{lower},...{upper}->...{lower}",
-    }
-
-    # One array per channel, shared between the keys rather than copied into
-    # each: that it is the same operator is the point of this basis.
-    operators = list(G_hat)
-
-    entries = {"gram": gram_float, "gram_inverse_sqrt": gram_inverse_sqrt}
-    for key, rule in rules.items():
-        entries[key] = [
-            {"symbolic": None, "rule": rule, "numerical": operator}
-            for operator in operators
-        ]
-
-    return entries
-
-
-def _symmetric_inverse_square_root(
-    matrix: np.ndarray, rtol: float = 1e-10, atol: float = 1e-12
-) -> np.ndarray:
-    """Compute the symmetric inverse square root of a positive-definite matrix."""
+    matrix = np.array(float_matrix(gram))
     if not np.allclose(matrix, matrix.T, rtol=rtol, atol=atol):
         raise ValueError("Gram matrix must be symmetric")
 

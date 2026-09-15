@@ -14,34 +14,49 @@ Levi-Civita symbol, so the file stays plain ASCII.
 
 from pathlib import Path
 
-import numpy as np
-
-from natto.reduction import get_reduction
+from natto import evaluate, get_gram_matrices, get_reduction
+from natto.rational import float_matrix, fraction_matrix, matrix_inverse
 from natto.utils import yaml_dump
 
 
-def convert_to_list(tensor):
-    """Make one operator entry YAML-safe, recursively.
+def get_operator_entry(operator) -> dict:
+    """One operator as the file stores it: symbolic form, einsum rule and values."""
+    array, rule = evaluate(operator)
 
-    Tensors become nested lists, and a symbolic form becomes its string with the
-    delta and epsilon characters spelled out in ASCII.
+    return {
+        "symbolic": operator.to_string(ascii=True),
+        "rule": rule,
+        "numerical": array.tolist(),
+    }
+
+
+def get_reduction_entries(rank: int, symmetry: str) -> dict:
+    """The operators of one class, grouped by weight as the file lays them out.
+
+    Each weight holds a list of embedding and a list of extraction operators, one
+    per channel in channel order, and its Gram matrix with the inverse.
     """
-    if isinstance(tensor, np.ndarray):
-        return tensor.tolist()
-    elif isinstance(tensor, dict):
-        if "symbolic" in tensor:
-            for k, v in tensor.items():
-                if k == "symbolic":
-                    tensor[k] = str(v).replace("\u03b4", "d").replace("\u03b5", "e")
-                else:
-                    tensor[k] = convert_to_list(v)
-            return tensor
-        else:
-            return {k: convert_to_list(v) for k, v in tensor.items()}
-    elif isinstance(tensor, list):
-        return [convert_to_list(v) for v in tensor]
-    else:
-        return tensor
+    entries = {}
+    for weight, gram in get_gram_matrices(rank, symmetry=symmetry).items():
+        gram_inverse = matrix_inverse(gram)
+        entries[weight] = {
+            "embedding": [],
+            "extraction": [],
+            "gram": {
+                "symbolic": fraction_matrix(gram),
+                "numerical": float_matrix(gram),
+            },
+            "gram_inverse": {
+                "symbolic": fraction_matrix(gram_inverse),
+                "numerical": float_matrix(gram_inverse),
+            },
+        }
+
+    for (weight, _), operators in get_reduction(rank, symmetry=symmetry).items():
+        for key in ("embedding", "extraction"):
+            entries[weight][key].append(get_operator_entry(operators[key]))
+
+    return entries
 
 
 if __name__ == "__main__":
@@ -66,8 +81,7 @@ if __name__ == "__main__":
 
     results = {}
     for name, info in physical_tensors.items():
-        out = get_reduction(info["rank"], info["symmetry"], numerical=True)
-        info["operators"] = convert_to_list(out)
+        info["operators"] = get_reduction_entries(info["rank"], info["symmetry"])
         results[name] = info
 
     # Same to yaml

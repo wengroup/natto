@@ -1,7 +1,7 @@
 """Mapping tensors between a Cartesian tensor and its irreducible parts.
 
-The candidate mapping tensors, the extraction duals, and the decomposition operators
-that compose the two. Everything here is symbolic and exact.
+The candidate mapping tensors, their duals, and the composition of a mapping with its
+dual. Everything here is symbolic and exact.
 
 A mapping tensor is the natural projector applied to a combination of rank-lowering
 tensors. All mappings of one weight and rank combine the same candidates, so a
@@ -41,7 +41,7 @@ class Sector:
         self.n = n
         self.labels = tuple(get_lowering_labels(ell, n))
         self.signature = Signature(
-            (IndexGroup("rank", n, upper=True), IndexGroup("weight", ell, upper=False))
+            (IndexGroup("ict", ell, upper=False), IndexGroup("gct", n, upper=True))
         )
 
         self._index = {label: i for i, label in enumerate(self.labels)}
@@ -74,6 +74,29 @@ class Sector:
         size = len(self)
 
         return [Mapping(self, [int(i == p) for i in range(size)]) for p in range(size)]
+
+    def combine_terms(
+        self, coefficients: Sequence[int | Fraction | float]
+    ) -> dict[Term, Fraction | float]:
+        """The terms of a combination of the candidates, collected.
+
+        Exact coefficients give exact terms, as a `Mapping` needs; float coefficients
+        give float terms, as an orthonormal mapping needs. A term whose contributions
+        cancel is kept, with its coefficient zero or, in floats, close to it.
+
+        Args:
+            coefficients: One coefficient per candidate.
+
+        Returns:
+            Each term with its coefficient, in the order the terms first occur.
+        """
+        terms = {}
+        for i, c in enumerate(coefficients):
+            if c:
+                for term, value in self._candidate(i).terms.items():
+                    terms[term] = terms.get(term, 0) + c * value
+
+        return terms
 
     def table(self, i: int, j: int) -> Fraction:
         """The contraction of candidates `i` and `j` over all their indices.
@@ -120,10 +143,11 @@ class Sector:
         """Candidate `i`: the natural projector applied to rank-lowering tensor `i`."""
         if i not in self._candidates:
             sigma = [("sigma", k) for k in range(self.ell)]
-            weight = [self.n + k for k in range(self.ell)]
+            ict = list(range(self.ell))
+            gct = [self.ell + a for a in range(self.n)]
             factors = [
-                (self._projector, weight + sigma),
-                (self._lowering(i), sigma + list(range(self.n))),
+                (self._projector, ict + sigma),
+                (self._lowering(i), sigma + gct),
             ]
             self._candidates[i] = contract(factors, self.signature)
 
@@ -229,16 +253,12 @@ class Mapping:
         return Mapping(self.sector, coefficients)
 
     def expand(self) -> Operator:
-        """The mapping as an operator, rank indices first and weight indices after."""
+        """The mapping as an operator, ICT indices first and tensor indices after."""
         if self._expansion is None:
-            terms = []
-            for i, c in enumerate(self.coefficients):
-                if c:
-                    candidate = self.sector._candidate(i)
-                    terms += [
-                        (c * value, term) for term, value in candidate.terms.items()
-                    ]
-            self._expansion = Operator(self.sector.signature, terms)
+            terms = self.sector.combine_terms(self.coefficients)
+            self._expansion = Operator(
+                self.sector.signature, [(c, term) for term, c in terms.items()]
+            )
 
         return self._expansion
 
@@ -350,68 +370,46 @@ def combine(
     return Mapping(sector, total)
 
 
-def get_extraction_operators(
-    gram_inverse: list[list[Fraction]], embedding: list[Mapping]
+def get_dual_mappings(
+    gram_inverse: list[list[Fraction]], mappings: list[Mapping]
 ) -> list[Mapping]:
-    """Build the extraction operators dual to a set of embedding operators.
+    """Build the duals of a set of mappings.
 
-    Each dual is the combination of the embedding operators whose coefficients are the
+    Each dual is the combination of the mappings whose coefficients are the
     corresponding row of the inverse Gram matrix. Contracted with a Cartesian tensor,
     each returns the ICT of its weight and channel.
 
     Args:
-        gram_inverse: Exact inverse of the embedding operators' Gram matrix.
-        embedding: The embedding operators, in the order the matrix indexes.
+        gram_inverse: Exact inverse of the mappings' Gram matrix.
+        mappings: The mappings, in the order the matrix indexes.
 
     Returns:
-        One extraction operator per row of `gram_inverse`, a mapping of the same sector.
+        One dual per row of `gram_inverse`, a mapping of the same sector.
 
     References:
         Eq. 16 of [Wen2026].
     """
-    return [combine(row, embedding) for row in gram_inverse]
-
-
-def get_decomposition_operators(
-    G: list[Mapping], G_tilde: list[Mapping]
-) -> list[Operator]:
-    """Get the decomposition operators of a mapping and its dual.
-
-    Each is a mapping composed with its own dual, so contracting one with a Cartesian
-    tensor gives that tensor's part of this weight and channel directly, without
-    forming the ICT on the way.
-
-    Careful with the paper's S: there it is a rank-n *tensor*, one weight's part of a
-    particular T, while here it is the rank-2n *operator* that produces it. Same
-    letter, one the map and one its output.
-
-    Args:
-        G: Mapping tensors.
-        G_tilde: The duals, in the order of the mappings they correspond to.
-
-    Returns:
-        One decomposition operator per channel.
-
-    References:
-        Eq. 19 of [Wen2026]. Computed as in A.2 of [Wen2026Refactor]: only the
-        rank-lowering tensors of each mapping enter, by Lemma 2.
-    """
-    return [compose(G_i, dual_i) for G_i, dual_i in zip(G, G_tilde)]
+    return [combine(row, mappings) for row in gram_inverse]
 
 
 def compose(mapping: Mapping, other: Mapping) -> Operator:
-    """Compose two mappings of one sector over their weight indices.
+    """Compose two mappings of one sector over their ICT indices.
 
-    The result carries the rank indices of `mapping` and then those of `other`.
-    `other` already carries the natural projector, so `mapping` contributes only its
-    rank-lowering tensors.
+    The result carries the tensor indices of `mapping`, the `gct` group, and then
+    those of `other`, the `gct_in` group, which is the input. `other` already carries
+    the natural projector, so `mapping` contributes only its rank-lowering tensors.
+
+    A mapping composed with its own dual takes a Cartesian tensor straight to its part
+    of that weight and channel, without forming the ICT on the way. Careful with the
+    paper's S: there it is a rank-n *tensor*, one weight's part of a particular T,
+    while this is the rank-2n *operator* that produces it.
 
     Args:
-        mapping: The mapping whose rank indices come first.
-        other: The mapping whose rank indices come second.
+        mapping: The mapping whose tensor indices come first.
+        other: The mapping whose tensor indices come second.
 
     Returns:
-        The composition, with signature `rank` then `rank_in`.
+        The composition.
 
     Raises:
         ValueError: If the mappings belong to different sectors.
@@ -426,7 +424,10 @@ def compose(mapping: Mapping, other: Mapping) -> Operator:
     n, ell = sector.n, sector.ell
 
     signature = Signature(
-        (IndexGroup("rank", n, upper=True), IndexGroup("rank_in", n, upper=True))
+        (
+            IndexGroup("gct", n, upper=True),
+            IndexGroup("gct_in", n, upper=True, input=True),
+        )
     )
     sigma = [("sigma", k) for k in range(ell)]
     dual = other.expand()
@@ -436,7 +437,7 @@ def compose(mapping: Mapping, other: Mapping) -> Operator:
         if c:
             factors = [
                 (sector._lowering(i), sigma + list(range(n))),
-                (dual, [n + a for a in range(n)] + sigma),
+                (dual, sigma + [n + a for a in range(n)]),
             ]
             part = contract(factors, signature)
             terms += [(c * value, term) for term, value in part.terms.items()]

@@ -4,7 +4,8 @@ Every operator is a sum of products of Kronecker deltas and Levi-Civita symbols 
 exact rational coefficients. `Signature` names its groups of indices, `Term` is one
 canonical product over integer index slots, and `Operator` is a sum of terms collected
 by construction. Each prints and parses in the familiar delta and epsilon notation, and
-evaluates to an array in any order of its groups.
+evaluates to an array in any order of its groups. `evaluate` gives that array with the
+einsum rule that applies the operator, and `act` applies it.
 """
 
 import re
@@ -23,15 +24,18 @@ class IndexGroup:
     """One named group of index slots in a signature.
 
     Attributes:
-        name: What the indices are, e.g. `rank` or `weight`.
+        name: What the indices are, e.g. `ict` or `gct`.
         size: How many indices the group has.
         upper: Whether the group prints with upper-case letters. Groups of the same
             case take consecutive letters in signature order.
+        input: Whether an array is contracted into this group when the operator is
+            applied; see `evaluate`.
     """
 
     name: str
     size: int
     upper: bool
+    input: bool = False
 
     def __post_init__(self):
         if self.size < 0:
@@ -46,8 +50,8 @@ class Signature:
     The signature decides the letters an operator prints with and the axis order of
     any array made from it. Lower-case groups take the letters a, b, c, ... in
     order, and upper-case groups A, B, C, ..., which reproduces the letters the
-    package prints: for a mapping tensor, rank indices `A...` then weight indices
-    `a...`.
+    package prints: for a mapping tensor, ICT indices `a...` then Cartesian tensor
+    indices `A...`.
 
     Args:
         groups: The index groups.
@@ -353,26 +357,7 @@ class Operator:
         Raises:
             ValueError: If `order` does not name every group exactly once.
         """
-        names = [group.name for group in self._signature.groups]
-        order = names if order is None else list(order)
-        if sorted(order) != sorted(names):
-            raise ValueError(f"The order must name the groups {names}, got {order}")
-        axes = [slot for name in order for slot in self._signature.slots(name)]
-
-        # The stride of each slot in the flattened array, with the axes in `order`
-        size = self._signature.size
-        stride = [0] * size
-        for position, slot in enumerate(axes):
-            stride[slot] = 3 ** (size - 1 - position)
-
-        # A product of deltas and Levi-Civita symbols is zero almost everywhere, so each
-        # term adds its coefficient only where it is nonzero. Every entry receives the
-        # same additions in the same order as summing the dense terms would give.
-        flat = np.zeros(3**size)
-        for term, coefficient in self._terms.items():
-            indices, signs = _nonzero_entries(term, stride)
-            flat[indices] += float(coefficient) * signs
-        result = flat.reshape((3,) * size)
+        result = evaluate_terms(self._signature, self._terms, order)
 
         return result
 
@@ -420,6 +405,107 @@ class Operator:
 
     def __repr__(self) -> str:
         return f"Operator({self._signature!r}, {self.to_string()!r})"
+
+
+def evaluate(operator: Operator) -> tuple[np.ndarray, str]:
+    """Evaluate an operator into an array, with the einsum rule that applies it.
+
+    The array has its axes in the order of the operator's index groups, which for
+    every operator of the package puts the output groups first, so ICT indices come
+    before Cartesian tensor indices. The rule contracts one array into each input
+    group and leaves the other groups free, so that `numpy.einsum(rule, array,
+    *inputs)` applies the operator. Every operand and the output carry a leading
+    ellipsis, so a batch of inputs applies as readily as one. The two are returned
+    together because the rule is only valid for this axis order.
+
+    Args:
+        operator: An `Operator`, or a `natto.orthonormal.OrthonormalOperator`.
+
+    Returns:
+        The evaluated array and its einsum rule.
+    """
+    signature = operator.signature
+    inputs = [group for group in signature.groups if group.input]
+    outputs = [group for group in signature.groups if not group.input]
+
+    operands = "".join(f",...{signature.letters_of(group.name)}" for group in inputs)
+    output = "".join(signature.letters_of(group.name) for group in outputs)
+    rule = f"{signature.letters}{operands}->...{output}"
+    array = operator.evaluate()
+
+    return array, rule
+
+
+def act(operator: Operator, *inputs: np.ndarray) -> np.ndarray:
+    """Apply an operator to arrays, one per input group.
+
+    This is `evaluate` followed by `numpy.einsum`, for when only the result is needed.
+
+    Args:
+        operator: An `Operator`, or a `natto.orthonormal.OrthonormalOperator`.
+        *inputs: One array per input group, in the order of the groups, each with the
+            group's indices last and any batch dimensions before them.
+
+    Returns:
+        The operator applied to the inputs.
+
+    Raises:
+        ValueError: If there is not one array per input group.
+    """
+    expected = sum(group.input for group in operator.signature.groups)
+    if len(inputs) != expected:
+        raise ValueError(f"The operator takes {expected} inputs, got {len(inputs)}")
+
+    array, rule = evaluate(operator)
+    result = np.einsum(rule, array, *inputs)
+
+    return result
+
+
+def evaluate_terms(
+    signature: Signature,
+    terms: dict[Term, int | Fraction | float],
+    order: Sequence[str] | None = None,
+) -> np.ndarray:
+    """Evaluate a sum of terms over the slots of a signature into an array.
+
+    This is the evaluation shared by `Operator`, whose coefficients are exact, and
+    `natto.orthonormal.OrthonormalOperator`, whose coefficients are floats.
+
+    Args:
+        signature: The index groups the terms' slots belong to.
+        terms: Each term with its coefficient.
+        order: Group names in the order their axes should appear. Defaults to the
+            signature's own order.
+
+    Returns:
+        An array with one axis of length 3 per slot, in the requested group order.
+
+    Raises:
+        ValueError: If `order` does not name every group exactly once.
+    """
+    names = [group.name for group in signature.groups]
+    order = names if order is None else list(order)
+    if sorted(order) != sorted(names):
+        raise ValueError(f"The order must name the groups {names}, got {order}")
+    axes = [slot for name in order for slot in signature.slots(name)]
+
+    # The stride of each slot in the flattened array, with the axes in `order`
+    size = signature.size
+    stride = [0] * size
+    for position, slot in enumerate(axes):
+        stride[slot] = 3 ** (size - 1 - position)
+
+    # A product of deltas and Levi-Civita symbols is zero almost everywhere, so each
+    # term adds its coefficient only where it is nonzero. Every entry receives the
+    # same additions in the same order as summing the dense terms would give.
+    flat = np.zeros(3**size)
+    for term, coefficient in terms.items():
+        indices, signs = _nonzero_entries(term, stride)
+        flat[indices] += float(coefficient) * signs
+    result = flat.reshape((3,) * size)
+
+    return result
 
 
 def sort_with_sign(items: Sequence) -> tuple[tuple, int]:

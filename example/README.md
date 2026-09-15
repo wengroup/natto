@@ -72,7 +72,7 @@ into its natural tensor components and reconstruct it back. Specifically:
 
 Their composition, taking the physical tensor straight to its weight-`l`,
 channel-`p` part without forming the natural tensor, is not in the file; build it
-with `natto.reduction.get_composed_operators` when needed.
+with `natto.get_composed_operators` when needed.
 
 The file contains the symbolic and numerical values of the two for each
 physical tensor and each natural tensor component (labeled by its weight).

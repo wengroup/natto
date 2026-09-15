@@ -13,20 +13,15 @@ polyadic, which checks the closed form against the reduction itself.
 the package is used to compute the expected values.
 """
 
-import functools
 import math
 
 import numpy as np
 import pytest
 import scipy.special
 
-from natto.harmonics import (
-    coeff_harmonic,
-    get_harmonic_operator,
-    get_harmonic_symbolic,
-)
-from natto.reduction import get_reduction
-from natto.symbolic import Operator
+from natto.harmonics import coeff_harmonic, get_harmonic_operator
+from natto.reduction import get_embedding_operators, get_extraction_operators
+from natto.symbolic import Operator, act
 from natto.utils import is_symmetric_traceless
 
 #: Weights checked. The operator is a closed form, so this is cheap; the ceiling
@@ -43,9 +38,7 @@ def unit_vector(seed: int) -> np.ndarray:
 
 def harmonic(direction: np.ndarray, weight: int, normalize: str = "legendre"):
     """The Cartesian harmonic of `direction`, through the operator."""
-    operator, rule = get_harmonic_operator(weight, normalize)
-
-    return np.einsum(rule, operator, *[direction] * weight)
+    return act(get_harmonic_operator(weight, normalize), *[direction] * weight)
 
 
 def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
@@ -57,19 +50,13 @@ def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
     return result
 
 
-@functools.lru_cache(maxsize=None)
-def reduction(rank: int) -> dict:
-    """The general reduction of a generic tensor of this rank, built once."""
-    return get_reduction(rank)
-
-
 def test_symbolic_form_is_the_papers():
     """H(3|3) without its scale, as the paper writes it out term by term.
 
     The Cartesian indices A, B, C are fixed, A meeting a harmonic index and B, C
     paired; only a, b, c are averaged, so t = 0 has six products and t = 1 three.
     """
-    H = get_harmonic_symbolic(3)
+    H = get_harmonic_operator(3, normalize="none")
     expected = Operator.parse(
         "+1/6 d_aA d_bB d_cC  +1/6 d_aA d_cB d_bC  +1/6 d_bA d_aB d_cC  "
         "+1/6 d_bA d_cB d_aC  +1/6 d_cA d_aB d_bC  +1/6 d_cA d_bB d_aC  "
@@ -133,24 +120,16 @@ def test_matches_reduction(weight: int):
 
     A polyadic of rank n has a single weight-n channel, whose mapping tensor and dual
     are both the natural projector, so each of them applied to the polyadic must equal
-    the unnormalized harmonic. The rank-four reduction takes seconds, hence the mark.
+    the unnormalized harmonic.
     """
     a = unit_vector(0)
     polyadic = outer_power(a, weight)
-    (embedding,) = reduction(weight)[weight]["embedding"]
-    (extraction,) = reduction(weight)[weight]["extraction"]
+    (embedding,) = get_embedding_operators(weight, ell=weight).values()
+    (extraction,) = get_extraction_operators(weight, ell=weight).values()
 
     expected = harmonic(a, weight, normalize="none")
-    via_embedding = np.tensordot(
-        np.asarray(embedding["numerical"], dtype=np.float64),
-        polyadic,
-        axes=(list(range(weight)), list(range(weight))),
-    )
-    via_extraction = np.einsum(
-        extraction["rule"],
-        np.asarray(extraction["numerical"], dtype=np.float64),
-        polyadic,
-    )
+    via_embedding = np.tensordot(embedding.evaluate(), polyadic, axes=weight)
+    via_extraction = act(extraction, polyadic)
 
     np.testing.assert_allclose(via_embedding, expected, atol=1e-12)
     np.testing.assert_allclose(via_extraction, expected, atol=1e-12)

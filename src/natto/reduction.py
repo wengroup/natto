@@ -1,29 +1,31 @@
 """The reduction of a Cartesian tensor into irreducible Cartesian tensors.
 
-This is the public entry point. `get_reduction` returns, for each weight and channel
-of a tensor of some rank, the two operators that move between the two spaces: the
-embedding operator, and the extraction operator dual to it.
+This is the public entry point for the operators that move between a Cartesian tensor
+and its ICTs. Every operator is keyed by `(ell, p)`, the weight of its ICT and the
+multiplicity index p = 1, ..., N_ell of its channel, as the paper labels them.
 
-Contracting the extraction operator with a Cartesian tensor gives the ICT of that
-weight and channel. Contracting the embedding operator back with that ICT returns
-the tensor's part of this weight and channel, and summing those parts over every
-weight and channel returns the tensor. They are published under the keys
-`embedding` and `extraction`.
+- `get_extraction_operators` takes a Cartesian tensor to the ICT of each weight and
+  channel.
+- `get_embedding_operators` takes that ICT back to the tensor's part of the weight and
+  channel. Summing those parts over every weight and channel returns the tensor.
+- `get_reduction` gives the two together.
+- `get_composed_operators` gives the two composed into one rank-2n operator that takes
+  the tensor straight to its part of a weight and channel. The paper applies the two
+  operators in turn instead, and at rank n the composed operator has 3^(2n) entries
+  per channel, so it is built only on request.
+- `get_gram_matrices` gives the exact Gram matrix of each weight.
 
-`get_composed_operators` gives, on request, the two composed into one rank-2n operator
-that takes the tensor straight to its part of a weight and channel. The paper applies
-the two operators in turn instead, and at rank n the composed operator has 3^(2n)
-entries per channel, so the reduction does not build it.
+Each operator is exact; `natto.evaluate` turns one into an array together with the
+einsum rule that applies it, and `natto.act` applies it directly.
 
-The work is staged, because the two bases need different amounts of it.
-`get_independent_mappings` is common to both: it keeps an independent subset of the
-candidates built in `mapping_tensors` and adapts them to any intrinsic symmetry.
-From there the dual basis calls `get_dual_pair`, which inverts the exact Gram matrix,
-while the orthonormal basis goes to `orthonormal` instead and builds no duals at all
--- its operator is its own dual, and is irrational, so the exact work would only be
-discarded.
+The dual basis is exact throughout: the mappings, and the duals built from them with
+the inverse of their exact Gram matrix. The orthonormal basis rotates the mappings by
+the inverse square root of that matrix instead, which is irrational in general, so
+its operators carry float coefficients; see `natto.orthonormal`.
 """
 
+import functools
+from dataclasses import replace
 from fractions import Fraction
 from typing import Literal
 
@@ -33,17 +35,14 @@ from natto.independence import (
     select_independent_mappings_via_components,
     select_independent_mappings_via_embeddings,
 )
-from natto.indices import letter_index
-from natto.mapping_tensors import (
-    Mapping,
-    get_decomposition_operators,
-    get_extraction_operators,
-    get_mappings,
-)
-from natto.orthonormal import get_orthonormal_entries
-from natto.rational import float_matrix, fraction_matrix, matrix_inverse
-from natto.symbolic import Operator
+from natto.mapping_tensors import Mapping, compose, get_dual_mappings, get_mappings
+from natto.orthonormal import OrthonormalOperator, get_orthonormal_operators
+from natto.rational import matrix_inverse
+from natto.symbolic import Operator, Signature
 from natto.symmetry_adaptation import get_symmetry_adapted_mappings
+
+#: The basis of each weight's operators: `dual`, exact, or `orthonormal`, self-dual.
+Basis = Literal["dual", "orthonormal"]
 
 #: What to judge the independence of the candidate mappings on; see
 #: `natto.independence`.
@@ -51,19 +50,16 @@ Selection = Literal["symbolic", "qr", "components", "embeddings"]
 
 
 def get_reduction(
-    n: int,
-    symmetry: str = None,
-    basis: str = "dual",
-    numerical: bool = True,
-    selection: Selection = "symbolic",
-) -> dict:
-    """Reduce a Cartesian tensor space into its irreducible parts.
+    n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
+) -> dict[tuple[int, int], dict[str, Operator | OrthonormalOperator]]:
+    """The extraction and embedding operators of a Cartesian tensor space.
 
-    The operators depend only on the rank and the symmetry, not on any
-    particular tensor, so one call serves every tensor of that class.
+    The operators depend only on the rank and the symmetry, not on any particular
+    tensor, so one call serves every tensor of that class.
 
     Args:
         n: Rank of the Cartesian tensor.
+        ell: The one weight to build, or None for every weight.
         symmetry: Intrinsic symmetry of the Cartesian tensor, if any. For example,
             - "ij=ji" is a fully symmetric rank-2 tensor, e.g. the stress tensor;
             - "ij=-ji" is an antisymmetric rank-2 tensor;
@@ -75,136 +71,172 @@ def get_reduction(
               ij and kl), e.g. the elastic tensor.
             The number of distinct letters gives the rank; which letters are used
             does not matter.
-        basis: `dual` returns the mappings and the duals that extract through
-            them, exactly, with rational coefficients. `orthonormal` returns
-            the mappings of Eq. 21 instead, rotated by the inverse square root
-            of their Gram matrix. Those are self-dual, so `embedding` and
-            `extraction` carry the same array and differ only in the einsum rule
-            applying it; the rotation is irrational, so they have no symbolic
-            form.
-        numerical: Whether to evaluate the operators as well as building them
-            symbolically. Ignored for `basis="orthonormal"`, which is numerical
-            by construction.
-        selection: What to judge the independence of the candidate mappings on.
-            `symbolic` is the default: the mappings' Gram matrix is contracted
-            symbolically and the decision made over the rationals, so it is the
-            same on every machine, keeping the earliest independent candidates.
-            `qr` is Algorithm 1 of the paper: a rank-revealing QR with column
-            pivoting on the evaluated mappings, which keeps the same number but
-            may keep a different subset. `components` uses the mappings evaluated
-            in full, `embeddings` their action on one probe tensor. The last three
-            are numerical, and so decided against a tolerance; see
-            `natto.independence`. All find the same number of mappings, but only
-            `symbolic` is free of a tolerance, which matters because the choice
-            fixes which duals are canonical.
+        basis: `dual` gives the mappings as embedding operators and their duals as
+            extraction operators, exactly. `orthonormal` gives the mappings of Eq. 21
+            instead, which are self-dual, so the embedding and extraction operator of
+            a channel have the same float terms and differ only in their input.
 
     Returns:
-        The embedding and extraction operators keyed by weight, each with the einsum
-        rule that applies it. A weight the symmetry extinguishes is absent rather
-        than empty. The Gram matrix comes with its inverse in the dual basis and with
-        its inverse square root in the orthonormal one.
+        A dict mapping `(ell, p)` to the operators of that weight and channel, under
+        the keys `embedding` and `extraction`. A weight the symmetry extinguishes has
+        no channels.
 
     Raises:
-        ValueError: If `basis` is neither `dual` nor `orthonormal`, or if
-            `selection` is not one of `symbolic`, `qr`, `components` and
-            `embeddings`.
+        ValueError: If `ell` is not between 0 and `n`, `basis` is not recognized, or
+            `symmetry` does not have rank `n`.
 
     References:
         Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the embedding, and
         Eq. 20 for the sum that returns the tensor.
     """
-    if basis not in ("dual", "orthonormal"):
-        raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")
+    embeddings = get_embedding_operators(n, ell, symmetry, basis)
+    extractions = get_extraction_operators(n, ell, symmetry, basis)
+    reduction = {
+        key: {"embedding": embeddings[key], "extraction": extractions[key]}
+        for key in embeddings
+    }
 
-    out = {}
-    for ell in range(n + 1):
-        G, gram = get_independent_mappings(ell, n, symmetry, selection)
-
-        # No ICT of this weight, or none that the symmetry admits
-        if not G:
-            continue
-
-        if basis == "orthonormal":
-            # The self-dual basis needs no duals, so none are built.
-            out[ell] = get_orthonormal_entries(ell, n, G, gram)
-        else:
-            G_expanded, G_tilde, gram_inverse = get_dual_pair(G, gram)
-            out[ell] = assemble_operator_entries(
-                ell,
-                n,
-                G_expanded,
-                G_tilde,
-                gram,
-                gram_inverse,
-                numerical,
-                include_gram=True,
-                include_gram_inverse=True,
-            )
-
-    return out
+    return reduction
 
 
-def get_composed_operators(
-    n: int,
-    symmetry: str = None,
-    numerical: bool = True,
-    selection: Selection = "symbolic",
-) -> dict:
-    """The composed operators of a Cartesian tensor space, in the dual basis.
+def get_embedding_operators(
+    n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
+) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+    """The embedding operators, which take an ICT to its part of a Cartesian tensor.
 
-    Each is the embedding operator of one weight and channel composed with its
-    extraction dual over the weight indices: a rank-2n operator that takes a tensor
-    straight to its part of that weight and channel. The paper applies the two
-    operators in turn, Eq. 18 and then Eq. 19, and never forms this one; at rank n
-    it has 3^(2n) entries per channel, which is why `get_reduction` leaves it out.
+    Each has the ICT indices as its `ict` group, the input, and the tensor indices as
+    its `gct` group.
 
     Args:
         n: Rank of the Cartesian tensor.
+        ell: The one weight to build, or None for every weight.
         symmetry: Intrinsic symmetry of the Cartesian tensor, if any, as for
             `get_reduction`.
-        numerical: Whether to evaluate the operators as well as building them
-            symbolically.
-        selection: What to judge the independence of the candidate mappings on, as
-            for `get_reduction`.
+        basis: `dual` or `orthonormal`, as for `get_reduction`.
 
     Returns:
-        One list of operators per weight, one per channel, each with its symbolic
-        form, the einsum rule that applies it and, if asked for, its array. A weight
-        the symmetry extinguishes is absent.
+        A dict mapping `(ell, p)` to the embedding operator of that weight and channel.
 
     Raises:
-        ValueError: If `selection` is not recognized.
+        ValueError: If `ell` is not between 0 and `n`, `basis` is not recognized, or
+            `symmetry` does not have rank `n`.
+
+    References:
+        Eq. 13 of [Wen2026] for the mappings, used as in Eq. 19, and Eq. 21 for the
+        orthonormal basis.
+    """
+    operators = _get_operators(n, ell, symmetry, basis, extraction=False)
+
+    return operators
+
+
+def get_extraction_operators(
+    n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
+) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+    """The extraction operators, which take a Cartesian tensor to its ICTs.
+
+    Each has the ICT indices as its `ict` group and the tensor indices as its `gct`
+    group, the input.
+
+    Args:
+        n: Rank of the Cartesian tensor.
+        ell: The one weight to build, or None for every weight.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any, as for
+            `get_reduction`.
+        basis: `dual` or `orthonormal`, as for `get_reduction`.
+
+    Returns:
+        A dict mapping `(ell, p)` to the extraction operator of that weight and
+        channel.
+
+    Raises:
+        ValueError: If `ell` is not between 0 and `n`, `basis` is not recognized, or
+            `symmetry` does not have rank `n`.
+
+    References:
+        Eq. 16 of [Wen2026] for the duals, used as in Eq. 18, and Eq. 21 for the
+        orthonormal basis.
+    """
+    operators = _get_operators(n, ell, symmetry, basis, extraction=True)
+
+    return operators
+
+
+def get_composed_operators(
+    n: int, ell: int | None = None, symmetry: str | None = None
+) -> dict[tuple[int, int], Operator]:
+    """The composed operators of a Cartesian tensor space, in the dual basis.
+
+    Each is the embedding operator of one weight and channel composed with its
+    extraction operator over the ICT indices: a rank-2n operator that takes a tensor
+    straight to its part of that weight and channel. Its `gct` group carries the
+    output tensor indices and its `gct_in` group the input ones. The paper applies the
+    two operators in turn, Eq. 18 and then Eq. 19, and never forms this one; at rank n
+    it has 3^(2n) entries per channel.
+
+    Args:
+        n: Rank of the Cartesian tensor.
+        ell: The one weight to build, or None for every weight.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any, as for
+            `get_reduction`.
+
+    Returns:
+        A dict mapping `(ell, p)` to the composed operator of that weight and channel.
+
+    Raises:
+        ValueError: If `ell` is not between 0 and `n`, or `symmetry` does not have
+            rank `n`.
 
     References:
         Eq. 18 and Eq. 19 of [Wen2026], composed. Computed as in A.2 of
         [Wen2026Refactor].
     """
-    upper = letter_index(n, upper_case=True)
-    upper2 = letter_index(n, start=n, upper_case=True)
-    rule = f"{upper}{upper2},...{upper2}->...{upper}"
+    operators = {}
+    for weight in _get_weights(n, ell):
+        G, G_tilde, _ = _get_channels(weight, n, symmetry)
+        for p, (G_p, G_tilde_p) in enumerate(zip(G, G_tilde), start=1):
+            operators[weight, p] = compose(G_p, G_tilde_p)
 
-    out = {}
-    for ell in range(n + 1):
-        G, gram = get_independent_mappings(ell, n, symmetry, selection)
-        if not G:
-            continue
+    return operators
 
-        duals = get_extraction_operators(matrix_inverse(gram), G)
-        entries = []
-        for S_p in get_decomposition_operators(G, duals):
-            entry = {"symbolic": str(S_p), "rule": rule}
-            if numerical:
-                entry["numerical"] = S_p.evaluate(("rank", "rank_in"))
-            entries.append(entry)
-        out[ell] = entries
 
-    return out
+def get_gram_matrices(
+    n: int, ell: int | None = None, symmetry: str | None = None
+) -> dict[int, list[list[Fraction]]]:
+    """The exact Gram matrix of the mappings of each weight.
+
+    Entry (p, q), counted from zero, pairs channel p + 1 with channel q + 1, so a
+    matrix belongs to a weight rather than to a channel.
+
+    Args:
+        n: Rank of the Cartesian tensor.
+        ell: The one weight to build, or None for every weight.
+        symmetry: Intrinsic symmetry of the Cartesian tensor, if any, as for
+            `get_reduction`.
+
+    Returns:
+        A dict mapping each weight that has channels to its Gram matrix.
+
+    Raises:
+        ValueError: If `ell` is not between 0 and `n`, or `symmetry` does not have
+            rank `n`.
+
+    References:
+        Eq. 15 of [Wen2026].
+    """
+    grams = {}
+    for weight in _get_weights(n, ell):
+        _, _, gram = _get_channels(weight, n, symmetry)
+        if gram:
+            grams[weight] = [list(row) for row in gram]
+
+    return grams
 
 
 def get_independent_mappings(
     ell: int,
     n: int,
-    symmetry: str = None,
+    symmetry: str | None = None,
     selection: Selection = "symbolic",
 ) -> tuple[list[Mapping], list[list[Fraction]]]:
     """The independent mapping tensors of one weight, and their exact Gram matrix.
@@ -224,8 +256,16 @@ def get_independent_mappings(
         ell: Weight of the ICT space.
         n: Rank of the Cartesian tensor.
         symmetry: Intrinsic index symmetry, as index equalities, or None.
-        selection: What to judge independence on; see `natto.independence`. The default
-            is the symbolic one.
+        selection: What to judge the independence of the candidate mappings on.
+            `symbolic` is the default: the mappings' Gram matrix is contracted
+            symbolically and the decision made over the rationals, so it is the
+            same on every machine, keeping the earliest independent candidates.
+            `qr` is Algorithm 1 of the paper: a rank-revealing QR with column
+            pivoting on the evaluated mappings, which keeps the same number but
+            may keep a different subset. `components` uses the mappings evaluated
+            in full, `embeddings` their action on one probe tensor. The last three
+            are numerical, and so decided against a tolerance; see
+            `natto.independence`.
 
     Returns:
         The independent mappings and their exact Gram matrix. Both are empty when there
@@ -275,100 +315,86 @@ def get_independent_mappings(
     return G, gram
 
 
-def get_dual_pair(
-    G: list[Mapping], gram: list[list[Fraction]]
-) -> tuple[list[Operator], list[Operator], list[list[Fraction]]]:
-    """Complete the mappings into an extraction-and-embedding pair, exactly.
+@functools.cache
+def _get_channels(
+    ell: int, n: int, symmetry: str | None
+) -> tuple[tuple[Mapping, ...], tuple[Mapping, ...], tuple[tuple[Fraction, ...], ...]]:
+    """The mappings of one weight, their duals and their Gram matrix, built once.
 
-    Each dual is the combination of the mappings whose coefficients are a row of the
-    inverse Gram matrix, so inverting that matrix over the rationals is all that is
-    needed.
-
-    Args:
-        G: The independent mappings, from `get_independent_mappings`.
-        gram: Their exact Gram matrix.
+    The result is cached for the life of the process, so asking for the embedding and
+    then the extraction operators of a class selects its mappings once. It is shared
+    between callers, so it is returned as tuples, and the public functions build fresh
+    operators and matrices from it.
 
     Returns:
-        The mappings and their duals, as operators, and the exact inverse of the Gram
-        matrix.
-
-    References:
-        Eq. 16 of [Wen2026].
+        The mappings, their duals and their exact Gram matrix; all empty when the
+        weight has no channel.
     """
-    gram_inverse = matrix_inverse(gram)
-    duals = get_extraction_operators(gram_inverse, G)
-    G_expanded = [G_p.expand() for G_p in G]
-    G_tilde = [dual.expand() for dual in duals]
+    G, gram = get_independent_mappings(ell, n, symmetry)
+    if not G:
+        return (), (), ()
 
-    return G_expanded, G_tilde, gram_inverse
+    G_tilde = get_dual_mappings(matrix_inverse(gram), G)
+    channels = (tuple(G), tuple(G_tilde), tuple(tuple(row) for row in gram))
+
+    return channels
 
 
-def assemble_operator_entries(
-    ell: int,
-    n: int,
-    G: list[Operator],
-    G_tilde: list[Operator],
-    gram: list[list[Fraction]],
-    gram_inverse: list[list[Fraction]],
-    numerical: bool = True,
-    include_gram: bool = True,
-    include_gram_inverse: bool = True,
-) -> dict:
-    """Pack the operators of one weight into the form the package publishes.
+def _get_operators(
+    n: int, ell: int | None, symmetry: str | None, basis: Basis, extraction: bool
+) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+    """The embedding or extraction operators; see `get_embedding_operators`."""
+    if basis not in ("dual", "orthonormal"):
+        raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")
 
-    Each operator is paired with the einsum rule that applies it, and optionally
-    with its evaluated array. The rules carry a leading ellipsis, so an operator
-    applies to a batch of tensors as readily as to one.
+    group = "gct" if extraction else "ict"
+    operators = {}
+    for weight in _get_weights(n, ell):
+        G, G_tilde, gram = _get_channels(weight, n, symmetry)
+        if not G:
+            continue
 
-    Args:
-        ell: Weight of the natural-tensor space.
-        n: Rank of the Cartesian tensor.
-        G: Embedding operators, one per channel.
-        G_tilde: Extraction operators dual to them.
-        gram: Gram matrix of the embedding operators.
-        gram_inverse: Its exact inverse.
-        numerical: Whether to evaluate each operator as well as recording it
-            symbolically.
-        include_gram: Whether to report the Gram matrix.
-        include_gram_inverse: Whether to report its inverse.
+        if basis == "orthonormal":
+            # The self-dual basis rotates the mappings themselves, for both uses.
+            signature = _with_input_group(G[0].sector.signature, group)
+            gram_matrix = [list(row) for row in gram]
+            orthonormal = get_orthonormal_operators(G, gram_matrix, signature)
+            for p, operator in enumerate(orthonormal, start=1):
+                operators[weight, p] = operator
+        else:
+            chosen = G_tilde if extraction else G
+            for p, mapping in enumerate(chosen, start=1):
+                operators[weight, p] = _with_input(mapping.expand(), group)
 
-    Returns:
-        The operators under the keys `embedding` and `extraction`, plus `gram` and
-        `gram_inverse` when asked for.
+    return operators
+
+
+def _get_weights(n: int, ell: int | None) -> range | list[int]:
+    """Every weight of rank `n`, or only `ell`.
+
+    Raises:
+        ValueError: If `ell` is not between 0 and `n`.
     """
-    out_weight = {"embedding": [], "extraction": []}
+    if ell is None:
+        return range(n + 1)
+    if not 0 <= ell <= n:
+        raise ValueError(f"The weight must be between 0 and {n}, got {ell}")
 
-    if include_gram:
-        out_weight["gram"] = {
-            "symbolic": fraction_matrix(gram),
-            "numerical": float_matrix(gram),
-        }
+    return [ell]
 
-    if include_gram_inverse:
-        out_weight["gram_inverse"] = {
-            "symbolic": fraction_matrix(gram_inverse),
-            "numerical": float_matrix(gram_inverse),
-        }
 
-    lower = letter_index(ell)
-    upper = letter_index(n, upper_case=True)
+def _with_input(operator: Operator, name: str) -> Operator:
+    """The same operator, with the group called `name` as its only input."""
+    signature = _with_input_group(operator.signature, name)
+    terms = [(coefficient, term) for term, coefficient in operator.terms.items()]
 
-    for G_p, G_tilde_p in zip(G, G_tilde):
-        out_weight["embedding"].append(
-            {"symbolic": str(G_p), "rule": f"{upper}{lower},...{lower}->...{upper}"}
-        )
-        if numerical:
-            out_weight["embedding"][-1]["numerical"] = G_p.evaluate(("rank", "weight"))
+    return Operator(signature, terms)
 
-        out_weight["extraction"].append(
-            {
-                "symbolic": str(G_tilde_p),
-                "rule": f"{lower}{upper},...{upper}->...{lower}",
-            }
-        )
-        if numerical:
-            out_weight["extraction"][-1]["numerical"] = G_tilde_p.evaluate(
-                ("weight", "rank")
-            )
 
-    return out_weight
+def _with_input_group(signature: Signature, name: str) -> Signature:
+    """The same signature, with the group called `name` as its only input."""
+    groups = tuple(
+        replace(group, input=group.name == name) for group in signature.groups
+    )
+
+    return Signature(groups)

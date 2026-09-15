@@ -26,7 +26,7 @@ def test_candidates(n: int, ell: int):
         expected = np.tensordot(projector, lowering_array(label, n, ell), axes=ell)
 
         np.testing.assert_allclose(
-            candidate.expand().evaluate(("weight", "rank")),
+            candidate.expand().evaluate(),
             expected,
             atol=1e-12,
             err_msg=str(label),

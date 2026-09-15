@@ -22,16 +22,12 @@ from fractions import Fraction
 
 import pytest
 
-from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_symbolic
-from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
-from natto.mapping_tensors import (
-    Mapping,
-    get_decomposition_operators,
-    get_extraction_operators,
-)
+from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_operator
+from natto.harmonics import coeff_harmonic, get_harmonic_operator
+from natto.mapping_tensors import Mapping, compose, get_dual_mappings
 from natto.natural_projector import get_natural_projector
-from natto.rational import matrix_null_space
-from natto.reduction import get_dual_pair, get_independent_mappings
+from natto.rational import matrix_inverse, matrix_null_space
+from natto.reduction import get_independent_mappings
 from natto.symmetry_adaptation import get_symmetry_action_matrix
 
 #: `Fraction` is the exact type. A plain `int` is exact too; `bool` is an `int` by
@@ -76,8 +72,9 @@ def reduce_weight(rank: int, symmetry: str, weight: int):
     if not G:
         return None
 
-    _, G_tilde, gram_inverse = get_dual_pair(G, gram)
-    S = get_decomposition_operators(G, get_extraction_operators(gram_inverse, G))
+    gram_inverse = matrix_inverse(gram)
+    G_tilde = get_dual_mappings(gram_inverse, G)
+    S = [compose(G_p, G_tilde_p) for G_p, G_tilde_p in zip(G, G_tilde)]
 
     return G, gram, G_tilde, S, gram_inverse
 
@@ -138,7 +135,7 @@ def test_natural_projector_is_exact(weight: int):
 @pytest.mark.parametrize("weight", range(4))
 def test_harmonic_is_exact(weight: int):
     """The harmonic operator, and the constant that normalizes it."""
-    assert_exact(f"H({weight})", coefficients(get_harmonic_symbolic(weight)))
+    assert_exact(f"H({weight})", coefficients(get_harmonic_operator(weight)))
     assert isinstance(coeff_harmonic(weight), Fraction)
 
 
@@ -150,7 +147,7 @@ def test_coupling_operator_is_exact(l1: int, l2: int, l3: int):
     a float, and `int / int` in Python would quietly make them one. The two cases
     are reached by the parity of `l1 + l2 + l3`.
     """
-    K = get_coupling_symbolic(l1, l2, l3)
+    K = get_coupling_operator(l1, l2, l3)
     assert_exact(f"K({l1},{l2},{l3})", coefficients(K))
 
     even = (l1 + l2 + l3) % 2 == 0

@@ -7,10 +7,13 @@ its terms contracted as dense arrays.
 
 import numpy as np
 
-from natto.coupling import get_coupling_symbolic
-from natto.mapping_tensors import get_decomposition_operators, get_extraction_operators
+from natto.coupling import get_coupling_operator
 from natto.natural_projector import get_natural_projector
-from natto.reduction import get_dual_pair, get_independent_mappings
+from natto.reduction import (
+    get_composed_operators,
+    get_embedding_operators,
+    get_extraction_operators,
+)
 from natto.symbolic import Operator
 from natto.utils import dij, eijk
 
@@ -19,14 +22,10 @@ def package_operators() -> list[Operator]:
     """Projectors, coupling operators, and the operators of a symmetric reduction."""
     operators = [get_natural_projector(ell) for ell in range(5)]
     for triple in [(1, 1, 1), (1, 1, 2), (2, 2, 3), (2, 3, 3)]:
-        operators.append(get_coupling_symbolic(*triple))
-    for ell in range(4):
-        G, gram = get_independent_mappings(ell, 3, "ijk=ikj")
-        if G:
-            embedding, extraction, gram_inverse = get_dual_pair(G, gram)
-            duals = get_extraction_operators(gram_inverse, G)
-            decomposition = get_decomposition_operators(G, duals)
-            operators += embedding + extraction + decomposition
+        operators.append(get_coupling_operator(*triple))
+    for build in (get_embedding_operators, get_extraction_operators):
+        operators += list(build(3, symmetry="ijk=ikj").values())
+    operators += list(get_composed_operators(3, symmetry="ijk=ikj").values())
 
     return operators
 

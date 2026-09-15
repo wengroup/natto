@@ -1,5 +1,5 @@
 import functools
-from collections import defaultdict
+from collections import Counter, defaultdict
 from fractions import Fraction
 from typing import NamedTuple, Optional
 
@@ -8,13 +8,14 @@ import pytest
 
 from natto.gram import get_gram_entry
 from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
-from natto.mapping_tensors import get_extraction_operators
+from natto.mapping_tensors import compose, get_dual_mappings
 from natto.rational import matrix_inverse
 from natto.reduction import (
     get_composed_operators,
     get_independent_mappings,
     get_reduction,
 )
+from natto.symbolic import act
 
 
 class TensorClass(NamedTuple):
@@ -104,19 +105,38 @@ def get_tensor_class_params(
 @functools.lru_cache(maxsize=None)
 def get_reduction_cached(rank: int, symmetry: str) -> dict:
     """`get_reduction`, computed once per class; rank 4 costs seconds."""
-    return get_reduction(rank, symmetry)
+    return get_reduction(rank, symmetry=symmetry)
 
 
 @functools.lru_cache(maxsize=None)
 def get_orthonormal_cached(rank: int, symmetry: str) -> dict:
     """`get_reduction` in the orthonormal basis, computed once per class."""
-    return get_reduction(rank, symmetry, basis="orthonormal")
+    return get_reduction(rank, symmetry=symmetry, basis="orthonormal")
 
 
 @functools.lru_cache(maxsize=None)
 def get_composed_operators_cached(rank: int, symmetry: str) -> dict:
     """`get_composed_operators`, computed once per class."""
-    return get_composed_operators(rank, symmetry)
+    return get_composed_operators(rank, symmetry=symmetry)
+
+
+def count_channels(operators: dict) -> dict[int, int]:
+    """The number of channels of each weight, from operators keyed by `(ell, p)`."""
+    return dict(Counter(ell for ell, _ in operators))
+
+
+def weight_projectors(rank: int, symmetry: Optional[str], selection: str) -> dict:
+    """The projector onto each weight, summed over its channels, as arrays."""
+    projectors = {}
+    for ell in range(rank + 1):
+        G, gram = get_independent_mappings(ell, rank, symmetry, selection)
+        if G:
+            duals = get_dual_mappings(matrix_inverse(gram), G)
+            projectors[ell] = sum(
+                compose(G_p, dual).evaluate() for G_p, dual in zip(G, duals)
+            )
+
+    return projectors
 
 
 def cycle_index_multiplicities(n: int, symmetry: Optional[str]) -> dict[int, int]:
@@ -188,12 +208,7 @@ def test_weight_multiplicity(tensor_class: TensorClass):
         tensor_class: physical tensor class to check
     """
     output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry)
-
-    found = {
-        m: len(out_m["extraction"])
-        for m, out_m in output.items()
-        if len(out_m["extraction"]) > 0
-    }
+    found = count_channels(output)
 
     assert found == tensor_class.multiplicity
     assert sum(N_m * (2 * m + 1) for m, N_m in found.items()) == tensor_class.n_ind
@@ -207,7 +222,7 @@ def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
     symmetry adaptation independently of the numbers typed into Table III.
     """
     output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry)
-    found = {ell: len(data["extraction"]) for ell, data in output.items()}
+    found = count_channels(output)
 
     assert found == cycle_index_multiplicities(tensor_class.rank, tensor_class.symmetry)
 
@@ -216,26 +231,17 @@ def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
 def test_qr_selection_spans_the_same_weights(tensor_class: TensorClass):
     """Algorithm 1 of the paper may keep other mappings, but spans the same spaces.
 
-    Pivoted QR keeps the same number of mappings at every weight as the exact scan, and
-    their extraction and embedding give the same projector onto each weight.
+    Pivoted QR keeps mappings at the same weights as the exact scan, and each mapping
+    composed with its dual, summed over the channels, gives the same projector onto
+    each weight.
     """
-    rank = tensor_class.rank
-    exact = get_reduction_cached(rank, tensor_class.symmetry)
-    qr = get_reduction(rank, tensor_class.symmetry, selection="qr")
+    rank, symmetry = tensor_class.rank, tensor_class.symmetry
+    exact = weight_projectors(rank, symmetry, "symbolic")
+    qr = weight_projectors(rank, symmetry, "qr")
 
-    assert {w: len(d["extraction"]) for w, d in qr.items()} == {
-        w: len(d["extraction"]) for w, d in exact.items()
-    }
+    assert sorted(qr) == sorted(exact)
     for weight in exact:
-        projectors = [
-            sum(
-                np.tensordot(g["numerical"], h["numerical"], axes=weight)
-                for g, h in zip(data["embedding"], data["extraction"])
-            )
-            for data in (exact[weight], qr[weight])
-        ]
-
-        np.testing.assert_allclose(projectors[1], projectors[0], rtol=0, atol=1e-10)
+        np.testing.assert_allclose(qr[weight], exact[weight], rtol=0, atol=1e-10)
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
@@ -249,7 +255,7 @@ def test_duality_is_exact(tensor_class: TensorClass):
         G, gram = get_independent_mappings(
             weight, tensor_class.rank, tensor_class.symmetry
         )
-        duals = get_extraction_operators(matrix_inverse(gram), G)
+        duals = get_dual_mappings(matrix_inverse(gram), G)
 
         for p, dual in enumerate(duals):
             entries = [get_gram_entry(dual, G_q) for G_q in G]
@@ -261,26 +267,27 @@ def test_duality_is_exact(tensor_class: TensorClass):
 def test_weight_projector_is_basis_independent(tensor_class: TensorClass):
     """Summed over channels, both bases give the same projector onto each weight.
 
-    The dual basis builds its decomposition operators symbolically and exactly; the
+    The dual basis builds its composed operators symbolically and exactly; the
     orthonormal basis rotates the mappings by a numerical inverse square root. The
     projector onto a weight does not depend on the basis within it, so the two routes
     must agree.
     """
     rank = tensor_class.rank
-    decomposition = get_composed_operators_cached(rank, tensor_class.symmetry)
+    composed = get_composed_operators_cached(rank, tensor_class.symmetry)
     orthonormal = get_orthonormal_cached(rank, tensor_class.symmetry)
 
-    assert sorted(decomposition) == sorted(orthonormal)
-    for weight, operators in decomposition.items():
-        summed = sum(entry["numerical"] for entry in operators)
+    assert sorted(composed) == sorted(orthonormal)
+    for weight in count_channels(composed):
+        channels = [key for key in composed if key[0] == weight]
+        summed = sum(composed[key].evaluate() for key in channels)
 
-        weight_axes = list(range(rank, rank + weight))
-        expected = sum(
-            np.tensordot(
-                entry["numerical"], entry["numerical"], axes=(weight_axes,) * 2
+        ict_axes = list(range(weight))
+        expected = 0
+        for key in channels:
+            embedding = orthonormal[key]["embedding"].evaluate()
+            expected = expected + np.tensordot(
+                embedding, embedding, axes=(ict_axes, ict_axes)
             )
-            for entry in orthonormal[weight]["embedding"]
-        )
 
         np.testing.assert_allclose(summed, expected, rtol=0, atol=1e-12)
 
@@ -297,7 +304,7 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
         Q, gram = get_independent_mappings(
             weight, tensor_class.rank, tensor_class.symmetry
         )
-        numerical_Q = np.stack([Q_p.expand().evaluate(("rank", "weight")) for Q_p in Q])
+        numerical_Q = np.stack([Q_p.expand().evaluate() for Q_p in Q])
         flattened_Q = numerical_Q.reshape(len(Q), -1)
         numerical = flattened_Q @ flattened_Q.T / (2 * weight + 1)
         symbolic = np.array(
@@ -312,7 +319,7 @@ def test_symbolic_symmetry_adapted_gram_matrix(tensor_class: TensorClass):
 def test_symmetry_rank_must_match_tensor_rank():
     """Reject a symmetry whose reference term has the wrong tensor rank."""
     with pytest.raises(ValueError):
-        get_reduction(3, "ij", numerical=False)
+        get_reduction(3, symmetry="ij")
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
@@ -320,7 +327,7 @@ def test_reduction_round_trip(tensor_class: TensorClass):
     """Check that extracting and embedding recovers the tensor it started from.
 
     Every weight and channel of `T` is extracted into its natural tensor and
-    embedded back; the parts must sum to `T`. The decomposition operator is
+    embedded back; the parts must sum to `T`. The composed operator is
     checked against the two-step route on the way, since it is their composition.
 
     Args:
@@ -336,28 +343,24 @@ def test_reduction_round_trip(tensor_class: TensorClass):
         T = impose_symmetry(T, symmetry)
 
     output = get_reduction_cached(rank, symmetry)
-    decompositions = get_composed_operators_cached(rank, symmetry)
+    composed = get_composed_operators_cached(rank, symmetry)
 
     all_T_prime = []
-    for j, out_j in output.items():
-        for p, (extraction, embedding, decomposition) in enumerate(
-            zip(out_j["extraction"], out_j["embedding"], decompositions[j])
-        ):
-            # X = G~ . T
-            X = np.einsum(extraction["rule"], extraction["numerical"], T)
+    for (ell, p), operators in output.items():
+        # X = G~ . T
+        X = act(operators["extraction"], T)
 
-            # T' = G . X
-            T_p_1 = np.einsum(embedding["rule"], embedding["numerical"], X)
+        # T' = G . X
+        T_p_1 = act(operators["embedding"], X)
 
-            # T' = S . T
-            T_p_2 = np.einsum(decomposition["rule"], decomposition["numerical"], T)
+        # T' = S . T
+        T_p_2 = act(composed[ell, p], T)
 
-            # T_p_1 and T_p_2 should be equal
-            assert np.allclose(T_p_1, T_p_2, rtol=0, atol=1e-10), (
-                f"T_p_1 and T_p_2 are not equal for j={j}, p={p}"
-            )
+        assert np.allclose(T_p_1, T_p_2, rtol=0, atol=1e-10), (
+            f"T_p_1 and T_p_2 are not equal for ell={ell}, p={p}"
+        )
 
-            all_T_prime.append(T_p_1)
+        all_T_prime.append(T_p_1)
 
     sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 

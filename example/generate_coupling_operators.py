@@ -18,15 +18,13 @@ stays plain ASCII.
 
 from pathlib import Path
 
-import numpy as np
-
-from natto.coupling import get_coupling_operator, get_coupling_symbolic
+from natto import evaluate, get_coupling_operator
 from natto.utils import yaml_dump
 
 
 def generate_coupling_operators(
     max_l1: int, max_l2: int, max_l3: int
-) -> dict[str, dict[str, np.ndarray]]:
+) -> dict[str, dict]:
     """
     Generate coupling operators and the corresponding einsum rules.
 
@@ -48,19 +46,15 @@ def generate_coupling_operators(
         for l2 in range(max_l2 + 1):
             for l3 in range(abs(l1 - l2), min(l1 + l2 + 1, max_l3 + 1)):
                 for normalize in ["legendre", "none"]:
-                    K_symbolic = get_coupling_symbolic(l1, l2, l3)
-                    K, rule = get_coupling_operator(l1, l2, l3, normalize)
+                    K = get_coupling_operator(l1, l2, l3, normalize)
+                    K_numerical, rule = evaluate(K)
 
-                    # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
-                    K_symbolic = K_symbolic.to_string(ascii=True)
-
-                    # Convert to numpy to save it
-                    K = K.tolist()
                     key = f"{l1}-{l2}-{l3}-{normalize}"
                     all_K[key] = {
                         "rule": rule,
-                        "symbolic": K_symbolic,
-                        "numerical": K,
+                        # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
+                        "symbolic": K.to_string(ascii=True),
+                        "numerical": K_numerical.tolist(),
                     }
 
     return all_K

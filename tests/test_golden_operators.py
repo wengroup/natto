@@ -32,14 +32,18 @@ Generate them once at the start of a porting session and they guard the rest of
 it; a fresh clone gets the rank-four coverage and a skip.
 """
 
-import functools
 from pathlib import Path
 
 import pytest
 
-from natto.indices import letter_index
-from natto.rational import fraction_matrix
-from natto.reduction import get_dual_pair, get_independent_mappings, get_reduction
+from natto.orthonormal import get_inverse_square_root
+from natto.rational import float_matrix, fraction_matrix, matrix_inverse
+from natto.reduction import (
+    get_embedding_operators,
+    get_extraction_operators,
+    get_gram_matrices,
+)
+from natto.symbolic import evaluate
 from tests.golden import (
     LOCAL_SNAPSHOT_DIR,
     assert_snapshot,
@@ -47,7 +51,11 @@ from tests.golden import (
     regolding,
     snapshot_path,
 )
-from tests.test_reduction import get_reduction_cached, get_tensor_class_params
+from tests.test_reduction import (
+    get_orthonormal_cached,
+    get_reduction_cached,
+    get_tensor_class_params,
+)
 
 #: `Operator.__str__` joins the terms of an operator with two spaces.
 TERM_SEPARATOR = "  "
@@ -81,12 +89,6 @@ TEST_FILE = (
 THIRD_ORDER_ELASTIC = "ijklmn=jiklmn=klijmn=ijmnkl"
 
 
-@functools.lru_cache(maxsize=None)
-def get_orthonormal_cached(rank: int, symmetry: str | None) -> dict:
-    """The reduction in the self-dual basis, once per class; rank 4 costs seconds."""
-    return get_reduction(rank, symmetry, basis="orthonormal")
-
-
 def dual_pair_content(rank: int, symmetry: str | None) -> dict:
     """Collect the dual-pair operators of one class into snapshot form.
 
@@ -98,15 +100,19 @@ def dual_pair_content(rank: int, symmetry: str | None) -> dict:
         The operators keyed by weight.
     """
     output = get_reduction_cached(rank, symmetry)
+    grams = get_gram_matrices(rank, symmetry=symmetry)
 
     content = {}
-    for weight, data in output.items():
-        content[weight] = {
-            "gram": data["gram"]["symbolic"],
-            "gram_inverse": data["gram_inverse"]["symbolic"],
-            "embedding": [_operator(entry) for entry in data["embedding"]],
-            "extraction": [_operator(entry) for entry in data["extraction"]],
-        }
+    for (weight, _), operators in output.items():
+        if weight not in content:
+            content[weight] = {
+                "gram": fraction_matrix(grams[weight]),
+                "gram_inverse": fraction_matrix(matrix_inverse(grams[weight])),
+                "embedding": [],
+                "extraction": [],
+            }
+        content[weight]["embedding"].append(_operator(operators["embedding"]))
+        content[weight]["extraction"].append(_operator(operators["extraction"]))
 
     return content
 
@@ -115,14 +121,9 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
     """Collect the orthonormal operators of one class into snapshot form.
 
     These have no symbolic form -- the inverse square root of the Gram matrix is
-    irrational -- so the Gram matrix and its inverse square root are stored in
-    full, being small, and the operators themselves by fingerprint.
-
-    One array per channel now serves as both embedding and extraction, so the
-    rules could be recorded once for the weight instead of once per operator.
-    They are not: keeping the shape the stored snapshots already have is what
-    lets these files stay byte-identical across the move to a `basis` argument,
-    and unchanged files are the evidence that the move touched no numbers.
+    irrational -- so the Gram matrix and its inverse square root, whose rows are the
+    weights of the operators, are stored in full, being small, and the operators
+    themselves by fingerprint.
 
     Args:
         rank: Rank of the Cartesian tensor.
@@ -132,21 +133,25 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
         The operators keyed by weight.
     """
     output = get_orthonormal_cached(rank, symmetry)
+    grams = get_gram_matrices(rank, symmetry=symmetry)
 
     content = {}
-    for weight, data in output.items():
-        content[weight] = {
-            "gram": data["gram"],
-            "gram_inverse_sqrt": data["gram_inverse_sqrt"],
-            "orthonormal": [
-                {
-                    "extraction_rule": extraction["rule"],
-                    "embedding_rule": embedding["rule"],
-                    "numerical": fingerprint(embedding["numerical"]),
-                }
-                for embedding, extraction in zip(data["embedding"], data["extraction"])
-            ],
-        }
+    for (weight, _), operators in output.items():
+        if weight not in content:
+            content[weight] = {
+                "gram": float_matrix(grams[weight]),
+                "gram_inverse_sqrt": get_inverse_square_root(grams[weight]),
+                "orthonormal": [],
+            }
+        embedding, embedding_rule = evaluate(operators["embedding"])
+        _, extraction_rule = evaluate(operators["extraction"])
+        content[weight]["orthonormal"].append(
+            {
+                "extraction_rule": extraction_rule,
+                "embedding_rule": embedding_rule,
+                "numerical": fingerprint(embedding),
+            }
+        )
 
     return content
 
@@ -154,9 +159,7 @@ def orthonormal_content(rank: int, symmetry: str | None) -> dict:
 def rank_six_content(symmetry: str | None) -> dict:
     """Collect the affordable rank-six sectors of one class into snapshot form.
 
-    `get_reduction` cannot be used here. It walks every weight, which would pull in
-    the ones that cost the most. This goes weight by weight instead and builds only
-    what is snapshotted.
+    Only the weights snapshotted are built, since the others cost the most.
 
     Args:
         symmetry: Intrinsic symmetry of the class, or None for a generic tensor.
@@ -166,59 +169,27 @@ def rank_six_content(symmetry: str | None) -> dict:
         recorded as a multiplicity of zero rather than omitted, since its
         absence is a result in its own right.
     """
-    lower_by_weight = {weight: letter_index(weight) for weight in RANK_SIX_WEIGHTS}
-    upper = letter_index(RANK_SIX, upper_case=True)
-
     content = {}
     for weight in RANK_SIX_WEIGHTS:
-        embedding, gram = get_independent_mappings(weight, RANK_SIX, symmetry)
-        if embedding:
-            _, extraction, gram_inverse = get_dual_pair(embedding, gram)
-
-        if not embedding:
+        embeddings = get_embedding_operators(RANK_SIX, ell=weight, symmetry=symmetry)
+        if not embeddings:
             content[weight] = {"multiplicity": 0}
             continue
 
-        lower = lower_by_weight[weight]
+        extractions = get_extraction_operators(RANK_SIX, ell=weight, symmetry=symmetry)
+        gram = get_gram_matrices(RANK_SIX, ell=weight, symmetry=symmetry)[weight]
         content[weight] = {
-            "multiplicity": len(embedding),
+            "multiplicity": len(embeddings),
             "gram": fraction_matrix(gram),
-            "gram_inverse": fraction_matrix(gram_inverse),
-            "embedding": [
-                _rank_six_operator(
-                    operator.expand(),
-                    ("rank", "weight"),
-                    f"{upper}{lower},...{lower}->...{upper}",
-                )
-                for operator in embedding
-            ],
-            "extraction": [
-                _rank_six_operator(
-                    operator,
-                    ("weight", "rank"),
-                    f"{lower}{upper},...{upper}->...{lower}",
-                )
-                for operator in extraction
-            ],
+            "gram_inverse": fraction_matrix(matrix_inverse(gram)),
+            "embedding": [_operator(operator) for operator in embeddings.values()],
+            "extraction": [_operator(operator) for operator in extractions.values()],
         }
 
     return content
 
 
-def _rank_six_operator(operator, order: tuple[str, str], rule: str) -> dict:
-    """Snapshot form of one rank-six operator, evaluated on the spot.
-
-    The rank-four path takes its operators from `get_reduction`, which has already
-    evaluated them. Here that happens on the spot, with the axes in `order`.
-    """
-    return {
-        "symbolic": str(operator).split(TERM_SEPARATOR),
-        "rule": rule,
-        "numerical": fingerprint(operator.evaluate(order)),
-    }
-
-
-def _operator(entry: dict) -> dict:
+def _operator(operator) -> dict:
     """Snapshot form of one operator: symbolic exactly, evaluated by fingerprint.
 
     The symbolic form is stored as one string per term rather than as the single
@@ -227,10 +198,12 @@ def _operator(entry: dict) -> dict:
     characters. `Operator.__str__` joins the terms with two spaces, so splitting
     on two spaces recovers exactly those terms.
     """
+    array, rule = evaluate(operator)
+
     return {
-        "symbolic": entry["symbolic"].split(TERM_SEPARATOR),
-        "rule": entry["rule"],
-        "numerical": fingerprint(entry["numerical"]),
+        "symbolic": str(operator).split(TERM_SEPARATOR),
+        "rule": rule,
+        "numerical": fingerprint(array),
     }
 
 

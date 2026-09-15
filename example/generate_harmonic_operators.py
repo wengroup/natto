@@ -19,13 +19,11 @@ plain ASCII.
 
 from pathlib import Path
 
-import numpy as np
-
-from natto.harmonics import get_harmonic_operator, get_harmonic_symbolic
+from natto import evaluate, get_harmonic_operator
 from natto.utils import yaml_dump
 
 
-def generate_harmonic_operators(max_weight: int) -> dict[str, dict[str, np.ndarray]]:
+def generate_harmonic_operators(max_weight: int) -> dict[str, dict]:
     """
     Generate harmonic operators and the corresponding einsum rules.
 
@@ -39,16 +37,14 @@ def generate_harmonic_operators(max_weight: int) -> dict[str, dict[str, np.ndarr
     all_H = {}
     for weight in range(max_weight + 1):
         for normalize in ["legendre", "none"]:
-            H_symbolic = get_harmonic_symbolic(weight)
-            H, rule = get_harmonic_operator(weight, normalize)
-
-            # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
-            H_symbolic = H_symbolic.to_string(ascii=True)
+            H = get_harmonic_operator(weight, normalize)
+            H_numerical, rule = evaluate(H)
 
             all_H[f"{weight}-{normalize}"] = {
                 "rule": rule,
-                "symbolic": H_symbolic,
-                "numerical": H.tolist(),
+                # `d` for the Kronecker delta and `e` for the Levi-Civita symbol
+                "symbolic": H.to_string(ascii=True),
+                "numerical": H_numerical.tolist(),
             }
 
     return all_H
