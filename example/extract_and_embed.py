@@ -1,4 +1,4 @@
-"""Reduce a Cartesian tensor into natural tensors, then rebuild it.
+"""Extract the natural tensors of a Cartesian tensor, then embed them back.
 
 This is the round trip the package exists for. For a Cartesian tensor `T` of
 some rank and intrinsic symmetry, the extraction operator of each weight and
@@ -24,7 +24,7 @@ from natto.reduction import get_composed_operators, get_reduction
 from natto.utils import is_symmetric, is_symmetric_traceless, is_traceless
 
 
-def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
+def extract_and_embed(rank: int = 3, symmetry: str = None):
     """Reduce a random tensor of this class, then rebuild it from the parts.
 
     Args:
@@ -78,13 +78,13 @@ def reduce_and_reconstruct(rank: int = 3, symmetry: str = None):
 
 if __name__ == "__main__":
     # a rank-2 tensor with no assumed symmetry: weights 0, 1 and 2, one channel each
-    reduce_and_reconstruct(rank=2)
+    extract_and_embed(rank=2)
 
     print("=" * 40)
     # rank 3, where a weight first appears more than once
-    reduce_and_reconstruct(rank=3)
+    extract_and_embed(rank=3)
 
     print("=" * 40)
     # the elastic tensor: minor symmetry within each pair of indices, and major
     # symmetry between the pairs, leaving weights 0, 2 and 4
-    reduce_and_reconstruct(rank=4, symmetry="ijkl=jikl=klij")
+    extract_and_embed(rank=4, symmetry="ijkl=jikl=klij")
