@@ -81,8 +81,8 @@ def cartesian_harmonic(direction: np.ndarray, weight: int) -> np.ndarray:
 
     The natural projector applied to the polyadic returns its traceless part,
     and the paper rescales that by `(2n - 1)!! / n!` so the result generates the
-    Legendre polynomial. The traceless part is taken numerically, which stays cheap
-    at weight six where evaluating the projector does not.
+    Legendre polynomial. The traceless part is taken numerically, independently of
+    the projector the package builds.
 
     Args:
         direction: A unit vector.
