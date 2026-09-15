@@ -126,7 +126,7 @@ def get_reduction(
 
         if basis == "orthonormal":
             # The self-dual basis needs no duals, so none are built.
-            out[ell] = get_orthonormal_entries(ell, n, G)
+            out[ell] = get_orthonormal_entries(ell, n, G, gram)
         else:
             G_simplified, G_tilde, S, gram_inverse = get_dual_pair(G, gram)
             out[ell] = assemble_operator_entries(

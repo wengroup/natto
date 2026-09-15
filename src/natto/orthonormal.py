@@ -16,31 +16,32 @@ points: `get_reduction(..., basis="orthonormal")` returns these in place of the
 mappings and their duals, whether or not a symmetry was asked for.
 """
 
+from fractions import Fraction
+
 import numpy as np
 
 from natto.indices import letter_index
 from natto.mapping_tensors import Mapping
+from natto.rational import float_matrix
 
 
 def orthonormalize_mappings(
-    mappings: list[Mapping],
-    ell: int,
-    n: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Orthonormalize mapping tensors with their Cartesian Gram matrix.
+    mappings: list[Mapping], gram: list[list[Fraction]]
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Orthonormalize mapping tensors with their exact Gram matrix.
 
-    The Gram matrix is the pairwise contraction of the mappings over all their indices,
-    divided by 2*ell + 1. Its unique symmetric positive-definite inverse square root
-    transforms the input mappings into an orthonormal set.
+    The Gram matrix is the exact one the selection or the symmetry adaptation already
+    built. Only its unique symmetric positive-definite inverse square root is taken
+    numerically, since it is irrational in general, and it rotates the evaluated
+    mappings into an orthonormal set.
 
     Args:
-        mappings: Independent symbolic mappings of this weight and n.
-        ell: Weight of the ICT space.
-        n: Rank of the Cartesian tensor space.
+        mappings: Independent mappings of one weight.
+        gram: Their exact Gram matrix.
 
     Returns:
-        The numerical input mappings, their Gram matrix, its symmetric inverse square
-        root, and the orthonormal numerical mappings.
+        The Gram matrix as floats, its symmetric inverse square root, and the
+        orthonormal numerical mappings.
 
     Raises:
         ValueError: If `mappings` is empty or its Gram matrix is not symmetric positive
@@ -52,22 +53,19 @@ def orthonormalize_mappings(
     if not mappings:
         raise ValueError("At least one mapping tensor is required")
 
+    gram_float = np.array(float_matrix(gram))
+    gram_inverse_sqrt = _symmetric_inverse_square_root(gram_float)
     numerical = np.stack(
         [mapping.expand().evaluate(("rank", "weight")) for mapping in mappings]
     )
-    if numerical.ndim != n + ell + 1:
-        raise ValueError(
-            f"mapping tensor ranks do not match rank n={n} and weight ell={ell}"
-        )
-    flattened = numerical.reshape(len(mappings), -1)
-    gram = flattened @ flattened.T / (2 * ell + 1)
-    gram_inverse_sqrt = _symmetric_inverse_square_root(gram)
     orthonormal = np.einsum("pq,q...->p...", gram_inverse_sqrt, numerical)
 
-    return numerical, gram, gram_inverse_sqrt, orthonormal
+    return gram_float, gram_inverse_sqrt, orthonormal
 
 
-def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
+def get_orthonormal_entries(
+    ell: int, n: int, G: list[Mapping], gram: list[list[Fraction]]
+) -> dict:
     """Pack one weight's operators in the self-dual basis of Eq. 21.
 
     One array both extracts and embeds, so it appears under both keys and only the
@@ -78,6 +76,7 @@ def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
         ell: Weight of the ICT space.
         n: Rank of the Cartesian tensor.
         G: The independent mappings of this weight.
+        gram: Their exact Gram matrix.
 
     Returns:
         The operators of this weight, in the form the package publishes.
@@ -86,7 +85,7 @@ def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
         Eq. 21 of [Wen2026] for the orthonormal mappings, Eq. 22 for the self-duality
         that makes them a basis.
     """
-    _, gram, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, ell, n)
+    gram_float, gram_inverse_sqrt, G_hat = orthonormalize_mappings(G, gram)
 
     lower = letter_index(ell)
     upper = letter_index(n, upper_case=True)
@@ -104,7 +103,7 @@ def get_orthonormal_entries(ell: int, n: int, G: list[Mapping]) -> dict:
     # each: that it is the same operator is the point of this basis.
     operators = list(G_hat)
 
-    entries = {"gram": gram, "gram_inverse_sqrt": gram_inverse_sqrt}
+    entries = {"gram": gram_float, "gram_inverse_sqrt": gram_inverse_sqrt}
     for key, rule in rules.items():
         entries[key] = [
             {"symbolic": None, "rule": rule, "numerical": operator}
