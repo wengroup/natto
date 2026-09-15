@@ -11,7 +11,7 @@ matrix is rational, but its inverse square root generally is not, so an
 ones, and does nothing but evaluate.
 
 The same construction serves the symmetry-adapted mappings, as Section IV of
-[Wen2026] notes it must. That is why this is a basis rather than a pair of entry
+[Wen2026Reusable] notes it must. That is why this is a basis rather than a pair of entry
 points: `natto.reduction` returns these in place of the mappings and their duals when
 asked for `basis="orthonormal"`, whether or not a symmetry was asked for.
 """
@@ -39,7 +39,7 @@ class OrthonormalOperator:
         terms: Each term with its float coefficient.
 
     References:
-        Eq. 21 of [Wen2026].
+        Eq. 21 of [Wen2026Reusable].
     """
 
     __slots__ = ("_signature", "_terms")
@@ -92,7 +92,7 @@ def get_orthonormal_operators(
         One orthonormal operator per mapping.
 
     References:
-        Eq. 21 of [Wen2026].
+        Eq. 21 of [Wen2026Reusable].
     """
     vectors = np.array([[float(c) for c in G_q.coefficients] for G_q in mappings])
     rotated = get_inverse_square_root(gram) @ vectors
@@ -126,7 +126,7 @@ def get_inverse_square_root(
         ValueError: If the matrix is not symmetric positive definite.
 
     References:
-        Eq. 21 of [Wen2026].
+        Eq. 21 of [Wen2026Reusable].
     """
     matrix = np.array(float_matrix(gram))
     if not np.allclose(matrix, matrix.T, rtol=rtol, atol=atol):

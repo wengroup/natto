@@ -58,9 +58,6 @@ class Signature:
 
     Raises:
         ValueError: If two groups share a name, or one case needs more than 26 letters.
-
-    References:
-        Definition 1 (C.1) of [Wen2026Refactor].
     """
 
     groups: tuple[IndexGroup, ...]
@@ -140,9 +137,6 @@ class Term:
     Raises:
         ValueError: If the blocks are not canonical, a slot occurs twice, or there are
             more than two Levi-Civita symbols.
-
-    References:
-        Definition 2 and Proposition 3 (C.2) of [Wen2026Refactor].
     """
 
     deltas: tuple[tuple[int, int], ...] = ()
@@ -237,9 +231,6 @@ class Operator:
     Raises:
         TypeError: If a coefficient is not exact.
         ValueError: If a term does not use every slot of the signature exactly once.
-
-    References:
-        Definition 3 (C.3) of [Wen2026Refactor].
     """
 
     __slots__ = ("_signature", "_terms")

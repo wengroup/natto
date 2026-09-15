@@ -86,7 +86,7 @@ def get_reduction(
             `symmetry` does not have rank `n`.
 
     References:
-        Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the embedding, and
+        Eq. 18 of [Wen2026Reusable] for the extraction, Eq. 19 for the embedding, and
         Eq. 20 for the sum that returns the tensor.
     """
     embeddings = get_embedding_operators(n, ell, symmetry, basis)
@@ -122,8 +122,8 @@ def get_embedding_operators(
             `symmetry` does not have rank `n`.
 
     References:
-        Eq. 13 of [Wen2026] for the mappings, used as in Eq. 19, and Eq. 21 for the
-        orthonormal basis.
+        Eq. 13 of [Wen2026Reusable] for the mappings, used as in Eq. 19, and Eq. 21 for
+        the orthonormal basis.
     """
     operators = _get_operators(n, ell, symmetry, basis, extraction=False)
 
@@ -154,7 +154,7 @@ def get_extraction_operators(
             `symmetry` does not have rank `n`.
 
     References:
-        Eq. 16 of [Wen2026] for the duals, used as in Eq. 18, and Eq. 21 for the
+        Eq. 16 of [Wen2026Reusable] for the duals, used as in Eq. 18, and Eq. 21 for the
         orthonormal basis.
     """
     operators = _get_operators(n, ell, symmetry, basis, extraction=True)
@@ -188,8 +188,8 @@ def get_composed_operators(
             rank `n`.
 
     References:
-        Eq. 18 and Eq. 19 of [Wen2026], composed. Computed as in A.2 of
-        [Wen2026Refactor].
+        Eq. 18 and Eq. 19 of [Wen2026Reusable], composed. Computed as in
+        Eq. 4 (eq-composed-collapse) of the implementation notes.
     """
     operators = {}
     for weight in _get_weights(n, ell):
@@ -222,7 +222,7 @@ def get_gram_matrices(
             rank `n`.
 
     References:
-        Eq. 15 of [Wen2026].
+        Eq. 15 of [Wen2026Reusable].
     """
     grams = {}
     for weight in _get_weights(n, ell):
@@ -275,8 +275,8 @@ def get_independent_mappings(
         ValueError: If `selection` is not recognized.
 
     References:
-        Eq. 13 of [Wen2026] for the mappings, Algorithm 1 for the `qr` selection, and
-        Eq. 27 for the symmetry-adapted mappings.
+        Eq. 13 of [Wen2026Reusable] for the mappings, Algorithm 1 for the `qr`
+        selection, and Eq. 27 for the symmetry-adapted mappings.
     """
     # No isotropic n-one mapping exists from a scalar ICT.
     if n == 1 and ell == 0:

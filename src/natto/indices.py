@@ -51,9 +51,6 @@ def get_slot_partitions(
     Examples:
         >>> get_slot_partitions([1], 1)
         [(((0,),), ((1, 2),)), (((1,),), ((0, 2),)), (((2,),), ((0, 1),))]
-
-    References:
-        C.8 of [Wen2026Refactor].
     """
     literals = {}
     start = 0

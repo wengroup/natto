@@ -33,7 +33,7 @@ class Sector:
         n: Rank of the Cartesian tensor.
 
     References:
-        Definition 5 (C.4) of [Wen2026Refactor].
+        Eq. 5 (eq-bilinear-forms) of the implementation notes, for the label table.
     """
 
     def __init__(self, ell: int, n: int):
@@ -112,10 +112,10 @@ class Sector:
             The exact entry L_ij, which is 2 * ell + 1 times the Gram entry.
 
         References:
-            A.1 and A.5 of [Wen2026Refactor]: Lemma 1 leaves one natural projector
-            out, and Theorems 1 and 2 count cycles instead of contracting; the Gram
-            matrix is read from the table by Proposition 5 (C.4). Used for Eq. 15 of
-            [Wen2026].
+            Eq. 3 (eq-gram-collapse) and Eq. 10 (eq-cycle-count) of the implementation
+            notes: one natural projector is left out, and cycles are counted instead of
+            contracting; the Gram matrix is read from the table by
+            Eq. 5 (eq-bilinear-forms). Used for Eq. 15 of [Wen2026Reusable].
         """
         key = (i, j) if i <= j else (j, i)
         if key not in self._table:
@@ -196,7 +196,8 @@ class Mapping:
         TypeError: If a coefficient is not exact.
 
     References:
-        Definition 6 and Proposition 4 (C.4) of [Wen2026Refactor].
+        Eq. 5 (eq-bilinear-forms) and Eq. 6 (eq-signed-closure) of the implementation
+        notes.
     """
 
     __slots__ = ("sector", "coefficients", "_expansion")
@@ -229,10 +230,9 @@ class Mapping:
             ValueError: If `permutation` does not permute the rank indices.
 
         References:
-            A.4 of [Wen2026Refactor]: by Proposition 2 a permuted mapping is its
-            rank-lowering tensors relabelled, with their signs, and by Proposition 4
-            (C.4) it stays in the sector. Used for the mixing matrices of Eq. 30 of
-            [Wen2026].
+            Eq. 6 (eq-signed-closure) of the implementation notes: a permuted mapping is
+            its rank-lowering tensors relabelled, with their signs, and stays in the
+            sector. Used for the mixing matrices of Eq. 30 of [Wen2026Reusable].
         """
         n = self.sector.n
         if sorted(permutation) != list(range(n)):
@@ -332,7 +332,7 @@ def get_mappings(ell: int, n: int) -> list[Mapping]:
         One mapping per choice of contracted indices: the candidates of a new sector.
 
     References:
-        Eq. 13 of [Wen2026].
+        Eq. 13 of [Wen2026Reusable].
     """
     return Sector(ell, n).candidates()
 
@@ -387,7 +387,7 @@ def get_dual_mappings(
         One dual per row of `gram_inverse`, a mapping of the same sector.
 
     References:
-        Eq. 16 of [Wen2026].
+        Eq. 16 of [Wen2026Reusable].
     """
     return [combine(row, mappings) for row in gram_inverse]
 
@@ -415,8 +415,8 @@ def compose(mapping: Mapping, other: Mapping) -> Operator:
         ValueError: If the mappings belong to different sectors.
 
     References:
-        A.2 of [Wen2026Refactor]: by Lemma 2 only the rank-lowering tensors of
-        `mapping` enter. Used for Eq. 19 of [Wen2026].
+        Eq. 4 (eq-composed-collapse) of the implementation notes: only the rank-lowering
+        tensors of `mapping` enter. Used for Eq. 19 of [Wen2026Reusable].
     """
     sector = mapping.sector
     if other.sector is not sector:

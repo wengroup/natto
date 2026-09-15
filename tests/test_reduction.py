@@ -147,9 +147,6 @@ def cycle_index_multiplicities(n: int, symmetry: Optional[str]) -> dict[int, int
     Its overlap with the weight-ell character, the sum of z^m for |m| <= ell, under
     the SO(3) measure is c_0 - (c_1 + c_-1) / 2, with c_m the coefficient of z^m in
     their product. No mapping tensor is built, and the arithmetic is exact.
-
-    References:
-        B.2 of [Wen2026Refactor].
     """
     group = generate_permutations(symmetry) if symmetry else [(tuple(range(n)), 1)]
 

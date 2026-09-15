@@ -71,8 +71,10 @@ def select_independent_mappings_and_gram(
         RuntimeError: If the candidates span fewer mappings than the weight has.
 
     References:
-        Eq. 15 of [Wen2026] for the Gram matrix this decides on, and Table II for the
-        number of mappings. B.1 of [Wen2026Refactor] for stopping the scan.
+        Eq. 15 of [Wen2026Reusable] for the Gram matrix this decides on, and Table II
+        for the number of mappings. The scan stops and decides as in
+        Eq. 11 (eq-multiplicity-recursion) and Eq. 12 (eq-schur-residual) of the
+        implementation notes.
     """
     kept: list[int] = []
     gram: list[list[Fraction]] = []
@@ -225,8 +227,8 @@ def get_multiplicity(n: int, ell: int) -> int:
         The multiplicity, zero when `ell` is negative or above `n`.
 
     References:
-        Table II of [Wen2026] for the values. B.1 of [Wen2026Refactor] for the
-        recursion.
+        Table II of [Wen2026Reusable] for the values, computed by
+        Eq. 11 (eq-multiplicity-recursion) of the implementation notes.
     """
     if ell < 0 or ell > n:
         return 0

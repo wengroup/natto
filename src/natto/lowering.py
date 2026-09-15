@@ -31,9 +31,6 @@ class LoweringLabel:
             n - ell is even; a pair `(i, j)`, standing for the symbol with the tau index
             first, when n - ell is odd and ell >= 1; a triple when n - ell is odd and
             ell = 0.
-
-    References:
-        Definition 4 (C.4) of [Wen2026Refactor].
     """
 
     deltas: tuple[tuple[int, int], ...]
@@ -78,8 +75,8 @@ def get_lowering_labels(ell: int, n: int) -> list[LoweringLabel]:
         The rank-lowering tensors, one per choice of contracted indices.
 
     References:
-        Eq. 2 of [Wen2026], with Eq. 3 for even n - ell and Eq. 5 for odd; Sec. II C
-        for the discussion.
+        Eq. 2 of [Wen2026Reusable], with Eq. 3 for even n - ell and Eq. 5 for odd;
+        Sec. II C for the discussion.
     """
     if (n - ell) % 2 == 0:
         return get_lowering_labels_even(ell, n)
@@ -101,7 +98,7 @@ def get_lowering_labels_even(ell: int, n: int) -> list[LoweringLabel]:
         The rank-lowering tensors, one per choice of contracted indices.
 
     References:
-        Eq. 3 of [Wen2026].
+        Eq. 3 of [Wen2026Reusable].
     """
     labels = []
     for _, pairs in get_slot_partitions([ell], (n - ell) // 2):
@@ -125,7 +122,7 @@ def get_lowering_labels_odd(ell: int, n: int) -> list[LoweringLabel]:
         The rank-lowering tensors, one per choice of contracted indices.
 
     References:
-        Eq. 5 of [Wen2026].
+        Eq. 5 of [Wen2026Reusable].
     """
     if ell == 0:
         return get_lowering_labels_odd_weight_zero(ell, n)

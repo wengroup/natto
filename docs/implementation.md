@@ -108,6 +108,35 @@ O_{pq} = \frac{1}{2\ell+1} \langle G^{(p)}, P\, G^{(q)} \rangle ,
 
 is read from the table [](#eq-bilinear-forms) with no contraction.
 
+## Contracting products of deltas and Levi-Civita symbols
+
+Every operator is a sum of products of Kronecker deltas and Levi-Civita symbols, so
+contracting operators reduces to contracting such products term by term, with no
+arrays. Following the repeated indices, a chain of deltas collapses to one delta, a
+closed chain is a factor of 3, and a Levi-Civita symbol with a repeated index
+vanishes:
+
+```{math}
+:label: eq-delta-chain
+\delta_{a i_1}\, \delta_{i_1 i_2} \cdots \delta_{i_k b} = \delta_{ab},
+\qquad
+\delta_{i_1 i_2} \cdots \delta_{i_k i_1} = 3,
+\qquad
+\varepsilon_{i i c} = 0 .
+```
+
+Two Levi-Civita symbols joined by a repeated index are expanded into deltas by their
+determinant identity, and the chains are followed again:
+
+```{math}
+:label: eq-epsilon-determinant
+\varepsilon_{abc}\, \varepsilon_{def}
+= \sum_{\pi \in S_3} \operatorname{sgn}(\pi)\, \delta_{a\pi(d)}\, \delta_{b\pi(e)}\, \delta_{c\pi(f)} .
+```
+
+Two symbols with no index in common are kept as they are, since expanding them would
+turn one product into six.
+
 ## Full contraction is cycle counting
 
 Every entry of the table is a full contraction, a number rather than an operator. A

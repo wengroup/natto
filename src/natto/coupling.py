@@ -64,8 +64,8 @@ def get_coupling_operator(
         ValueError: If `normalize` is not recognized.
 
     References:
-        Eq. 50 of [Wen2026] for even l1 + l2 + l3 and Eq. 51 for odd, both with the
-        coefficient of Eq. 49, and the normalization constant of Eq. 53 for even and
+        Eq. 50 of [Wen2026Reusable] for even l1 + l2 + l3 and Eq. 51 for odd, both with
+        the coefficient of Eq. 49, and the normalization constant of Eq. 53 for even and
         Eq. 54 for odd.
     """
     if normalize not in ("legendre", "none"):
@@ -104,7 +104,7 @@ def triangle_numbers(l1: int, l2: int, l3: int) -> tuple[int, int, int]:
         L1, L2 and L3.
 
     References:
-        Defined below Eq. 48 of [Wen2026] as L_i = floor(L / 2) - l_i, with
+        Defined below Eq. 48 of [Wen2026Reusable] as L_i = floor(L / 2) - l_i, with
         L = l1 + l2 + l3.
     """
     half = (l1 + l2 + l3) // 2
@@ -130,7 +130,7 @@ def coeff_k(l1: int, l2: int, l3: int, t: int) -> Fraction:
         The exact coefficient k_t.
 
     References:
-        Eq. 49 of [Wen2026].
+        Eq. 49 of [Wen2026Reusable].
     """
     L1, L2, _ = triangle_numbers(l1, l2, l3)
 
@@ -166,7 +166,7 @@ def coeff_C_even(l1: int, l2: int, l3: int) -> Fraction:
         The normalization constant.
 
     References:
-        Eq. 53 of [Wen2026].
+        Eq. 53 of [Wen2026Reusable].
     """
     L = l1 + l2 + l3
     L1, L2, L3 = triangle_numbers(l1, l2, l3)
@@ -206,7 +206,7 @@ def coeff_C_odd(l1: int, l2: int, l3: int) -> Fraction:
         The normalization constant.
 
     References:
-        Eq. 54 of [Wen2026].
+        Eq. 54 of [Wen2026Reusable].
     """
     L = l1 + l2 + l3
     L1, L2, L3 = triangle_numbers(l1, l2, l3)
@@ -309,7 +309,7 @@ def _get_coupling_blocks_even(
         ValueError: If l1 + l2 - l3 is odd.
 
     References:
-        Eq. 50 of [Wen2026].
+        Eq. 50 of [Wen2026Reusable].
     """
     if (l1 + l2 - l3) % 2 != 0:
         raise ValueError(
@@ -358,7 +358,7 @@ def _get_coupling_blocks_odd(
         ValueError: If l1 + l2 - l3 is even.
 
     References:
-        Eq. 51 of [Wen2026].
+        Eq. 51 of [Wen2026Reusable].
     """
     if (l1 + l2 - l3) % 2 != 1:
         raise ValueError(

@@ -43,7 +43,7 @@ def get_symmetry_adapted_mappings(
         The symmetry-adapted mappings, one per null-space basis vector.
 
     References:
-        Procedure 2 of [Wen2026], with the symmetry-adapted mappings of Eq. 27.
+        Procedure 2 of [Wen2026Reusable], with the symmetry-adapted mappings of Eq. 27.
     """
     if not mappings:
         return []
@@ -97,9 +97,10 @@ def get_symmetry_action_matrix(
         ValueError: If the permutation does not permute the Cartesian indices.
 
     References:
-        Eq. 30 of [Wen2026]. Computed as in A.4 of [Wen2026Refactor]: each permuted
-        mapping is relabelled rather than contracted (Proposition 2), and its overlaps
-        with the mappings are read from the label table.
+        Eq. 30 of [Wen2026Reusable]. Computed as in Eq. 7 (eq-mixing-matrix) of the
+        implementation notes: each permuted mapping is relabelled rather than
+        contracted, by Eq. 6 (eq-signed-closure), and its overlaps with the mappings are
+        read from the label table.
     """
     # A permuted mapping is another mapping of the same sector, whose candidates are
     # the permuted candidates with their signs.

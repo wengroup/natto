@@ -62,7 +62,7 @@ def get_harmonic_operator(n: int, normalize: Normalization = "legendre") -> Oper
         ValueError: If `n` is negative, or `normalize` is not recognized.
 
     References:
-        Eq. 45 of [Wen2026], with the coefficients c_t of Eq. 8, and the
+        Eq. 45 of [Wen2026Reusable], with the coefficients c_t of Eq. 8, and the
         normalization of Eq. 46 fixed by Eq. 47.
     """
     if normalize not in ("legendre", "none"):
@@ -120,6 +120,6 @@ def coeff_harmonic(n: int) -> Fraction:
         The normalization constant.
 
     References:
-        Eq. 46 of [Wen2026].
+        Eq. 46 of [Wen2026Reusable].
     """
     return Fraction(double_factorial(2 * n - 1), math.factorial(n))

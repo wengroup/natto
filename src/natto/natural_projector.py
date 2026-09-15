@@ -33,8 +33,9 @@ def get_natural_projector(ell: int) -> Operator:
         The projector, with exact coefficients.
 
     References:
-        Eq. 7 of [Wen2026], with the coefficients of Eq. 8 built by the recursion of
-        Eq. S27. Definition 3 (C.3) of [Wen2026Refactor] for the operator.
+        Eq. 7 of [Wen2026Reusable], with the coefficients of Eq. 8 built by the
+        recursion of Eq. S27, written as a sum over matchings as in
+        Eq. 2 (eq-projector-matchings) of the implementation notes.
     """
     signature = Signature(
         (
@@ -131,7 +132,7 @@ def get_projector_coefficients(ell: int) -> list[Fraction]:
         The exact coefficients, starting from c_0 = 1.
 
     References:
-        Eq. 8 of [Wen2026], by the recursion of Eq. S27.
+        Eq. 8 of [Wen2026Reusable], by the recursion of Eq. S27.
     """
     coefficients = [Fraction(1)]
     for t in range(1, ell // 2 + 1):
@@ -161,7 +162,7 @@ def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
         ValueError: If `ell` is less than `2 * t`.
 
     References:
-        Eq. 7 of [Wen2026].
+        Eq. 7 of [Wen2026Reusable].
     """
     if ell < 2 * t:
         raise ValueError(f"weight (ell) must be at least 2*t, got ell={ell}, t={t}")
