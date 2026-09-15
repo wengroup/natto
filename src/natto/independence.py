@@ -122,8 +122,10 @@ def select_independent_mappings_via_components(
     vectors being compared carry the whole mapping and no information can hide in the
     part that was dropped.
 
-    This is the numerical counterpart of `select_independent_mappings_and_gram`, which
-    settles the same question exactly. It is kept as a cross-check: agreement between the
+    With `method="scipy_qr"` this is Algorithm 1 of the paper: the flattened mappings
+    are the columns of a matrix whose rank-revealing QR with column pivoting picks the
+    independent ones. It is also the numerical counterpart of
+    `select_independent_mappings_and_gram`, which settles the same question exactly. It is kept as a cross-check: agreement between the
     two is evidence that the exact Gram matrix and the evaluated arrays describe the same
     mappings. Prefer the exact scheme for anything whose answer is recorded.
 

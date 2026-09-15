@@ -203,6 +203,32 @@ def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
 
 
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
+def test_qr_selection_spans_the_same_weights(tensor_class: TensorClass):
+    """Algorithm 1 of the paper may keep other mappings, but spans the same spaces.
+
+    Pivoted QR keeps the same number of mappings at every weight as the exact scan, and
+    their extraction and embedding give the same projector onto each weight.
+    """
+    rank = tensor_class.rank
+    exact = get_reduction_cached(rank, tensor_class.symmetry)
+    qr = get_reduction(rank, tensor_class.symmetry, selection="qr")
+
+    assert {w: len(d["extraction"]) for w, d in qr.items()} == {
+        w: len(d["extraction"]) for w, d in exact.items()
+    }
+    for weight in exact:
+        projectors = [
+            sum(
+                np.tensordot(g["numerical"], h["numerical"], axes=weight)
+                for g, h in zip(data["embedding"], data["extraction"])
+            )
+            for data in (exact[weight], qr[weight])
+        ]
+
+        np.testing.assert_allclose(projectors[1], projectors[0], rtol=0, atol=1e-10)
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params())
 def test_duality_is_exact(tensor_class: TensorClass):
     """Each dual contracts to one with its own mapping and to zero with the others.
 

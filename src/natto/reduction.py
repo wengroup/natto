@@ -50,7 +50,7 @@ from natto.symmetry_adaptation import get_symmetry_adapted_mappings
 
 #: What to judge the independence of the candidate mappings on; see
 #: `natto.independence`.
-Selection = Literal["symbolic", "components", "embeddings"]
+Selection = Literal["symbolic", "qr", "components", "embeddings"]
 
 
 def get_reduction(
@@ -91,12 +91,15 @@ def get_reduction(
         selection: What to judge the independence of the candidate mappings on.
             `symbolic` is the default: the mappings' Gram matrix is contracted
             symbolically and the decision made over the rationals, so it is the
-            same on every machine. `components` uses the mappings evaluated in
-            full, `embeddings` their action on one probe tensor -- both
-            numerically, and so both against a tolerance; see
-            `natto.independence`. All three agree on every sector tested, but
-            only `symbolic` is free of a tolerance, which matters because the
-            choice fixes which duals are canonical.
+            same on every machine, keeping the earliest independent candidates.
+            `qr` is Algorithm 1 of the paper: a rank-revealing QR with column
+            pivoting on the evaluated mappings, which keeps the same number but
+            may keep a different subset. `components` uses the mappings evaluated
+            in full, `embeddings` their action on one probe tensor. The last three
+            are numerical, and so decided against a tolerance; see
+            `natto.independence`. All find the same number of mappings, but only
+            `symbolic` is free of a tolerance, which matters because the choice
+            fixes which duals are canonical.
 
     Returns:
         The embedding, extraction and decomposition operators keyed by weight,
@@ -107,7 +110,8 @@ def get_reduction(
 
     Raises:
         ValueError: If `basis` is neither `dual` nor `orthonormal`, or if
-            `selection` is not one of `symbolic`, `components` and `embeddings`.
+            `selection` is not one of `symbolic`, `qr`, `components` and
+            `embeddings`.
 
     References:
         Eq. 18 of [Wen2026] for the extraction, Eq. 19 for the decomposition, and
@@ -175,8 +179,12 @@ def get_independent_mappings(
         The independent mappings and their exact Gram matrix. Both are empty when there
         is no mapping of this weight, or none the symmetry admits.
 
+    Raises:
+        ValueError: If `selection` is not recognized.
+
     References:
-        Eq. 13 of [Wen2026] for the mappings, Eq. 27 for the symmetry-adapted ones.
+        Eq. 13 of [Wen2026] for the mappings, Algorithm 1 for the `qr` selection, and
+        Eq. 27 for the symmetry-adapted mappings.
     """
     # No isotropic n-one mapping exists from a scalar ICT.
     if n == 1 and ell == 0:
@@ -186,6 +194,11 @@ def get_independent_mappings(
 
     if selection == "symbolic":
         independent_indices, gram = select_independent_mappings_and_gram(candidates)
+    elif selection == "qr":
+        independent_indices = select_independent_mappings_via_components(
+            candidates, method="scipy_qr"
+        )
+        gram = get_gram_matrix([candidates[i] for i in independent_indices])
     elif selection == "components":
         independent_indices = select_independent_mappings_via_components(candidates)
         gram = get_gram_matrix([candidates[i] for i in independent_indices])
@@ -194,7 +207,8 @@ def get_independent_mappings(
         gram = get_gram_matrix([candidates[i] for i in independent_indices])
     else:
         raise ValueError(
-            f"Unknown selection: {selection}. Supported are: symbolic, components, embeddings."
+            f"Unknown selection: {selection}. "
+            "Supported are: symbolic, qr, components, embeddings."
         )
 
     G = [candidates[i] for i in independent_indices]
