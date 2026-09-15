@@ -11,6 +11,8 @@ Some other features:
 2. coupling two ICTs into a third
 3. building Cartesian harmonics
 
+**Documentation**: https://wengroup.github.io/natto/
+
 ## Installation
 
 It is recommended to create a virtual environment first (e.g. using `conda` ) and
@@ -118,7 +120,7 @@ weight 2, channel 1:
 Weight 1 is absent from the reduction, not present and zero. `X0` and `X2` are
 unchanged: symmetrizing removed only what weight 1 carried.
 
-For more examples, see the [`example/`](example/) directory.
+For more, see the [documentation](https://wengroup.github.io/natto/).
 
 ## Citation
 

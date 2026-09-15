@@ -1,0 +1,21 @@
+version: 1
+project:
+  title: natto
+  authors:
+    - name: Mingjian Wen
+  github: wengroup/natto
+  bibliography:
+    - references.bib
+  toc:
+    - file: index.md
+    - file: overview.md
+    - file: extraction_and_embedding.md
+    - file: harmonics.md
+    - file: coupling.md
+    - file: reduction.md
+    - file: implementation.md
+    - file: dev_guide.md
+    - file: api.md
+    - file: changelog.md
+site:
+  template: book-theme

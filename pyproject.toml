@@ -16,7 +16,12 @@ dependencies = [
 test = [
     "pytest",
 ]
+doc = ["jupyter-book", "ipykernel"]
 dev = ["pre-commit>=2.19.0"]
+
+[project.urls]
+Documentation = "https://wengroup.github.io/natto/"
+Repository = "https://github.com/wengroup/natto"
 
 [tool.versioningit.vcs]
 method = "git"
