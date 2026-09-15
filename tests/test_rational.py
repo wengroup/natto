@@ -32,6 +32,16 @@ def test_bordered_inverse():
     assert bordered_inverse(two, [Fraction(2), Fraction(3)], Fraction(5)) is None
 
 
+def test_matrix_inverse_exchanges_rows():
+    """A zero on the diagonal is not singularity: the rows are exchanged instead."""
+    matrix = [[Fraction(0), Fraction(2)], [Fraction(3), Fraction(0)]]
+
+    assert matrix_inverse(matrix) == [
+        [Fraction(0), Fraction(1, 3)],
+        [Fraction(1, 2), Fraction(0)],
+    ]
+
+
 def test_matrix_null_space_exact_relations():
     """Check exact rational solutions of simultaneous homogeneous constraints."""
     constraints = [

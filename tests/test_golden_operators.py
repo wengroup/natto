@@ -13,10 +13,10 @@ symbolic form and run to hundreds of kilobytes per class; `golden.fingerprint`
 guards the evaluation instead.
 
 `S` is not snapshotted. It is the composition `G` and the extraction operator,
-carrying nothing they do not, and `test_mappings.test_reduction_round_trip` already asserts
+carrying nothing they do not, and `test_reduction.test_reduction_round_trip` already asserts
 `G (H T) == S T` for every class, so pinning the two pins `S` with them.
 
-The classes come from `test_mappings.PHYSICAL_TENSOR_CLASSES` rather than being
+The classes come from `test_reduction.PHYSICAL_TENSOR_CLASSES` rather than being
 restated here, so the table stays one statement about the physics.
 
 Rank six is snapshotted too, since it carries the paper's new result, but only

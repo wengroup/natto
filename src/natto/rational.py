@@ -39,10 +39,12 @@ def matrix_inverse(matrix: list[list[Fraction]]) -> list[list[Fraction]]:
 
     # Gaussian elimination
     for i in range(n):
-        # Find pivot
-        pivot = augmented[i][i]
-        if pivot == 0:
+        # Find a nonzero pivot, exchanging rows when the diagonal entry is zero
+        pivot_row = next((k for k in range(i, n) if augmented[k][i] != 0), None)
+        if pivot_row is None:
             raise ValueError("Matrix is not invertible")
+        augmented[i], augmented[pivot_row] = augmented[pivot_row], augmented[i]
+        pivot = augmented[i][i]
 
         # Scale row to make pivot 1
         for j in range(2 * n):
@@ -95,18 +97,6 @@ def matrix_multiply(
         result.append(row)
 
     return result
-
-
-def matrix_transpose(m: list[list[Fraction]]) -> list[list[Fraction]]:
-    """Transpose a matrix containing Fraction objects.
-
-    Args:
-        m: Matrix to be transposed
-
-    Returns:
-        Transposed matrix as list of lists with Fraction objects
-    """
-    return [[m[j][i] for j in range(len(m))] for i in range(len(m[0]))]
 
 
 def is_nonsingular(matrix: list[list[Fraction]]) -> bool:
