@@ -41,7 +41,7 @@ def get_natural_projector(ell: int) -> Operator:
     )
 
     terms = []
-    for t, c in enumerate(_projector_coefficients(ell)):
+    for t, c in enumerate(get_projector_coefficients(ell)):
         matchings = _projector_matchings(ell, t)
 
         # The coefficient of Eq. 8 is shared by the matchings of one t, and averaged
@@ -116,6 +116,30 @@ def get_random_natural_tensor(n: int, seed: int = 35) -> np.ndarray:
     return natural
 
 
+def get_projector_coefficients(ell: int) -> list[Fraction]:
+    """The coefficients c_t of the natural projector, for t = 0, ..., ell // 2.
+
+    Built by the recursion of Eq. S27, which keeps every step exact.
+
+    Args:
+        ell: Weight of the projector.
+
+    Returns:
+        The exact coefficients, starting from c_0 = 1.
+
+    References:
+        Eq. 8 of [Wen2026], by the recursion of Eq. S27.
+    """
+    coefficients = [Fraction(1)]
+    for t in range(1, ell // 2 + 1):
+        ratio = Fraction(
+            (ell - 2 * t + 2) * (ell - 2 * t + 1), 2 * t * (2 * ell - 2 * t + 1)
+        )
+        coefficients.append(-ratio * coefficients[-1])
+
+    return coefficients
+
+
 def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
     """The delta pairs of the terms of the natural projector with a given t.
 
@@ -155,18 +179,3 @@ def _projector_matchings(ell: int, t: int) -> list[list[tuple[int, int]]]:
                 matchings.append(rs_pairs + list(rr_pairs) + ss_pairs)
 
     return matchings
-
-
-def _projector_coefficients(ell: int) -> list[Fraction]:
-    """The coefficients c_t of Eq. 8 of [Wen2026], for t = 0, ..., ell // 2.
-
-    Built by the recursion of Eq. S27, which keeps every step exact.
-    """
-    coefficients = [Fraction(1)]
-    for t in range(1, ell // 2 + 1):
-        ratio = Fraction(
-            (ell - 2 * t + 2) * (ell - 2 * t + 1), 2 * t * (2 * ell - 2 * t + 1)
-        )
-        coefficients.append(-ratio * coefficients[-1])
-
-    return coefficients

@@ -23,7 +23,7 @@ from fractions import Fraction
 import pytest
 
 from natto.coupling import coeff_C_even, coeff_C_odd, get_coupling_symbolic
-from natto.harmonics import coeff_harmonic
+from natto.harmonics import coeff_harmonic, get_harmonic_symbolic
 from natto.mapping_tensors import Mapping
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_null_space
@@ -132,7 +132,8 @@ def test_natural_projector_is_exact(weight: int):
 
 @pytest.mark.parametrize("weight", range(4))
 def test_harmonic_is_exact(weight: int):
-    """The constant that normalizes the harmonic operator."""
+    """The harmonic operator, and the constant that normalizes it."""
+    assert_exact(f"H({weight})", coefficients(get_harmonic_symbolic(weight)))
     assert isinstance(coeff_harmonic(weight), Fraction)
 
 

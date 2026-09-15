@@ -1,10 +1,11 @@
 """Tests for the Cartesian harmonics.
 
-The harmonic operator is the natural projector under another name and another
-scale, so what needs asserting is not its shape but the two things the scale is
-chosen for: that contracting the harmonic of one direction with another
-direction gives the Legendre polynomial of the angle between them, and that the
-result is symmetric and traceless, which is what makes it a natural tensor.
+The harmonic operator is the natural projector in its form on fully symmetric
+tensors, Eq. 45, rescaled. Its terms are pinned against the paper's worked example,
+and beyond that what needs asserting is the two things the scale is chosen for:
+that contracting the harmonic of one direction with another direction gives the
+Legendre polynomial of the angle between them, and that the result is symmetric
+and traceless, which is what makes it a natural tensor.
 Without normalization it must also be what the general reduction extracts from the
 polyadic, which checks the closed form against the reduction itself.
 
@@ -19,8 +20,13 @@ import numpy as np
 import pytest
 import scipy.special
 
-from natto.harmonics import coeff_harmonic, get_harmonic_operator
+from natto.harmonics import (
+    coeff_harmonic,
+    get_harmonic_operator,
+    get_harmonic_symbolic,
+)
 from natto.reduction import get_reduction
+from natto.symbolic import Operator
 from natto.utils import is_symmetric_traceless
 
 #: Weights checked. The operator is a closed form, so this is cheap; the ceiling
@@ -55,6 +61,23 @@ def outer_power(vector: np.ndarray, power: int) -> np.ndarray:
 def reduction(rank: int) -> dict:
     """The general reduction of a generic tensor of this rank, built once."""
     return get_reduction(rank)
+
+
+def test_symbolic_form_is_the_papers():
+    """H(3|3) without its scale, as the paper writes it out term by term.
+
+    The Cartesian indices A, B, C are fixed, A meeting a harmonic index and B, C
+    paired; only a, b, c are averaged, so t = 0 has six products and t = 1 three.
+    """
+    H = get_harmonic_symbolic(3)
+    expected = Operator.parse(
+        "+1/6 d_aA d_bB d_cC  +1/6 d_aA d_cB d_bC  +1/6 d_bA d_aB d_cC  "
+        "+1/6 d_bA d_cB d_aC  +1/6 d_cA d_aB d_bC  +1/6 d_cA d_bB d_aC  "
+        "-1/5 d_aA d_bc d_BC  -1/5 d_bA d_ac d_BC  -1/5 d_cA d_ab d_BC",
+        H.signature,
+    )
+
+    assert H == expected
 
 
 @pytest.mark.parametrize("weight", range(MAX_WEIGHT + 1))
