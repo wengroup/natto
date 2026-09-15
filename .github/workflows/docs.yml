@@ -45,7 +45,7 @@ jobs:
 
       - name: Configure GitHub Pages
         if: github.event_name == 'push'
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
         with:
           # Auto-enable Pages (build type "workflow") if it isn't configured yet.
           enablement: true
