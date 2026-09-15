@@ -36,11 +36,7 @@ import numpy as np
 
 from natto import act, get_extraction_operators
 
-T = np.array([
-    [1.0, 2.0, 3.0],
-    [4.0, 5.0, 6.0],
-    [7.0, 8.0, 12.0]
-])
+T = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 12.0]])
 
 # the extraction operators of every rank-2 tensor, keyed by (weight, channel);
 # a weight can occur more than once, each occurrence a channel, and at rank 2
