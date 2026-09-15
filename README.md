@@ -53,6 +53,7 @@ for (weight, p), extraction in operators.items():
     print(f"  operator: {extraction}")
     print(f"  X{weight}:")
     print(textwrap.indent(str(X), "    "))
+    print()
 ```
 
 ```
@@ -60,34 +61,23 @@ weight 0, channel 1:
   operator: +1/3 δ_AB
   X0:
     6.0
+
 weight 1, channel 1:
   operator: +1/2 ε_ABa
   X1:
     [-1.  2. -1.]
+
 weight 2, channel 1:
   operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
   X2:
     [[-5.  3.  5.]
      [ 3. -1.  7.]
      [ 5.  7.  6.]]
+
 ```
 
-Each operator is printed beside its result, as `natto` built it, exactly. `1/3 δ_AB`
-takes a third of the trace, `18 / 3`; `1/2 ε_ABa` the antisymmetric part; the
-three terms of `X2` symmetrize `T` and subtract that trace.
-
-`act` evaluates the operator and contracts it with `T`. To keep the array instead,
-`evaluate` returns it together with the einsum rule that applies it:
-
-```python
-from natto import evaluate
-
-array, rule = evaluate(operators[2, 1])  # rule: "abAB,...AB->...ab"
-X2 = np.einsum(rule, array, T)
-```
-
-`get_embedding_operators` gives the operators that embed each ICT back, and
-`get_reduction` gives both kinds together.
+`X0` is a third of the trace, `X1` the antisymmetric part, and `X2` the symmetric
+traceless part.
 
 ### Intrinsic symmetry
 
@@ -107,6 +97,7 @@ for (weight, p), extraction in operators.items():
     print(f"  operator: {extraction}")
     print(f"  X{weight}:")
     print(textwrap.indent(str(X), "    "))
+    print()
 ```
 
 ```
@@ -114,12 +105,14 @@ weight 0, channel 1:
   operator: +1/3 δ_AB
   X0:
     6.0
+
 weight 2, channel 1:
   operator: +1/2 δ_Aa δ_Bb  +1/2 δ_Ab δ_Ba  -1/3 δ_AB δ_ab
   X2:
     [[-5.  3.  5.]
      [ 3. -1.  7.]
      [ 5.  7.  6.]]
+
 ```
 
 Weight 1 is absent from the reduction, not present and zero. `X0` and `X2` are
