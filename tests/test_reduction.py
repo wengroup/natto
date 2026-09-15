@@ -1,10 +1,12 @@
 import functools
+from collections import defaultdict
+from fractions import Fraction
 from typing import NamedTuple, Optional
 
 import numpy as np
 import pytest
 
-from natto.intrinsic_symmetry import impose_symmetry
+from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
 from natto.reduction import get_independent_mappings, get_reduction
 
 
@@ -98,6 +100,61 @@ def get_reduction_cached(rank: int, symmetry: str) -> dict:
     return get_reduction(rank, symmetry)
 
 
+def cycle_index_multiplicities(n: int, symmetry: Optional[str]) -> dict[int, int]:
+    """The nonzero multiplicity of each weight in a rank-n tensor of a symmetry class.
+
+    The character of the class, averaged over its signed permutations, is a Laurent
+    polynomial in z = exp(it) with one factor z^-k + 1 + z^k per cycle of length k.
+    Its overlap with the weight-ell character, the sum of z^m for |m| <= ell, under
+    the SO(3) measure is c_0 - (c_1 + c_-1) / 2, with c_m the coefficient of z^m in
+    their product. No mapping tensor is built, and the arithmetic is exact.
+
+    References:
+        B.2 of [Wen2026Refactor].
+    """
+    group = generate_permutations(symmetry) if symmetry else [(tuple(range(n)), 1)]
+
+    character = defaultdict(Fraction)
+    for permutation, sign in group:
+        term = {0: Fraction(sign, len(group))}
+        for length in cycle_lengths(permutation):
+            product = defaultdict(Fraction)
+            for power, value in term.items():
+                for shift in (-length, 0, length):
+                    product[power + shift] += value
+            term = product
+        for power, value in term.items():
+            character[power] += value
+
+    multiplicities = {}
+    for ell in range(n + 1):
+        c_minus, c_zero, c_plus = (
+            sum((character.get(m - k, 0) for k in range(-ell, ell + 1)), Fraction(0))
+            for m in (-1, 0, 1)
+        )
+        multiplicity = c_zero - (c_plus + c_minus) / 2
+        assert multiplicity.denominator == 1
+        if multiplicity:
+            multiplicities[ell] = int(multiplicity)
+
+    return multiplicities
+
+
+def cycle_lengths(permutation: tuple[int, ...]) -> list[int]:
+    """The lengths of the cycles of a permutation, fixed points included."""
+    seen, lengths = set(), []
+    for start in range(len(permutation)):
+        length, slot = 0, start
+        while slot not in seen:
+            seen.add(slot)
+            slot = permutation[slot]
+            length += 1
+        if length:
+            lengths.append(length)
+
+    return lengths
+
+
 @pytest.mark.parametrize("tensor_class", get_tensor_class_params())
 def test_weight_multiplicity(tensor_class: TensorClass):
     """Check the weight decomposition of each physical tensor class in Table III.
@@ -121,6 +178,19 @@ def test_weight_multiplicity(tensor_class: TensorClass):
 
     assert found == tensor_class.multiplicity
     assert sum(N_m * (2 * m + 1) for m, N_m in found.items()) == tensor_class.n_ind
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params())
+def test_multiplicity_from_cycle_index(tensor_class: TensorClass):
+    """The channels found are the multiplicities the symmetry's character predicts.
+
+    The prediction uses the symmetry group alone, so it checks the selection and the
+    symmetry adaptation independently of the numbers typed into Table III.
+    """
+    output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry)
+    found = {ell: len(data["extraction"]) for ell, data in output.items()}
+
+    assert found == cycle_index_multiplicities(tensor_class.rank, tensor_class.symmetry)
 
 
 @pytest.mark.parametrize(
