@@ -3,40 +3,44 @@
 `get_reduction(..., basis="orthonormal")` returns, per channel, an embedding and an
 extraction operator with the same terms, differing only in their input. These tests
 assert the property that makes that possible -- the mappings of a weight are
-orthonormal under the Cartesian inner product -- and that extraction followed by
-embedding still recovers the tensor.
+orthonormal under the Cartesian inner product, exactly, since each is an exact operator
+with one root of an integer -- and that extraction followed by embedding still
+recovers the tensor.
 """
 
 import numpy as np
 import pytest
 
+from natto.algebra import contract
 from natto.intrinsic_symmetry import check_symmetry, impose_symmetry
 from natto.reduction import get_gram_matrices, get_reduction
-from natto.symbolic import act, evaluate
+from natto.symbolic import Signature, act, evaluate
 
-#: The operators are built in double precision and the identity they satisfy is
-#: exact, so what is left is rounding in the eigendecomposition.
-ORTHONORMAL_ATOL = 1e-12
-
-#: Reconstruction accumulates over every weight and channel, so it is looser.
+#: Reconstruction evaluates the operators and accumulates over every weight and
+#: channel, so it is compared to a tolerance.
 RECONSTRUCTION_TOL = 1e-10
 
 
 def assert_orthonormal(output: dict, weight: int):
-    """Assert the mappings of one weight are orthonormal, as Eq. 22 states."""
-    stacked = np.stack(
-        [
-            operators["embedding"].evaluate()
-            for (ell, _), operators in output.items()
-            if ell == weight
-        ]
-    )
-    flattened = stacked.reshape(len(stacked), -1)
-    gram = flattened @ flattened.T / (2 * weight + 1)
+    """Assert the mappings of one weight are orthonormal, exactly, as Eq. 22 states.
 
-    np.testing.assert_allclose(
-        gram, np.eye(len(stacked), dtype=gram.dtype), rtol=0, atol=ORTHONORMAL_ATOL
-    )
+    Two mappings contracted over every index give 2 * weight + 1 times their Gram
+    entry, and the roots of the two normalizations multiply back to a rational.
+    """
+    mappings = [
+        operators["embedding"]
+        for (ell, _), operators in output.items()
+        if ell == weight
+    ]
+    labels = list(range(mappings[0].signature.size))
+
+    for p, first in enumerate(mappings):
+        for q, second in enumerate(mappings):
+            product = contract([(first, labels), (second, labels)], Signature(()))
+            expected = [2 * weight + 1] if p == q else []
+
+            assert product.radicand == 1
+            assert list(product.terms.values()) == expected
 
 
 def reconstruct(output: dict, tensor: np.ndarray) -> list[np.ndarray]:

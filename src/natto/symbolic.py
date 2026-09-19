@@ -1,13 +1,15 @@
 """Symbolic representation of the isotropic operators the package builds.
 
 Every operator is a sum of products of Kronecker deltas and Levi-Civita symbols with
-exact rational coefficients. `Signature` names its groups of indices, `Term` is one
-canonical product over integer index slots, and `Operator` is a sum of terms collected
-by construction. Each prints and parses in the familiar delta and epsilon notation, and
-evaluates to an array in any order of its groups. `evaluate` gives that array with the
-einsum rule that applies the operator, and `act` applies it.
+exact rational coefficients, times at most the square root of one square-free integer.
+`Signature` names its groups of indices, `Term` is one canonical product over integer
+index slots, and `Operator` is a sum of terms collected by construction. Each prints
+and parses in the familiar delta and epsilon notation, and evaluates to an array in any
+order of its groups. `evaluate` gives that array with the einsum rule that applies the
+operator, and `act` applies it.
 """
 
+import math
 import re
 import string
 from collections.abc import Iterable, Sequence
@@ -17,6 +19,8 @@ from functools import cached_property
 from types import MappingProxyType
 
 import numpy as np
+
+from natto.rational import square_free_split
 
 
 @dataclass(frozen=True)
@@ -204,9 +208,13 @@ class Term:
         """
         return _parse_factors(text.split(), signature)
 
-    @property
+    @cached_property
     def slots(self) -> tuple[int, ...]:
-        """The slots the term uses, sorted."""
+        """The slots the term uses, sorted.
+
+        Cached, since every operator built from the term checks it, and terms are shared
+        between operators.
+        """
         return tuple(
             sorted(slot for block in (*self.deltas, *self.epsilons) for slot in block)
         )
@@ -220,6 +228,16 @@ class Operator:
     slot of the signature exactly once, since all of an operator's indices are free.
     Operators are immutable; arithmetic returns new ones.
 
+    The whole sum may carry one irrational factor, the square root of the square-free
+    integer `radicand`: the operator is `sqrt(radicand)` times its terms. Square-free
+    means no prime divides it twice -- 2, 5 and 6 are, 8 = 2**2 * 2 is not -- which
+    gives each root one written form; see `natto.rational.square_free_split`. It is
+    what an orthonormal mapping needs, `1 / sqrt(d)` for a rational `d`, written as a
+    rational, which goes into the coefficients, times such a root. The default, 1, is
+    an ordinary rational operator. Operators with different radicands cannot be added,
+    since the sum is no longer of this form; contracting them multiplies the radicands,
+    and the square part of the product moves into the coefficients.
+
     Build one from `(coefficient, term)` pairs or from its printed form with
     `Operator.parse`; `natto.algebra.contract` builds one out of others.
 
@@ -227,17 +245,30 @@ class Operator:
         signature: The index groups of the operator.
         terms: `(coefficient, term)` pairs in the order they should print, each
             coefficient an `int` or a `Fraction`.
+        radicand: The square-free positive integer whose square root multiplies the
+            terms. A zero operator always has radicand 1.
 
     Raises:
-        TypeError: If a coefficient is not exact.
-        ValueError: If a term does not use every slot of the signature exactly once.
+        TypeError: If a coefficient is not exact, or `radicand` is not an `int`.
+        ValueError: If a term does not use every slot of the signature exactly once,
+            or `radicand` is not a square-free positive integer.
     """
 
-    __slots__ = ("_signature", "_terms")
+    __slots__ = ("_signature", "_terms", "_radicand")
 
     def __init__(
-        self, signature: Signature, terms: Iterable[tuple[int | Fraction, Term]] = ()
+        self,
+        signature: Signature,
+        terms: Iterable[tuple[int | Fraction, Term]] = (),
+        radicand: int = 1,
     ):
+        if isinstance(radicand, bool) or not isinstance(radicand, int):
+            raise TypeError(f"The radicand must be an int, got {radicand!r}")
+        if radicand < 1 or square_free_split(radicand)[0] != 1:
+            raise ValueError(
+                f"The radicand must be a square-free positive integer, got {radicand}"
+            )
+
         all_slots = tuple(range(signature.size))
         collected: dict[Term, Fraction] = {}
         for coefficient, term in terms:
@@ -253,6 +284,7 @@ class Operator:
 
         self._signature = signature
         self._terms = {term: c for term, c in collected.items() if c != 0}
+        self._radicand = radicand if self._terms else 1
 
     @classmethod
     def parse(cls, text: str, signature: Signature) -> "Operator":
@@ -263,7 +295,9 @@ class Operator:
         and its index letters, and the name may be typed in plain ASCII: `d` or `delta`
         for the Kronecker delta, `e`, `eps` or `epsilon` for the Levi-Civita symbol,
         as well as the printed `δ` and `ε`. Factors before any coefficient form a
-        term with coefficient 1, so `d_AB d_CD` is a single term.
+        term with coefficient 1, so `d_AB d_CD` is a single term. An operator with a
+        radicand prints as `√6 · (...)`, or `sqrt(6) * (...)` in ASCII, and parses
+        back from either.
 
         Args:
             text: The printed operator; an empty string is the zero operator.
@@ -275,6 +309,12 @@ class Operator:
         Raises:
             ValueError: If a factor is malformed or uses a letter outside the signature.
         """
+        radicand = 1
+        radical = _RADICAL.match(text)
+        if radical:
+            radicand = int(radical.group(1) or radical.group(2))
+            text = radical.group(3)
+
         pieces: list[tuple[Fraction, list[str]]] = []
         for token in text.split():
             if _COEFFICIENT.match(token):
@@ -289,7 +329,7 @@ class Operator:
             sign, term = _parse_factors(factors, signature)
             terms.append((sign * coefficient, term))
 
-        return cls(signature, terms)
+        return cls(signature, terms, radicand)
 
     @property
     def signature(self) -> Signature:
@@ -301,6 +341,11 @@ class Operator:
         """The terms and their coefficients, in print order; read-only."""
         return MappingProxyType(self._terms)
 
+    @property
+    def radicand(self) -> int:
+        """The square-free integer whose square root multiplies the terms."""
+        return self._radicand
+
     def to_string(self, ascii: bool = False) -> str:
         """The printed form, as `str` gives it or in plain ASCII.
 
@@ -308,7 +353,8 @@ class Operator:
             ascii: Name the tensors `d` and `e` rather than `δ` and `ε`.
 
         Returns:
-            The terms joined by two spaces; the zero operator prints as an empty string.
+            The terms joined by two spaces, inside `√s · (...)` when the radicand `s`
+            is not 1; the zero operator prints as an empty string.
         """
         letters = self._signature.letters
         delta, epsilon = ("d", "e") if ascii else ("δ", "ε")
@@ -332,8 +378,13 @@ class Operator:
             value = sign * coefficient
             head = f"+{value}" if value >= 0 else f"{value}"
             printed.append(" ".join([head, *factors]))
+        body = "  ".join(printed)
 
-        return "  ".join(printed)
+        if self._radicand != 1:
+            root = f"sqrt({self._radicand}) *" if ascii else f"√{self._radicand} ·"
+            body = f"{root} ({body})"
+
+        return body
 
     def evaluate(self, order: Sequence[str] | None = None) -> np.ndarray:
         """Evaluate the operator into an array.
@@ -349,6 +400,8 @@ class Operator:
             ValueError: If `order` does not name every group exactly once.
         """
         result = evaluate_terms(self._signature, self._terms, order)
+        if self._radicand != 1:
+            result = result * math.sqrt(self._radicand)
 
         return result
 
@@ -356,7 +409,11 @@ class Operator:
         if not isinstance(other, Operator):
             return NotImplemented
 
-        return self._signature == other._signature and self._terms == other._terms
+        return (
+            self._signature == other._signature
+            and self._terms == other._terms
+            and self._radicand == other._radicand
+        )
 
     __hash__ = None
 
@@ -368,10 +425,15 @@ class Operator:
             return NotImplemented
         if other._signature != self._signature:
             raise ValueError("Operators with different signatures cannot be added")
+        if self._terms and other._terms and self._radicand != other._radicand:
+            raise ValueError("Operators with different radicands cannot be added")
+
+        radicand = self._radicand if self._terms else other._radicand
 
         return Operator(
             self._signature,
             [(c, t) for t, c in (*self._terms.items(), *other._terms.items())],
+            radicand,
         )
 
     def __neg__(self) -> "Operator":
@@ -385,7 +447,9 @@ class Operator:
             return NotImplemented
 
         return Operator(
-            self._signature, [(c * scalar, t) for t, c in self._terms.items()]
+            self._signature,
+            [(c * scalar, t) for t, c in self._terms.items()],
+            self._radicand,
         )
 
     def __rmul__(self, scalar: int | Fraction) -> "Operator":
@@ -410,7 +474,7 @@ def evaluate(operator: Operator) -> tuple[np.ndarray, str]:
     together because the rule is only valid for this axis order.
 
     Args:
-        operator: An `Operator`, or a `natto.orthonormal.OrthonormalOperator`.
+        operator: The operator.
 
     Returns:
         The evaluated array and its einsum rule.
@@ -433,7 +497,7 @@ def act(operator: Operator, *inputs: np.ndarray) -> np.ndarray:
     This is `evaluate` followed by `numpy.einsum`, for when only the result is needed.
 
     Args:
-        operator: An `Operator`, or a `natto.orthonormal.OrthonormalOperator`.
+        operator: The operator.
         *inputs: One array per input group, in the order of the groups, each with the
             group's indices last and any batch dimensions before them.
 
@@ -460,8 +524,7 @@ def evaluate_terms(
 ) -> np.ndarray:
     """Evaluate a sum of terms over the slots of a signature into an array.
 
-    This is the evaluation shared by `Operator`, whose coefficients are exact, and
-    `natto.orthonormal.OrthonormalOperator`, whose coefficients are floats.
+    `Operator.evaluate` is this, times the square root of the operator's radicand.
 
     Args:
         signature: The index groups the terms' slots belong to.
@@ -522,6 +585,9 @@ def sort_with_sign(items: Sequence) -> tuple[tuple, int]:
 
 #: A coefficient token of a printed operator, such as `+1`, `-1/3` or `2`.
 _COEFFICIENT = re.compile(r"^[+-]?\d+(/\d+)?$")
+
+#: The radical around a printed operator: `√6 · (...)` or `sqrt(6) * (...)`.
+_RADICAL = re.compile(r"^\s*(?:√(\d+)|sqrt\((\d+)\))\s*[·*]\s*\((.*)\)\s*$", re.DOTALL)
 
 #: A factor token: a tensor name, an underscore and the index letters.
 _FACTOR = re.compile(r"^(δ|ε|delta|epsilon|eps|d|e)_([A-Za-z]+)$")

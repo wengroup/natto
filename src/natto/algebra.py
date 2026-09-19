@@ -8,10 +8,12 @@ as an operator whose terms are canonical and collected.
 """
 
 import itertools
+import math
 from collections import Counter
 from collections.abc import Hashable, Sequence
 from fractions import Fraction
 
+from natto.rational import square_free_split
 from natto.symbolic import Operator, Signature, Term, sort_with_sign
 
 
@@ -26,6 +28,10 @@ def contract(
     a chain of deltas collapses to one delta, a closed loop of them is a factor of 3,
     a Levi-Civita symbol with a repeated index vanishes, and two symbols sharing an
     index expand into deltas by their determinant identity.
+
+    The radicands of the operators multiply: the product is written as `k**2 * s`
+    with `s` square-free, `k` joins the coefficients, and `s` is the radicand of the
+    result. An orthonormal mapping contracted with itself is therefore rational again.
 
     Args:
         factors: The operators, each with the labels of its slots in order.
@@ -60,10 +66,13 @@ def contract(
             f"The free labels {sorted(free, key=str)} are not the slots of the result"
         )
 
+    radicand = math.prod(operator.radicand for operator, _ in factors)
+    root, radicand = square_free_split(radicand)
+
     terms = []
     choices = [list(operator.terms.items()) for operator, _ in factors]
     for choice in itertools.product(*choices):
-        coefficient = Fraction(1)
+        coefficient = Fraction(root)
         deltas, epsilons = [], []
         for (term, value), (_, labels) in zip(choice, factors):
             coefficient *= value
@@ -74,7 +83,7 @@ def contract(
             sign, reduced = Term.from_blocks(kept_deltas, kept_epsilons)
             terms.append((sign * factor * coefficient, reduced))
 
-    return Operator(signature, terms)
+    return Operator(signature, terms, radicand)
 
 
 def contract_fully(

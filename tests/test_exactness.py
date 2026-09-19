@@ -12,9 +12,9 @@ functions a rank-six one does, so nothing here goes above rank three. Rank two a
 three together already reach both parities of `rank - weight`, a weight carrying
 several channels, and a symmetry whose null space extinguishes one.
 
-Two places are deliberately numerical, and are not checked here: evaluating an
-operator into an array, and the orthonormal mappings, whose inverse square root is
-irrational in general.
+One place is deliberately numerical, and is not checked here: evaluating an
+operator into an array. The orthonormal mappings are exact too, each carrying the one
+irrational factor it needs as the root of an integer.
 """
 
 import functools
@@ -27,7 +27,7 @@ from natto.harmonics import coeff_harmonic, get_harmonic_operator
 from natto.mapping_tensors import Mapping, compose, get_dual_mappings
 from natto.natural_projector import get_natural_projector
 from natto.rational import matrix_inverse, matrix_null_space
-from natto.reduction import get_independent_mappings
+from natto.reduction import get_independent_mappings, get_reduction
 from natto.symmetry_adaptation import get_symmetry_action_matrix
 
 #: `Fraction` is the exact type. A plain `int` is exact too; `bool` is an `int` by
@@ -125,6 +125,16 @@ def test_symmetry_mixing_matrix_and_null_space_are_exact(rank: int, symmetry: st
             f"{tag} null space",
             [v for row in matrix_null_space(mixing, len(G)) for v in row],
         )
+
+
+@pytest.mark.parametrize("rank, symmetry", CASES)
+def test_orthonormal_mappings_are_exact(rank: int, symmetry: str):
+    """Rational coefficients, and the normalization as the root of an integer."""
+    output = get_reduction(rank, symmetry=symmetry, basis="orthonormal")
+    for key, operators in output.items():
+        embedding = operators["embedding"]
+        assert_exact(f"rank {rank} {key} orthonormal", coefficients(embedding))
+        assert isinstance(embedding.radicand, int)
 
 
 @pytest.mark.parametrize("weight", range(4))

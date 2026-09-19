@@ -19,9 +19,9 @@ Each operator is exact; `natto.evaluate` turns one into an array together with t
 einsum rule that applies it, and `natto.act` applies it directly.
 
 The dual basis is exact throughout: the mappings, and the duals built from them with
-the inverse of their exact Gram matrix. The orthonormal basis rotates the mappings by
-the inverse square root of that matrix instead, which is irrational in general, so
-its operators carry float coefficients; see `natto.orthonormal`.
+the inverse of their exact Gram matrix. The orthonormal basis orthonormalizes the
+mappings in their order instead; each operator is exact but for one square root of an
+integer, which it carries as its radicand; see `natto.orthonormal`.
 """
 
 import functools
@@ -36,7 +36,7 @@ from natto.independence import (
     select_independent_mappings_via_embeddings,
 )
 from natto.mapping_tensors import Mapping, compose, get_dual_mappings, get_mappings
-from natto.orthonormal import OrthonormalOperator, get_orthonormal_operators
+from natto.orthonormal import get_orthonormal_operators
 from natto.rational import matrix_inverse
 from natto.symbolic import Operator, Signature
 from natto.symmetry_adaptation import get_symmetry_adapted_mappings
@@ -51,7 +51,7 @@ Selection = Literal["symbolic", "qr", "components", "embeddings"]
 
 def get_reduction(
     n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
-) -> dict[tuple[int, int], dict[str, Operator | OrthonormalOperator]]:
+) -> dict[tuple[int, int], dict[str, Operator]]:
     """The extraction and embedding operators of a Cartesian tensor space.
 
     The operators depend only on the rank and the symmetry, not on any particular
@@ -72,9 +72,11 @@ def get_reduction(
             The number of distinct letters gives the rank; which letters are used
             does not matter.
         basis: `dual` gives the mappings as embedding operators and their duals as
-            extraction operators, exactly. `orthonormal` gives the mappings of Eq. 21
+            extraction operators, exactly. `orthonormal` gives orthonormal mappings
             instead, which are self-dual, so the embedding and extraction operator of
-            a channel have the same float terms and differ only in their input.
+            a channel have the same terms and differ only in their input. They are the
+            mappings orthonormalized in their order, exact but for one square root per
+            channel, carried as the operator's radicand.
 
     Returns:
         A dict mapping `(ell, p)` to the operators of that weight and channel, under
@@ -101,7 +103,7 @@ def get_reduction(
 
 def get_embedding_operators(
     n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
-) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+) -> dict[tuple[int, int], Operator]:
     """The embedding operators, which take an ICT to its part of a Cartesian tensor.
 
     Each has the ICT indices as its `ict` group, the input, and the tensor indices as
@@ -132,7 +134,7 @@ def get_embedding_operators(
 
 def get_extraction_operators(
     n: int, ell: int | None = None, symmetry: str | None = None, basis: Basis = "dual"
-) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+) -> dict[tuple[int, int], Operator]:
     """The extraction operators, which take a Cartesian tensor to its ICTs.
 
     Each has the ICT indices as its `ict` group and the tensor indices as its `gct`
@@ -242,15 +244,17 @@ def get_independent_mappings(
     """The independent mapping tensors of one weight, and their exact Gram matrix.
 
     This is the first stage of the reduction, and the only one both bases share: it
-    enumerates the candidate mappings, keeps an independent subset of them, and -- if the
-    tensor has an intrinsic symmetry -- mixes those into the symmetry-adapted mappings.
+    enumerates the candidate mappings, keeps an independent subset of them, and -- if
+    the tensor has an intrinsic symmetry -- mixes those into the symmetry-adapted
+    mappings.
 
     Each mapping is a vector over the candidates of its weight and rank; `expand`
     gives its terms.
 
     The symmetry adaptation is exact whatever `selection` is. Its null space is what
-    yields the multiplicity of the weight, and a weight that comes out empty -- as weight
-    one does for the third-order elastic tensor -- is a statement rather than a threshold.
+    yields the multiplicity of the weight, and a weight that comes out empty -- as
+    weight one does for the third-order elastic tensor -- is a statement rather than a
+    threshold.
 
     Args:
         ell: Weight of the ICT space.
@@ -344,7 +348,7 @@ def _get_channels(
 
 def _get_operators(
     n: int, ell: int | None, symmetry: str | None, basis: Basis, extraction: bool
-) -> dict[tuple[int, int], Operator | OrthonormalOperator]:
+) -> dict[tuple[int, int], Operator]:
     """The embedding or extraction operators; see `get_embedding_operators`."""
     if basis not in ("dual", "orthonormal"):
         raise ValueError(f"Unknown basis: {basis}. Supported are: dual, orthonormal.")
@@ -357,18 +361,33 @@ def _get_operators(
             continue
 
         if basis == "orthonormal":
-            # The self-dual basis rotates the mappings themselves, for both uses.
-            signature = _with_input_group(G[0].sector.signature, group)
-            gram_matrix = [list(row) for row in gram]
-            orthonormal = get_orthonormal_operators(G, gram_matrix, signature)
+            # The self-dual basis serves both uses, so it is built once per weight.
+            orthonormal = _get_orthonormal_channels(weight, n, symmetry)
             for p, operator in enumerate(orthonormal, start=1):
-                operators[weight, p] = operator
+                operators[weight, p] = _with_input(operator, group)
         else:
             chosen = G_tilde if extraction else G
             for p, mapping in enumerate(chosen, start=1):
                 operators[weight, p] = _with_input(mapping.expand(), group)
 
     return operators
+
+
+@functools.cache
+def _get_orthonormal_channels(
+    ell: int, n: int, symmetry: str | None
+) -> tuple[Operator, ...]:
+    """The orthonormal mappings of one weight, built once, as extraction operators.
+
+    They are self-dual, so the embedding and extraction operators of a channel are the
+    same operator with a different input group, and both come from this one result:
+    extraction uses it as it is, and embedding relabels its input.
+    """
+    G, _, gram = _get_channels(ell, n, symmetry)
+    signature = _with_input_group(G[0].sector.signature, "gct")
+    operators = get_orthonormal_operators(G, [list(row) for row in gram], signature)
+
+    return tuple(operators)
 
 
 def _get_weights(n: int, ell: int | None) -> range | list[int]:
@@ -388,9 +407,12 @@ def _get_weights(n: int, ell: int | None) -> range | list[int]:
 def _with_input(operator: Operator, name: str) -> Operator:
     """The same operator, with the group called `name` as its only input."""
     signature = _with_input_group(operator.signature, name)
+    if signature == operator.signature:
+        return operator
+
     terms = [(coefficient, term) for term, coefficient in operator.terms.items()]
 
-    return Operator(signature, terms)
+    return Operator(signature, terms, operator.radicand)
 
 
 def _with_input_group(signature: Signature, name: str) -> Signature:

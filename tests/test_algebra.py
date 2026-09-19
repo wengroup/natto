@@ -40,6 +40,14 @@ CASES = {
         4,
     ),
     "symbols apart": ([("e_abc", 3, [0, 1, 2]), ("e_abc", 3, [3, 4, 5])], 6),
+    "radicands multiply": (
+        [("sqrt(2) * (d_ab)", 2, [0, "i"]), ("sqrt(6) * (d_ab)", 2, ["i", 1])],
+        2,
+    ),
+    "radicands cancel": (
+        [("sqrt(2) * (d_ab)", 2, [0, "i"]), ("sqrt(2) * (d_ab)", 2, ["i", 1])],
+        2,
+    ),
     "sums of terms": (
         [
             ("+1/2 d_ab d_cd  +1/2 d_ac d_bd  -1/3 d_ad d_bc", 4, [0, 1, "i", "j"]),

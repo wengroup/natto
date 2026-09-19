@@ -76,13 +76,11 @@ class Sector:
         return [Mapping(self, [int(i == p) for i in range(size)]) for p in range(size)]
 
     def combine_terms(
-        self, coefficients: Sequence[int | Fraction | float]
-    ) -> dict[Term, Fraction | float]:
+        self, coefficients: Sequence[int | Fraction]
+    ) -> dict[Term, Fraction]:
         """The terms of a combination of the candidates, collected.
 
-        Exact coefficients give exact terms, as a `Mapping` needs; float coefficients
-        give float terms, as an orthonormal mapping needs. A term whose contributions
-        cancel is kept, with its coefficient zero or, in floats, close to it.
+        A term whose contributions cancel is kept, with its coefficient zero.
 
         Args:
             coefficients: One coefficient per candidate.

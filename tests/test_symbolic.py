@@ -6,6 +6,7 @@ its terms contracted as dense arrays.
 """
 
 import numpy as np
+import pytest
 
 from natto.coupling import get_coupling_operator
 from natto.natural_projector import get_natural_projector
@@ -26,6 +27,9 @@ def package_operators() -> list[Operator]:
     for build in (get_embedding_operators, get_extraction_operators):
         operators += list(build(3, symmetry="ijk=ikj").values())
     operators += list(get_composed_operators(3, symmetry="ijk=ikj").values())
+    operators += list(
+        get_embedding_operators(3, symmetry="ijk=ikj", basis="orthonormal").values()
+    )
 
     return operators
 
@@ -56,4 +60,17 @@ def test_evaluate():
             dense = np.einsum(*operands, axes) if operands else 1.0
             expected = expected + float(coefficient) * dense
 
+        expected = expected * np.sqrt(operator.radicand)
+
         np.testing.assert_allclose(operator.evaluate(order), expected, atol=1e-12)
+
+
+def test_different_radicands_do_not_add():
+    """A sum of different roots is not an operator's form, so it is refused."""
+    signature = get_natural_projector(1).signature
+    root_two = Operator.parse("sqrt(2) * (d_Aa)", signature)
+    root_three = Operator.parse("sqrt(3) * (d_Aa)", signature)
+
+    assert root_two + root_two == Operator.parse("sqrt(2) * (2 d_Aa)", signature)
+    with pytest.raises(ValueError):
+        root_two + root_three

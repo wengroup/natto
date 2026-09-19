@@ -294,8 +294,8 @@ def test_duality_is_exact(tensor_class: TensorClass):
 def test_weight_projector_is_basis_independent(tensor_class: TensorClass):
     """Summed over channels, both bases give the same projector onto each weight.
 
-    The dual basis builds its composed operators symbolically and exactly; the
-    orthonormal basis rotates the mappings by a numerical inverse square root. The
+    The dual basis composes each mapping with its dual; the orthonormal basis
+    orthonormalizes the mappings in order and composes each with itself. The
     projector onto a weight does not depend on the basis within it, so the two routes
     must agree.
     """

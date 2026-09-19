@@ -4,9 +4,13 @@ import pytest
 
 from natto.rational import (
     bordered_inverse,
+    inverse_square_root,
     is_nonsingular,
+    ldl_decomposition,
     matrix_inverse,
+    matrix_multiply,
     matrix_null_space,
+    square_free_split,
 )
 
 
@@ -87,3 +91,25 @@ def test_is_nonsingular_empty_matrix():
 def test_is_nonsingular_rejects_a_non_square_matrix():
     with pytest.raises(ValueError, match="not square"):
         is_nonsingular([[Fraction(1), Fraction(2)]])
+
+
+def test_ldl_decomposition():
+    """L diag(d) L^T gives the matrix back exactly, with L unit lower triangular."""
+    matrix = [[Fraction(v) for v in row] for row in [[4, 2, 2], [2, 5, 1], [2, 1, 6]]]
+    lower, pivots = ldl_decomposition(matrix)
+    scaled = [[value * pivot for value, pivot in zip(row, pivots)] for row in lower]
+    transposed = [list(column) for column in zip(*lower)]
+
+    assert all(
+        lower[i][i] == 1 and lower[i][i + 1 :] == [0] * (2 - i) for i in range(3)
+    )
+    assert matrix_multiply(scaled, transposed) == matrix
+
+
+@pytest.mark.parametrize("value", [Fraction(8, 3), Fraction(2), Fraction(9, 4), 12])
+def test_inverse_square_root(value):
+    """1 / sqrt(value) = r sqrt(s) exactly, with s square-free."""
+    scale, radicand = inverse_square_root(Fraction(value))
+
+    assert scale**2 * radicand * value == 1
+    assert square_free_split(radicand) == (1, radicand)
