@@ -1,9 +1,9 @@
 # Implementation notes
 
 `natto` computes the operators of [@Wen2026Reusable], but not always by the paper's
-formulas taken literally. This page collects the rewritings it uses instead. Each
-leaves the computed quantity unchanged and only makes it cheaper. Equations of the
-paper are written (W15) for Eq. 15 of [@Wen2026Reusable].
+formulas taken literally. This page collects the simplifications and rewritings of the
+paper's equations that it uses instead. Equations of the paper are written (W15) for
+Eq. 15 of [@Wen2026Reusable].
 
 ## Notation
 
@@ -82,8 +82,8 @@ L_{ij} = \langle F_i, \mathsf E\, F_j \rangle,
 
 where the rows of $C_1$ and $C_2$ are the coefficient vectors of two lists of
 mappings. The Gram matrix of any mappings, the adapted Gram matrix
-$g^Q = M g M^{\mathsf T}$, and the orthonormal mappings
-$\widehat G = g^{-1/2} G$ (W21) are all matrix algebra on these vectors.
+$g^Q = M g M^{\mathsf T}$, and the orthonormal mappings $\widehat G = g^{-1/2} G$ (W21),
+computed as in [](#eq-ldl-orthonormal), are all matrix algebra on these vectors.
 
 ## Permuted mappings
 
@@ -167,15 +167,8 @@ N(n, \ell) = N(n-1, \ell+1) + [\ell \ge 1]\, \bigl(N(n-1, \ell-1) + N(n-1, \ell)
 \qquad N(0, \ell) = \delta_{\ell 0} .
 ```
 
-The candidates are scanned in order, and the scan stops once $N(n, \ell)$ are kept. The
-order is by delta pairs, then Levi-Civita slots, both ascending, so the first candidate
-contracts the earliest slots; [the rank-4 channels](#channel-order) show it for every
-weight. Independent sets form a matroid, so scanning a fixed total order
-keeps its lexicographically first basis: a definite set, whichever exact test decides
-independence along the scan. Some
-convention is unavoidable: the index permutations mix the mappings of a repeated
-weight, and in general no basis is fixed by all of them (at $\ell = 2$, $n = 3$ they
-act irreducibly on the two mappings). A
+The candidates are scanned in order, and the scan stops once $N(n, \ell)$ are kept; the
+order, and why some order has to be chosen, are in [](conventions.md). A
 candidate with Gram entries $b$ against the kept mappings and $d$ with itself is kept
 exactly when
 
@@ -186,3 +179,34 @@ d - b^{\mathsf T} g^{-1} b \neq 0 ,
 
 with $g^{-1}$ extended by the bordered inverse as candidates are kept. The decision is
 exact, where the paper's Algorithm 1 decides by a pivoted QR against a tolerance.
+
+## Orthonormal mappings
+
+The paper orthonormalizes the mappings of a weight with the symmetric inverse square
+root of their Gram matrix, $\widehat G = g^{-1/2} G$ (W21). Its entries come from the
+eigenvalues of $g$, which are irrational in general, so the orthonormal mappings
+could only be held in floating point. `natto` factors the Gram matrix exactly
+instead, $g = L D L^{\mathsf T}$ with $L$ unit lower triangular and
+$D = \operatorname{diag}(d_1, \dots, d_N)$, both rational, and takes
+
+```{math}
+:label: eq-ldl-orthonormal
+\widehat G = D^{-1/2} L^{-1} G,
+\qquad
+\widehat G^p = \frac{1}{\sqrt{d_p}} \sum_{q \le p} (L^{-1})_{pq}\, G^q ,
+```
+
+which is Gram-Schmidt in the order of the mappings: $\widehat G^1$ is $G^1$
+normalized, $\widehat G^2$ is $G^2$ with its part along $G^1$ removed, and so on.
+$L^{-1} G$ is rational, and the only irrational number left is one factor
+$1/\sqrt{d_p}$ per channel. With $d_p = a/b$ in lowest terms,
+$1/\sqrt{d_p} = \sqrt{ab}/a = (k/a)\sqrt{s}$, where $ab = k^2 s$ and $s$ is
+square-free, so $k/a$ joins the rational coefficients and the operator carries
+$\sqrt{s}$ as its radicand. For example, $d = 8/3$ gives $\tfrac14 \sqrt 6$.
+
+This is a change of basis, not of the result. The two constructions span the same
+space and are related by an orthogonal matrix, so they agree on everything that does
+not depend on the basis: the total weight-$\ell$ part, the reconstruction,
+$\sum_p \lVert \mathbf X^p_\ell \rVert^2$, and every weight that occurs once. Only
+how a repeated weight is divided into channels differs; [](conventions.md) states the
+order that fixes it.

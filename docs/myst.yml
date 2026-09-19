@@ -13,6 +13,7 @@ project:
     - file: harmonics.md
     - file: coupling.md
     - file: reduction.md
+    - file: conventions.md
     - file: implementation.md
     - file: dev_guide.md
     - file: api.md

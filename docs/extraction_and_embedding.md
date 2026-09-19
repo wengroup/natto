@@ -122,37 +122,25 @@ print(f"channels (ell, p): {list(G_tilde)}")
 (channel-order)=
 ### Which mapping is channel `p`
 
-Each candidate mapping contracts some slots of the tensor away: pairs of slots with
-Kronecker deltas and, when $n - \ell$ is odd, two slots with a Levi-Civita symbol
-$\varepsilon_{\tau ij}$ whose $\tau$ index goes to the ICT. The candidates are ordered
-by their delta pairs, then their Levi-Civita slots, both ascending, and the channels
-are the earliest ones that are independent of those before them. For a rank-4 tensor,
-with slots 0 to 3:
-
-| weight | channels, in order | dropped |
-|---|---|---|
-| 0 | $\delta_{01}\delta_{23}$, $\delta_{02}\delta_{13}$, $\delta_{03}\delta_{12}$ | |
-| 1 | $\delta_{01}\varepsilon_{\tau 23}$, $\delta_{02}\varepsilon_{\tau 13}$, $\delta_{03}\varepsilon_{\tau 12}$, $\delta_{12}\varepsilon_{\tau 03}$, $\delta_{13}\varepsilon_{\tau 02}$, $\delta_{23}\varepsilon_{\tau 01}$ | |
-| 2 | $\delta_{01}$, $\delta_{02}$, $\delta_{03}$, $\delta_{12}$, $\delta_{13}$, $\delta_{23}$ | |
-| 3 | $\varepsilon_{\tau 01}$, $\varepsilon_{\tau 02}$, $\varepsilon_{\tau 03}$ | $\varepsilon_{\tau 12}$, $\varepsilon_{\tau 13}$, $\varepsilon_{\tau 23}$ |
-| 4 | nothing contracted | |
-
-So channel 1 of weight 2 traces slots 0 and 1 and keeps the ICT on slots 2 and 3.
-Weight 3 has six candidates but only three channels, and the last three candidates are
-combinations of the first three.
+Each candidate mapping contracts some slots of the tensor away, with Kronecker deltas
+and, when $n - \ell$ is odd, one Levi-Civita symbol. The candidates are ordered by
+their delta pairs, then their Levi-Civita slots, both ascending, and the channels are
+the earliest ones that are independent of those before them. For a rank-4 tensor,
+channel 1 of weight 2 traces slots 0 and 1 and keeps the ICT on slots 2 and 3.
 
 Within a repeated weight, the choice of channels is a convention. The total
 weight-$\ell$ part, $\sum_p \mathbf S^{\ell, p}$, is the same for any choice; the
-individual channels are not.
+individual channels are not. [](conventions.md) states the conventions, with the
+rank-4 channels of every weight.
 
 ## Orthonormal basis
 
 With `basis="orthonormal"`, the mapping tensors of each weight are orthonormalized,
 $\widehat G = g^{-1/2} G$ with $g$ their [Gram matrix](#eq-objects). An orthonormal mapping tensor is
 its own dual, so the same $\widehat G$ both extracts and embeds; the extraction and
-embedding operators of a channel share one array and differ only in their rule. The
-orthonormalization is irrational in general, so these operators have float
-coefficients and no printed form, and are used through `act` or `evaluate`:
+embedding operators of a channel share one array and differ only in their rule. Each
+is exact: rational coefficients times an overall factor $\sqrt{s}$, with $s$ an
+integer that is 1 when the factor is rational:
 
 ```{code-cell} python
 G_hat = get_embedding_operators(n=2, basis="orthonormal")

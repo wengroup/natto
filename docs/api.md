@@ -6,8 +6,9 @@ Everything below is imported from the top-level package, e.g.
 ## Operators
 
 Every operator builder returns exact operators: sums of products of Kronecker deltas
-and Levi-Civita symbols with rational coefficients, which print in that notation. The
-one exception is the orthonormal basis, whose coefficients are floats.
+and Levi-Civita symbols with rational coefficients, which print in that notation. An
+operator of the orthonormal basis may also carry an overall factor $\sqrt{s}$, with
+the integer $s$ its `radicand`.
 `get_gram_matrices` returns exact rational matrices instead. The reduction builders
 key their operators by `(ell, p)`, the weight and the channel of that weight.
 
