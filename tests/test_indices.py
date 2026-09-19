@@ -9,11 +9,7 @@ from natto.indices import get_slot_partitions
     "sizes, num_pairs", [([2], 3), ([2, 3], 2), ([1, 2, 2], 1), ([2, 0, 1], 2)]
 )
 def test_partitions_order(sizes: list[int], num_pairs: int):
-    """The placements come in the order all permutations first meet them.
-
-    The order decides which candidates are selected as independent, so it must not
-    move.
-    """
+    """The placements come in the order all permutations first meet them."""
     labels = [("group", g) for g, size in enumerate(sizes) for _ in range(size)]
     labels += [p for p in range(num_pairs) for _ in range(2)]
     starts = [sum(sizes[:g]) for g in range(len(sizes))]

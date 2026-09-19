@@ -119,6 +119,32 @@ G_tilde = get_extraction_operators(n=3, ell=1)
 print(f"channels (ell, p): {list(G_tilde)}")
 ```
 
+(channel-order)=
+### Which mapping is channel `p`
+
+Each candidate mapping contracts some slots of the tensor away: pairs of slots with
+Kronecker deltas and, when $n - \ell$ is odd, two slots with a Levi-Civita symbol
+$\varepsilon_{\tau ij}$ whose $\tau$ index goes to the ICT. The candidates are ordered
+by their delta pairs, then their Levi-Civita slots, both ascending, and the channels
+are the earliest ones that are independent of those before them. For a rank-4 tensor,
+with slots 0 to 3:
+
+| weight | channels, in order | dropped |
+|---|---|---|
+| 0 | $\delta_{01}\delta_{23}$, $\delta_{02}\delta_{13}$, $\delta_{03}\delta_{12}$ | |
+| 1 | $\delta_{01}\varepsilon_{\tau 23}$, $\delta_{02}\varepsilon_{\tau 13}$, $\delta_{03}\varepsilon_{\tau 12}$, $\delta_{12}\varepsilon_{\tau 03}$, $\delta_{13}\varepsilon_{\tau 02}$, $\delta_{23}\varepsilon_{\tau 01}$ | |
+| 2 | $\delta_{01}$, $\delta_{02}$, $\delta_{03}$, $\delta_{12}$, $\delta_{13}$, $\delta_{23}$ | |
+| 3 | $\varepsilon_{\tau 01}$, $\varepsilon_{\tau 02}$, $\varepsilon_{\tau 03}$ | $\varepsilon_{\tau 12}$, $\varepsilon_{\tau 13}$, $\varepsilon_{\tau 23}$ |
+| 4 | nothing contracted | |
+
+So channel 1 of weight 2 traces slots 0 and 1 and keeps the ICT on slots 2 and 3.
+Weight 3 has six candidates but only three channels, and the last three candidates are
+combinations of the first three.
+
+Within a repeated weight, the choice of channels is a convention. The total
+weight-$\ell$ part, $\sum_p \mathbf S^{\ell, p}$, is the same for any choice; the
+individual channels are not.
+
 ## Orthonormal basis
 
 With `basis="orthonormal"`, the mapping tensors of each weight are orthonormalized,

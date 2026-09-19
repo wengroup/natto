@@ -259,7 +259,9 @@ def get_independent_mappings(
         selection: What to judge the independence of the candidate mappings on.
             `symbolic` is the default: the mappings' Gram matrix is contracted
             symbolically and the decision made over the rationals, so it is the
-            same on every machine, keeping the earliest independent candidates.
+            same on every machine, keeping the earliest independent candidates in
+            the order of `natto.lowering.get_lowering_labels`: by delta pairs, then
+            epsilon slots, both ascending.
             `qr` is Algorithm 1 of the paper: a rank-revealing QR with column
             pivoting on the evaluated mappings, which keeps the same number but
             may keep a different subset. `components` uses the mappings evaluated

@@ -45,8 +45,9 @@ def get_slot_partitions(
     Returns:
         One `(groups, pairs)` per placement: the slots of each group, increasing, and
         the pairs of slots, each increasing and ordered by their first slot. The
-        placements come in the order `itertools.permutations` first meets them, which
-        decides the candidates selected as independent, so it must not change.
+        placements come in the order `itertools.permutations` first meets them. That
+        order only sets how terms are listed; the candidate mappings are sorted by
+        their own rule in `natto.lowering.get_lowering_labels`.
 
     Examples:
         >>> get_slot_partitions([1], 1)

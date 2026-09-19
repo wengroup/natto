@@ -33,6 +33,24 @@ def test_candidates(n: int, ell: int):
         )
 
 
+def test_candidate_order():
+    """Candidates are ordered by delta pairs, then epsilon slots, both ascending.
+
+    At weight one and rank four both fields vary, so ordering by the epsilon slots
+    first, or keeping the enumeration order, would put delta_23 epsilon_01 first.
+    """
+    labels = [(label.deltas, label.epsilon) for label in Sector(1, 4).labels]
+
+    assert labels == [
+        (((0, 1),), (2, 3)),
+        (((0, 2),), (1, 3)),
+        (((0, 3),), (1, 2)),
+        (((1, 2),), (0, 3)),
+        (((1, 3),), (0, 2)),
+        (((2, 3),), (0, 1)),
+    ]
+
+
 def lowering_array(label: LoweringLabel, n: int, ell: int) -> np.ndarray:
     """The rank-lowering tensor of a label, with its sigma axes before its rank axes.
 

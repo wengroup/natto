@@ -65,7 +65,7 @@ def test_piezoelectric_gram_matrix():
     """Pin the piezoelectric weight-1 Gram matrix, and its orthonormal mappings."""
     gram = get_gram_matrices(3, ell=1, symmetry="ijk=ikj")[1]
 
-    assert gram == [[3, 2], [2, 8]]
+    assert gram == [[8, 2], [2, 3]]
     output = get_reduction(3, ell=1, symmetry="ijk=ikj", basis="orthonormal")
     assert_orthonormal(output, weight=1)
 

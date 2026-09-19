@@ -19,14 +19,14 @@
   "1": {
     "embedding": [
       [
-        "-1 δ_Aa δ_BC",
-        "+1 δ_AC δ_Ba"
+        "-1 δ_AC δ_Ba",
+        "+1 δ_Aa δ_BC"
       ]
     ],
     "extraction": [
       [
-        "-1/4 δ_Aa δ_BC",
-        "+1/4 δ_AC δ_Ba"
+        "-1/4 δ_AC δ_Ba",
+        "+1/4 δ_Aa δ_BC"
       ]
     ],
     "gram": [

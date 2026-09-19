@@ -167,7 +167,15 @@ N(n, \ell) = N(n-1, \ell+1) + [\ell \ge 1]\, \bigl(N(n-1, \ell-1) + N(n-1, \ell)
 \qquad N(0, \ell) = \delta_{\ell 0} .
 ```
 
-The candidates are scanned in order, and the scan stops once $N(n, \ell)$ are kept. A
+The candidates are scanned in order, and the scan stops once $N(n, \ell)$ are kept. The
+order is by delta pairs, then Levi-Civita slots, both ascending, so the first candidate
+contracts the earliest slots; [the rank-4 channels](#channel-order) show it for every
+weight. Independent sets form a matroid, so scanning a fixed total order
+keeps its lexicographically first basis: a definite set, whichever exact test decides
+independence along the scan. Some
+convention is unavoidable: the index permutations mix the mappings of a repeated
+weight, and in general no basis is fixed by all of them (at $\ell = 2$, $n = 3$ they
+act irreducibly on the two mappings). A
 candidate with Gram entries $b$ against the kept mappings and $d$ with itself is kept
 exactly when
 

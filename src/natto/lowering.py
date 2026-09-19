@@ -10,6 +10,11 @@ A rank-lowering tensor is given by its label: the pairs of rank indices its delt
 join, and the rank indices on its Levi-Civita symbol if it has one. The rank indices
 it leaves free, with the tau index of the symbol, are what the natural projector
 takes; `mapping_tensors` is where they are put to work.
+
+The labels of a weight are ordered by their delta pairs, then their epsilon slots,
+both ascending. The order is part of the result, not of the enumeration: the
+independent mappings are the earliest independent candidates in it, so it fixes
+which mappings a weight keeps and how its channels are numbered.
 """
 
 import itertools
@@ -20,9 +25,37 @@ from natto.indices import get_slot_partitions
 from natto.symbolic import sort_with_sign
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class LoweringLabel:
     """A rank-lowering tensor, as the blocks of rank slots it contracts.
+
+    Labels can be sorted, and their order is the order of the candidates; see
+    `get_lowering_labels`. What makes them sortable is `order=True` on the dataclass,
+    which generates `<`, `<=`, `>` and `>=` comparing the fields as a tuple in the
+    order they are declared: `(deltas, epsilon)`. Tuples compare element by element,
+    into nested tuples, so labels are ordered by their first delta pair, then their
+    second, and so on, and by `epsilon` only when all the deltas agree. The fields
+    are canonical -- each pair increasing, the pairs sorted, the epsilon slots
+    increasing -- so equal tensors compare equal. Reordering the two fields would
+    change the order of the candidates, and so the mappings a weight keeps.
+
+    Examples:
+        The deltas decide first:
+
+        >>> LoweringLabel(((0, 1), (2, 3))) < LoweringLabel(((0, 2), (1, 3)))
+        True
+
+        The epsilon slots break a tie in the deltas:
+
+        >>> LoweringLabel(((0, 1),), (2, 3)) < LoweringLabel(((0, 1),), (2, 4))
+        True
+
+        So sorting the candidates of weight 3 and rank 4, which have no deltas, orders
+        them by their epsilon slots:
+
+        >>> labels = [LoweringLabel((), e) for e in [(1, 2), (0, 3), (0, 1)]]
+        >>> [label.epsilon for label in sorted(labels)]
+        [(0, 1), (0, 3), (1, 2)]
 
     Attributes:
         deltas: The pairs of rank slots its Kronecker deltas join, each increasing and
@@ -67,21 +100,31 @@ def get_lowering_labels(ell: int, n: int) -> list[LoweringLabel]:
     deltas alone when it is even, and one Levi-Civita symbol alongside them when it
     is odd. This dispatches on that, so a caller supplies only the weight and rank.
 
+    The labels are sorted by their delta pairs, then their epsilon slots, both
+    ascending -- the comparison `order=True` gives `LoweringLabel`, which `sorted`
+    uses -- so the first contracts the earliest slots: at ell = 2, n = 4 they are
+    delta_01, delta_02, delta_03, delta_12, delta_13, delta_23. The same rule serves
+    both parities, the epsilon slots being only the second key. Since the independent
+    mappings are the earliest independent candidates, this order is what decides
+    which are kept; the order the labels are enumerated in plays no part.
+
     Args:
         ell: Weight of the ICT.
         n: Rank of the Cartesian tensor.
 
     Returns:
-        The rank-lowering tensors, one per choice of contracted indices.
+        The rank-lowering tensors, one per choice of contracted indices, in order.
 
     References:
         Eq. 2 of [Wen2026Reusable], with Eq. 3 for even n - ell and Eq. 5 for odd;
         Sec. II C for the discussion.
     """
     if (n - ell) % 2 == 0:
-        return get_lowering_labels_even(ell, n)
+        labels = get_lowering_labels_even(ell, n)
+    else:
+        labels = get_lowering_labels_odd(ell, n)
 
-    return get_lowering_labels_odd(ell, n)
+    return sorted(labels)
 
 
 def get_lowering_labels_even(ell: int, n: int) -> list[LoweringLabel]:
