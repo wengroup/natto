@@ -34,13 +34,21 @@ def get_symmetry_adapted_mappings(
     the label table, and the null space by Gaussian elimination over the rationals,
     so the symmetry-adapted mappings carry no numerical tolerance at all.
 
+    The null space is spanned by its reduced row echelon basis, which is unique for
+    the order of `mappings`.
+
+    The symmetry-adapted mappings are ordered by the mappings they contain, compared
+    in turn: the first, then the second, and so on. So G1 + G2 + G5 comes before
+    G1 + G3 + G4. Only which mappings appear decides the order, not their
+    coefficients, and no two contain the same set of mappings, so there are no ties.
+
     Args:
         mappings: Independent mappings of one sector.
         gram_inverse: Exact inverse of their Gram matrix.
         symmetry: Internal index symmetry of the Cartesian tensor.
 
     Returns:
-        The symmetry-adapted mappings, one per null-space basis vector.
+        The symmetry-adapted mappings, one per null-space basis vector, in order.
 
     References:
         Procedure 2 of [Wen2026Reusable], with the symmetry-adapted mappings of Eq. 27.
@@ -61,6 +69,7 @@ def get_symmetry_adapted_mappings(
             )
 
     coefficients = matrix_null_space(constraints, len(mappings))
+    coefficients.sort(key=_support)
 
     return [combine(vector, mappings) for vector in coefficients]
 
@@ -111,3 +120,15 @@ def get_symmetry_action_matrix(
     ]
 
     return matrix_multiply(gram_inverse, overlap)
+
+
+def _support(vector: list[Fraction]) -> tuple[int, ...]:
+    """The positions of the nonzero entries of a coefficient vector, increasing.
+
+    It is the sort key of the symmetry-adapted mappings. Each reduced row echelon
+    basis vector is 1 at its own free column and 0 at the others', so no two vectors
+    share a support and the order has no ties.
+    """
+    support = tuple(q for q, value in enumerate(vector) if value)
+
+    return support
