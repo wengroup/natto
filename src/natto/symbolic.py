@@ -521,6 +521,7 @@ def evaluate_terms(
     signature: Signature,
     terms: dict[Term, int | Fraction | float],
     order: Sequence[str] | None = None,
+    dtype: type = float,
 ) -> np.ndarray:
     """Evaluate a sum of terms over the slots of a signature into an array.
 
@@ -531,6 +532,10 @@ def evaluate_terms(
         terms: Each term with its coefficient.
         order: Group names in the order their axes should appear. Defaults to the
             signature's own order.
+        dtype: The type of the array. `int` evaluates integer coefficients with integer
+            arithmetic and no floating point; it does not check for overflow of the
+            platform integer, which the entries of every operator of this package
+            stay far below.
 
     Returns:
         An array with one axis of length 3 per slot, in the requested group order.
@@ -553,10 +558,13 @@ def evaluate_terms(
     # A product of deltas and Levi-Civita symbols is zero almost everywhere, so each
     # term adds its coefficient only where it is nonzero. Every entry receives the
     # same additions in the same order as summing the dense terms would give.
-    flat = np.zeros(3**size)
+    flat = np.zeros(3**size, dtype=dtype)
     for term, coefficient in terms.items():
         indices, signs = _nonzero_entries(term, stride)
-        flat[indices] += float(coefficient) * signs
+        if dtype is int:
+            flat[indices] += int(coefficient) * np.asarray(signs).astype(int)
+        else:
+            flat[indices] += float(coefficient) * signs
     result = flat.reshape((3,) * size)
 
     return result

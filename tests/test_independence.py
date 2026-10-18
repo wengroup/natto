@@ -2,7 +2,7 @@
 
 The exact scheme is what the reduction uses, so what matters here is that it keeps
 the earliest independent candidates, that the Gram matrix it returns is the one for
-what it kept, and that the two numerical schemes reach the same answer by looking at
+what it kept, and that the numerical schemes reach the same answer by looking at
 something else entirely.
 """
 
@@ -11,12 +11,14 @@ import pytest
 from natto.gram import get_gram_matrix
 from natto.independence import (
     get_multiplicity,
-    select_independent_mappings_and_gram,
-    select_independent_mappings_via_components,
-    select_independent_mappings_via_embeddings,
+    qr_exact_pivots,
+    select_independent_mappings_gram_schmidt_exact,
+    select_independent_mappings_gram_schmidt_numerical,
+    select_independent_mappings_qr_exact,
+    select_independent_mappings_qr_numerical,
 )
 from natto.mapping_tensors import get_mappings
-from natto.rational import is_nonsingular
+from natto.rational import is_nonsingular, ldl_decomposition
 
 
 def get_candidates(weight: int, rank: int):
@@ -46,7 +48,7 @@ def test_selection_keeps_the_earliest_independent_candidates(
     candidates = get_candidates(weight, rank)
     assert len(candidates) == n_candidates
 
-    kept, _ = select_independent_mappings_and_gram(candidates)
+    kept, _ = select_independent_mappings_gram_schmidt_exact(candidates)
 
     assert kept == expected
 
@@ -58,7 +60,7 @@ def test_selection_returns_the_gram_matrix_of_what_it_kept(
     """The Gram matrix accumulates during selection rather than in a second pass."""
     candidates = get_candidates(weight, rank)
 
-    kept, gram = select_independent_mappings_and_gram(candidates)
+    kept, gram = select_independent_mappings_gram_schmidt_exact(candidates)
 
     assert gram == get_gram_matrix([candidates[i] for i in kept])
 
@@ -71,7 +73,7 @@ def test_every_discarded_candidate_is_genuinely_dependent(rank, weight):
     rejected candidate that still raised the rank would mean a mapping was lost.
     """
     candidates = get_candidates(weight, rank)
-    kept, gram = select_independent_mappings_and_gram(candidates)
+    kept, gram = select_independent_mappings_gram_schmidt_exact(candidates)
     rejected = [i for i in range(len(candidates)) if i not in kept]
     assert rejected, "this sector is meant to be rank deficient"
 
@@ -108,7 +110,7 @@ def matrix_rank_rows(matrix):
 
 
 def test_no_candidates_selects_nothing():
-    assert select_independent_mappings_and_gram([]) == ([], [])
+    assert select_independent_mappings_gram_schmidt_exact([]) == ([], [])
 
 
 def test_multiplicity():
@@ -122,28 +124,27 @@ def test_multiplicity():
 
 
 @pytest.mark.parametrize("rank, weight, n_candidates, expected", SECTORS)
-def test_numerical_schemes_agree_with_the_exact_one(
+def test_numerical_scheme_agrees_with_the_exact_one(
     rank, weight, n_candidates, expected
 ):
-    """The two numerical schemes must reach the exact scheme's answer.
+    """The numerical scheme must reach the exact scheme's answer.
 
-    They look at different things -- the full components of each mapping, and the
-    mappings' action on one random ICT -- so agreement is evidence that the rational
-    Gram matrix and the evaluated arrays describe the same mappings.
+    The numerical scheme looks at the full components of each mapping, so agreement is
+    evidence that the rational Gram matrix and the evaluated arrays describe the same
+    mappings.
     """
     candidates = get_candidates(weight, rank)
 
-    kept, _ = select_independent_mappings_and_gram(candidates)
+    kept, _ = select_independent_mappings_gram_schmidt_exact(candidates)
 
-    assert select_independent_mappings_via_components(candidates) == kept
-    assert select_independent_mappings_via_embeddings(candidates) == kept
+    assert select_independent_mappings_gram_schmidt_numerical(candidates) == kept
 
 
 @pytest.mark.parametrize(
     "select",
     [
-        select_independent_mappings_via_components,
-        select_independent_mappings_via_embeddings,
+        select_independent_mappings_gram_schmidt_numerical,
+        select_independent_mappings_qr_numerical,
     ],
 )
 def test_numerical_schemes_select_nothing_from_nothing(select):
@@ -160,35 +161,21 @@ DEFICIENT_SECTORS = [
 ]
 
 
-@pytest.mark.parametrize(
-    "select",
-    [
-        select_independent_mappings_via_components,
-        select_independent_mappings_via_embeddings,
-    ],
-)
 @pytest.mark.parametrize("rank, weight", DEFICIENT_SECTORS)
-def test_gram_schmidt_reaches_the_exact_selection(select, rank, weight):
+def test_gram_schmidt_reaches_the_exact_selection(rank, weight):
     """The float Gram-Schmidt route must agree with the exact one, index for index.
 
     Both prefer the earliest candidates, so they are the same algorithm over
     different arithmetic and there is no licence for them to differ.
     """
     candidates = get_candidates(weight, rank)
-    kept, _ = select_independent_mappings_and_gram(candidates)
+    kept, _ = select_independent_mappings_gram_schmidt_exact(candidates)
 
-    assert select(candidates, method="gram_schmidt") == kept
+    assert select_independent_mappings_gram_schmidt_numerical(candidates) == kept
 
 
-@pytest.mark.parametrize(
-    "select",
-    [
-        select_independent_mappings_via_components,
-        select_independent_mappings_via_embeddings,
-    ],
-)
 @pytest.mark.parametrize("rank, weight", DEFICIENT_SECTORS)
-def test_pivoted_qr_finds_a_valid_subset_of_the_same_size(select, rank, weight):
+def test_pivoted_qr_finds_a_valid_subset_of_the_same_size(rank, weight):
     """Pivoted QR may keep a different subset, and that is allowed.
 
     It orders the candidates by residual norm rather than by position, so of
@@ -198,21 +185,38 @@ def test_pivoted_qr_finds_a_valid_subset_of_the_same_size(select, rank, weight):
     nonsingular, both checked over the rationals.
     """
     candidates = get_candidates(weight, rank)
-    kept, _ = select_independent_mappings_and_gram(candidates)
+    kept, _ = select_independent_mappings_gram_schmidt_exact(candidates)
 
-    chosen = select(candidates, method="scipy_qr")
+    chosen = select_independent_mappings_qr_numerical(candidates)
 
     assert len(chosen) == len(kept)
     assert is_nonsingular(get_gram_matrix([candidates[i] for i in chosen]))
 
 
-@pytest.mark.parametrize(
-    "select",
-    [
-        select_independent_mappings_via_components,
-        select_independent_mappings_via_embeddings,
-    ],
-)
-def test_mapping_schemes_reject_an_unknown_method(select):
-    with pytest.raises(ValueError, match="Unknown"):
-        select(get_candidates(2, 4), method="not_a_method")
+#: Sectors up to rank six, including the rank-deficient ones. The slowest of the
+#: rank-six sectors takes seconds, so one of them stands for the rank.
+EXACT_QR_SECTORS = [(3, 2), (4, 0), (4, 3), (5, 0), (5, 2), (5, 4), (6, 1)]
+
+
+@pytest.mark.parametrize("rank, weight", EXACT_QR_SECTORS)
+def test_qr_exact_keeps_what_the_gram_scan_keeps(rank, weight):
+    """Factorizing the evaluated arrays exactly decides as the Gram matrix does."""
+    candidates = get_candidates(weight, rank)
+
+    kept, _ = select_independent_mappings_gram_schmidt_exact(candidates)
+
+    assert select_independent_mappings_qr_exact(candidates) == kept
+
+
+@pytest.mark.parametrize("rank, weight", EXACT_QR_SECTORS)
+def test_qr_exact_pivots_are_the_ldl_pivots_of_the_gram_matrix(rank, weight):
+    """A^T A = (2 ell + 1) g, so the squared lengths are (2 ell + 1) g's pivots."""
+    candidates = get_candidates(weight, rank)
+
+    kept, gram = select_independent_mappings_gram_schmidt_exact(candidates)
+    _, pivots = ldl_decomposition(gram)
+
+    qr_kept, qr_pivots = qr_exact_pivots(candidates)
+
+    assert qr_kept == kept
+    assert qr_pivots == [(2 * weight + 1) * p for p in pivots]

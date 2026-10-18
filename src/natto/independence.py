@@ -3,36 +3,42 @@
 Every choice of which indices to contract gives a candidate mapping tensor, and from
 rank five on some of them are combinations of the others. Exactly which subset is
 kept is not a detail: it fixes which duals are the canonical ones, and so the basis
-every ICT downstream is expressed in. Three schemes are offered, differing in what
-they look at to decide:
+every ICT downstream is expressed in. Three functions are offered. Each visits the
+candidates in order and keeps one when it is not a combination of those kept before it
+(the Gram-Schmidt residual test, or its QR form), so they keep the earliest independent
+candidates; they differ in the arithmetic and in what they look at:
 
-- `select_independent_mappings_and_gram`: the exact one, and what the reduction
-  uses. It borders the rational Gram matrix of the kept mappings with each candidate
-  in turn, so no tolerance enters the decision and nothing is evaluated numerically.
-- `select_independent_mappings_via_components`: evaluates each mapping in full and
-  tests those vectors. It compares what the mappings *are*.
-- `select_independent_mappings_via_embeddings`: contracts one fixed ICT through each
-  mapping and tests the embeddings that come back, which are smaller. It compares
-  what the mappings *do*, which is why it is the cheapest and the least direct. This
-  is what the reduction used before the exact scheme.
+- `select_independent_mappings_gram_schmidt_exact` (selection `gram_schmidt_exact`):
+  the exact one, and what the reduction uses. It borders the rational Gram matrix of
+  the kept mappings with each candidate in turn, so no tolerance enters the decision
+  and nothing is evaluated numerically.
+- `select_independent_mappings_qr_exact` (selection `qr_exact`): factorizes the
+  evaluated mappings in integer arithmetic without normalizing the columns. It makes the
+  same decisions with no tolerance, but evaluates every candidate in full.
+- `select_independent_mappings_gram_schmidt_numerical` and
+  `select_independent_mappings_qr_numerical` (selections `gram_schmidt_numerical` and
+  `qr_numerical`): evaluate each mapping in full and test those vectors in floating
+  point against a tolerance, by in-order Gram-Schmidt or by a pivoted QR, which may keep
+  a different subset.
 
-The two numerical schemes hand the actual independence test to `qr`, and are kept to
-cross-check the exact one. All three agree on every sector through rank six.
+The numerical schemes hand the actual independence test to `qr`, and are kept to
+cross-check the exact ones.
 """
 
 import functools
+import math
 from fractions import Fraction
 
 import numpy as np
 
 from natto.gram import get_gram_entry
 from natto.mapping_tensors import Mapping
-from natto.natural_projector import get_random_natural_tensor
 from natto.qr import DEFAULT_TOLERANCE, Method, find_independent_tensors
 from natto.rational import bordered_inverse
+from natto.symbolic import evaluate_terms
 
 
-def select_independent_mappings_and_gram(
+def select_independent_mappings_gram_schmidt_exact(
     candidates: list[Mapping],
 ) -> tuple[list[int], list[list[Fraction]]]:
     """Select a maximal independent set of mapping tensors, and their Gram matrix.
@@ -48,8 +54,8 @@ def select_independent_mappings_and_gram(
     bordered matrix is nonsingular exactly when the candidate lies outside their span.
     The Schur complement of the border is the squared norm of the candidate's residual,
     so this is the residual test of Gram-Schmidt carried out over the rationals -- no
-    tolerance, and no random tensor to probe the mappings with. The selection is
-    therefore a pure function of the weight and the n, the same on every machine.
+    tolerance. The selection is therefore a pure function of the weight and the n, the
+    same on every machine.
 
     Only the contractions against the kept set are needed, not the full
     candidate-by-candidate matrix, and the kept set's own Gram matrix accumulates as a
@@ -111,42 +117,106 @@ def select_independent_mappings_and_gram(
     return kept, gram
 
 
-def select_independent_mappings_via_components(
-    candidates: list[Mapping],
-    tolerance: float = DEFAULT_TOLERANCE,
-    method: Method = "gram_schmidt",
-) -> list[int]:
-    """Select independent mapping tensors via their numerical components.
+def qr_exact_pivots(candidates: list[Mapping]) -> tuple[list[int], list[Fraction]]:
+    """Factorize the evaluated candidates exactly and read the pivots.
 
-    Each candidate is evaluated in full -- all 3^(n+ell) components of the n-(n+l)
-    array -- and those arrays are tested for linear independence directly. Unlike
-    `select_independent_mappings_via_embeddings` nothing is contracted away first, so the
-    vectors being compared carry the whole mapping and no information can hide in the
-    part that was dropped.
+    The candidates are the columns of a matrix `A` with rational entries. In rational
+    arithmetic `A = Q U` with the columns `q_k` of `Q` mutually orthogonal, not
+    normalized, and `U` unit upper triangular, so no square roots arise. A column that
+    is a combination of the earlier ones gives `q_k = 0`; the others have
+    `q_k . q_k != 0`, and these squared lengths are the pivots. The columns are taken
+    in the given order.
 
-    With `method="scipy_qr"` this is Algorithm 1 of the paper: the flattened mappings
-    are the columns of a matrix whose rank-revealing QR with column pivoting picks the
-    independent ones. It is also the numerical counterpart of
-    `select_independent_mappings_and_gram`, which settles the same question exactly. It is kept as a cross-check: agreement between the
-    two is evidence that the exact Gram matrix and the evaluated arrays describe the same
-    mappings. Prefer the exact scheme for anything whose answer is recorded.
-
-    The arrays grow as 3^(n+ell), which at n = l = 6 is 3^12 components per candidate,
-    so this costs real memory and time at high n.
+    The arithmetic is done on integers. A column is multiplied by the common
+    denominator of its coefficients, which changes neither the span nor whether a
+    column is dependent, and its pivot is divided by the square of that factor
+    afterwards. The orthogonal columns are kept as integer vectors, each known up to a
+    factor: `v -> (q.q) v - (q.v) q` removes the part along `q` with no division, and
+    the common content of a vector is divided out.
 
     Args:
         candidates: Candidate mapping tensors of one sector, in the order they are
             preferred.
-        tolerance: Residual norm below which a candidate is taken as dependent.
-        method: Which array-level scheme decides independence; see
-            `find_independent_tensors`.
+
+    Returns:
+        The indices of the columns with a nonzero pivot, and those pivots.
+
+    Raises:
+        ValueError: If an evaluated candidate is too large for int64, which it is not
+            for any weight through rank six.
+    """
+    kept: list[int] = []
+    pivots: list[Fraction] = []
+    basis: list[np.ndarray] = []  # integer vectors, orthogonal to each other
+    squares: list[int] = []  # their squared lengths
+
+    for i, c in enumerate(candidates):
+        operator = c.expand()
+        denominator = math.lcm(
+            *[Fraction(x).denominator for x in operator.terms.values()]
+        )
+        cleared = {t: int(Fraction(x) * denominator) for t, x in operator.terms.items()}
+        a = evaluate_terms(
+            operator.signature, cleared, ("gct", "ict"), dtype=int
+        ).ravel()
+        if np.abs(a).max() >= 2**40:
+            raise ValueError("The evaluated candidate is too large for int64.")
+        v = a.astype(object)
+
+        scale = Fraction(1)  # v = scale * (the exact residual so far)
+        for q, qq in zip(basis, squares):
+            v = qq * v - (q @ v) * q
+            scale *= qq
+            if any(v):
+                content = math.gcd(*[int(x) for x in v])
+                v = v // content
+                scale /= content
+
+        if not any(v):
+            continue
+
+        # The residual is v / scale for the column cleared by `denominator`.
+        pivot = Fraction(int(v @ v)) / scale**2 / denominator**2
+
+        basis.append(v)
+        squares.append(int(v @ v))
+        kept.append(i)
+        pivots.append(pivot)
+
+    return kept, pivots
+
+
+def select_independent_mappings_qr_exact(candidates: list[Mapping]) -> list[int]:
+    """Select independent mapping tensors by an exact QR factorization of the arrays.
+
+    This is Algorithm 1 of the paper: the flattened mappings are the columns of a matrix
+    that is factorized in rational arithmetic, without normalizing the columns, and a
+    column is independent of the earlier ones exactly when its orthogonalized column
+    has a nonzero squared length. No tolerance enters. The arrays grow as 3^(n+ell),
+    so this evaluates every candidate in full;
+    `select_independent_mappings_gram_schmidt_exact` decides the same question from the
+    Gram matrix, as the pivots of its LDL^T factorization, without the arrays, and is
+    what the reduction uses.
+
+    Args:
+        candidates: Candidate mapping tensors of one sector, in the order they are
+            preferred.
 
     Returns:
         The indices of the independent candidates.
-
-    Raises:
-        ValueError: If `method` is not a known scheme, from `find_independent_tensors`.
     """
+    if not candidates:
+        return []
+
+    kept, _ = qr_exact_pivots(candidates)
+
+    return kept
+
+
+def _select_numerical(
+    candidates: list[Mapping], tolerance: float, method: Method
+) -> list[int]:
+    """Evaluate every candidate in full and test the arrays for independence."""
     if not candidates:
         return []
 
@@ -157,54 +227,54 @@ def select_independent_mappings_via_components(
     return indices
 
 
-def select_independent_mappings_via_embeddings(
-    candidates: list[Mapping],
-    tolerance: float = DEFAULT_TOLERANCE,
-    method: Method = "gram_schmidt",
+def select_independent_mappings_gram_schmidt_numerical(
+    candidates: list[Mapping], tolerance: float = DEFAULT_TOLERANCE
 ) -> list[int]:
-    """Select independent mapping tensors via the embeddings they produce.
+    """Select independent mapping tensors by an in-order Gram-Schmidt in floating point.
 
-    One fixed-seed random ICT of the weight is contracted through each candidate. That
-    contracts away the mapping's ell weight indices, leaving a rank-n tensor rather
-    than the n-(n+l) one the candidate itself is, so there are 3^n components to
-    compare instead of 3^(n+ell). This is what the reduction used before the exact scheme, and
-    it is much the cheapest of the three.
+    Each candidate is evaluated in full -- all 3^(n+ell) components of the n-(n+l)
+    array -- and kept when the norm of its residual, after projecting out the kept ones,
+    exceeds `tolerance`. It is the numerical counterpart of
+    `select_independent_mappings_gram_schmidt_exact` and
+    `select_independent_mappings_qr_exact`, which settle the same question exactly, and
+    is kept as a cross-check: agreement is evidence that the exact Gram matrix and the
+    evaluated arrays describe the same mappings. Prefer the exact schemes for anything
+    whose answer is recorded.
 
-    It is also the least direct. Embedding is linear in the mapping, so dependent
-    mappings always give dependent results and a dependence is never missed. The converse
-    does not hold: contracting a mapping with a fixed ICT has a kernel in general, so for
-    an unlucky probe two independent mappings can give dependent tensors, and a channel
-    would be lost. That cannot happen with `select_independent_mappings_and_gram`, which
-    looks at the mappings themselves.
+    The arrays grow as 3^(n+ell), which at n = l = 6 is 3^12 components per candidate,
+    so this costs real memory and time at high n.
 
     Args:
         candidates: Candidate mapping tensors of one sector, in the order they are
             preferred.
         tolerance: Residual norm below which a candidate is taken as dependent.
-        method: Which array-level scheme decides independence; see
-            `find_independent_tensors`.
 
     Returns:
         The indices of the independent candidates.
-
-    Raises:
-        ValueError: If `method` is not a known scheme, from `find_independent_tensors`.
     """
-    if not candidates:
-        return []
+    return _select_numerical(candidates, tolerance, "gram_schmidt")
 
-    ell = candidates[0].sector.ell
-    X = get_random_natural_tensor(ell)
 
-    # The weight axes come last, and are contracted with the ICT in order.
-    embedded = [
-        np.tensordot(c.expand().evaluate(("gct", "ict")), X, axes=ell)
-        for c in candidates
-    ]
+def select_independent_mappings_qr_numerical(
+    candidates: list[Mapping], tolerance: float = DEFAULT_TOLERANCE
+) -> list[int]:
+    """Select independent mapping tensors by a pivoted QR in floating point.
 
-    _, indices = find_independent_tensors(embedded, tolerance=tolerance, method=method)
+    The evaluated candidates are the columns of a matrix, and a column is kept when its
+    diagonal entry of the pivoted QR factor exceeds `tolerance`. It keeps the same
+    number as the exact schemes but may keep a different subset, since pivoting
+    reorders the columns. Like `select_independent_mappings_gram_schmidt_numerical` it
+    evaluates every candidate in full and is kept as a cross-check.
 
-    return indices
+    Args:
+        candidates: Candidate mapping tensors of one sector, in the order they are
+            preferred.
+        tolerance: Diagonal entry below which a column is taken as dependent.
+
+    Returns:
+        The indices of the independent candidates.
+    """
+    return _select_numerical(candidates, tolerance, "scipy_qr")
 
 
 @functools.cache

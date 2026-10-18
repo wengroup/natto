@@ -263,8 +263,8 @@ def test_qr_selection_spans_the_same_weights(tensor_class: TensorClass):
     each weight.
     """
     rank, symmetry = tensor_class.rank, tensor_class.symmetry
-    exact = weight_projectors(rank, symmetry, "symbolic")
-    qr = weight_projectors(rank, symmetry, "qr")
+    exact = weight_projectors(rank, symmetry, "gram_schmidt_exact")
+    qr = weight_projectors(rank, symmetry, "qr_numerical")
 
     assert sorted(qr) == sorted(exact)
     for weight in exact:

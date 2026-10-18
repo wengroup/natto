@@ -31,9 +31,10 @@ from typing import Literal
 
 from natto.gram import get_gram_matrix
 from natto.independence import (
-    select_independent_mappings_and_gram,
-    select_independent_mappings_via_components,
-    select_independent_mappings_via_embeddings,
+    select_independent_mappings_gram_schmidt_exact,
+    select_independent_mappings_gram_schmidt_numerical,
+    select_independent_mappings_qr_exact,
+    select_independent_mappings_qr_numerical,
 )
 from natto.mapping_tensors import Mapping, compose, get_dual_mappings, get_mappings
 from natto.orthonormal import get_orthonormal_operators
@@ -44,9 +45,12 @@ from natto.symmetry_adaptation import get_symmetry_adapted_mappings
 #: The basis of each weight's operators: `dual`, exact, or `orthonormal`, self-dual.
 Basis = Literal["dual", "orthonormal"]
 
-#: What to judge the independence of the candidate mappings on; see
-#: `natto.independence`.
-Selection = Literal["symbolic", "qr", "components", "embeddings"]
+#: How to decide which candidate mappings are independent: `gram_schmidt_exact` and
+#: `qr_exact` in exact arithmetic, `gram_schmidt_numerical` and `qr_numerical` in
+#: floating point against a tolerance; see `natto.independence`.
+Selection = Literal[
+    "gram_schmidt_exact", "qr_exact", "gram_schmidt_numerical", "qr_numerical"
+]
 
 
 def get_reduction(
@@ -239,7 +243,7 @@ def get_independent_mappings(
     ell: int,
     n: int,
     symmetry: str | None = None,
-    selection: Selection = "symbolic",
+    selection: Selection = "gram_schmidt_exact",
 ) -> tuple[list[Mapping], list[list[Fraction]]]:
     """The independent mapping tensors of one weight, and their exact Gram matrix.
 
@@ -260,18 +264,24 @@ def get_independent_mappings(
         ell: Weight of the ICT space.
         n: Rank of the Cartesian tensor.
         symmetry: Intrinsic index symmetry, as index equalities, or None.
-        selection: What to judge the independence of the candidate mappings on.
-            `symbolic` is the default: the mappings' Gram matrix is contracted
-            symbolically and the decision made over the rationals, so it is the
-            same on every machine, keeping the earliest independent candidates in
-            the order of `natto.lowering.get_lowering_labels`: by delta pairs, then
-            epsilon slots, both ascending.
-            `qr` is Algorithm 1 of the paper: a rank-revealing QR with column
-            pivoting on the evaluated mappings, which keeps the same number but
-            may keep a different subset. `components` uses the mappings evaluated
-            in full, `embeddings` their action on one probe tensor. The last three
-            are numerical, and so decided against a tolerance; see
-            `natto.independence`.
+        selection: How to decide which candidate mappings are independent. All four
+            visit the candidates in order and keep one when it is not a combination of
+            those kept before it, which is the Gram-Schmidt residual test, or its
+            QR form.
+            `gram_schmidt_exact` is the default: the residual is the Schur complement of
+            the mappings' Gram matrix, contracted symbolically and decided over the
+            rationals, so it is the same on every machine, keeping the earliest
+            independent candidates in the order of `natto.lowering.get_lowering_labels`:
+            by delta pairs, then epsilon slots, both ascending.
+            `qr_exact` factorizes the evaluated mappings in integer arithmetic, without
+            normalizing the columns, and keeps those with a nonzero squared length; it
+            keeps the same candidates as `gram_schmidt_exact` and evaluates the full
+            arrays.
+            `gram_schmidt_numerical` does the same on the evaluated mappings in floating
+            point, against a tolerance.
+            `qr_numerical` is a pivoted QR on the evaluated mappings in floating point,
+            against a tolerance, which keeps the same number but may keep a different
+            subset because pivoting reorders the columns.
 
     Returns:
         The independent mappings and their exact Gram matrix. Both are empty when there
@@ -281,7 +291,7 @@ def get_independent_mappings(
         ValueError: If `selection` is not recognized.
 
     References:
-        Eq. 13 of [Wen2026Reusable] for the mappings, Algorithm 1 for the `qr`
+        Eq. 13 of [Wen2026Reusable] for the mappings, Algorithm 1 for the `qr_exact`
         selection, and Eq. 27 for the symmetry-adapted mappings.
     """
     # No isotropic n-one mapping exists from a scalar ICT.
@@ -290,23 +300,25 @@ def get_independent_mappings(
 
     candidates = get_mappings(ell, n)
 
-    if selection == "symbolic":
-        independent_indices, gram = select_independent_mappings_and_gram(candidates)
-    elif selection == "qr":
-        independent_indices = select_independent_mappings_via_components(
-            candidates, method="scipy_qr"
+    if selection == "gram_schmidt_exact":
+        independent_indices, gram = select_independent_mappings_gram_schmidt_exact(
+            candidates
+        )
+    elif selection == "qr_exact":
+        independent_indices = select_independent_mappings_qr_exact(candidates)
+        gram = get_gram_matrix([candidates[i] for i in independent_indices])
+    elif selection == "gram_schmidt_numerical":
+        independent_indices = select_independent_mappings_gram_schmidt_numerical(
+            candidates
         )
         gram = get_gram_matrix([candidates[i] for i in independent_indices])
-    elif selection == "components":
-        independent_indices = select_independent_mappings_via_components(candidates)
-        gram = get_gram_matrix([candidates[i] for i in independent_indices])
-    elif selection == "embeddings":
-        independent_indices = select_independent_mappings_via_embeddings(candidates)
+    elif selection == "qr_numerical":
+        independent_indices = select_independent_mappings_qr_numerical(candidates)
         gram = get_gram_matrix([candidates[i] for i in independent_indices])
     else:
         raise ValueError(
-            f"Unknown selection: {selection}. "
-            "Supported are: symbolic, qr, components, embeddings."
+            f"Unknown selection: {selection}. Supported are: gram_schmidt_exact, "
+            "qr_exact, gram_schmidt_numerical, qr_numerical."
         )
 
     G = [candidates[i] for i in independent_indices]
