@@ -1,4 +1,6 @@
 import functools
+import itertools
+import math
 from collections import Counter, defaultdict
 from fractions import Fraction
 from typing import NamedTuple, Optional
@@ -6,6 +8,7 @@ from typing import NamedTuple, Optional
 import numpy as np
 import pytest
 
+from natto.algebra import contract
 from natto.gram import get_gram_entry
 from natto.intrinsic_symmetry import generate_permutations, impose_symmetry
 from natto.mapping_tensors import compose, get_dual_mappings
@@ -16,7 +19,7 @@ from natto.reduction import (
     get_independent_mappings,
     get_reduction,
 )
-from natto.symbolic import act
+from natto.symbolic import IndexGroup, Signature, act, evaluate_terms
 
 
 class TensorClass(NamedTuple):
@@ -392,3 +395,109 @@ def test_reduction_round_trip(tensor_class: TensorClass):
     sum_T_prime = np.sum(np.stack(all_T_prime), axis=0)
 
     assert np.allclose(sum_T_prime, T, rtol=0, atol=1e-10)
+
+
+#: Ranks two to four: the reduction is the same construction at every rank, and these
+#: reach every kind of class at a cost of seconds.
+VERIFIED_CLASSES = [tc for tc in PHYSICAL_TENSOR_CLASSES if 2 <= tc.rank <= 4]
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params(VERIFIED_CLASSES))
+def test_reconstruction_is_exact(tensor_class: TensorClass):
+    """The composed operators sum to the projector onto the class, exactly.
+
+    The coefficients are rational, so the sum is compared as integer arrays after
+    clearing the denominator: no floating point and no tolerance.
+    """
+    rank, symmetry = tensor_class.rank, tensor_class.symmetry
+    operators = list(get_composed_operators_cached(rank, symmetry).values())
+    total = operators[0]
+    for operator in operators[1:]:
+        total = total + operator
+
+    denominator = math.lcm(*[Fraction(c).denominator for c in total.terms.values()])
+    cleared = {t: int(Fraction(c) * denominator) for t, c in total.terms.items()}
+    array = evaluate_terms(total.signature, cleared, ("gct", "gct_in"), dtype=int)
+
+    # |G| times the projector: the sum over the class's permutations of delta pairs
+    permutations = [(tuple(range(rank)), 1)]
+    if symmetry is not None:
+        permutations = generate_permutations(symmetry)
+    out, inp = "abcdefghij"[:rank], "klmnopqrst"[:rank]
+    projector = sum(
+        sign
+        * np.einsum(
+            ",".join(out[perm[k]] + inp[k] for k in range(rank)) + f"->{out}{inp}",
+            *([np.eye(3, dtype=int)] * rank),
+        )
+        for perm, sign in permutations
+    )
+
+    assert np.array_equal(array * len(permutations), projector * denominator)
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params(VERIFIED_CLASSES))
+def test_orthonormal_mappings_are_orthogonal_exactly(tensor_class: TensorClass):
+    """Two mappings of a weight contract to 2 ell + 1 if they are one, else to zero."""
+    from tests.test_orthonormal import assert_orthonormal
+
+    output = get_orthonormal_cached(tensor_class.rank, tensor_class.symmetry)
+    for weight in {ell for ell, _ in output}:
+        assert_orthonormal(output, weight)
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params(VERIFIED_CLASSES))
+def test_extracted_icts_are_traceless_and_symmetric_exactly(tensor_class: TensorClass):
+    """The extraction operator of every channel has no trace and is symmetric.
+
+    Contracting two ICT indices must give the zero operator, and swapping them must
+    leave the operator unchanged, both as symbolic operators.
+    """
+    output = get_reduction_cached(tensor_class.rank, tensor_class.symmetry)
+    for (ell, _), operators in output.items():
+        operator = operators["extraction"]
+        signature = operator.signature
+        n = signature.size - ell
+        remaining = Signature(
+            (
+                IndexGroup("ict", max(ell - 2, 0), False),
+                IndexGroup("gct", n, True, True),
+            )
+        )
+        for i, j in itertools.combinations(range(ell), 2):
+            traced = ["trace" if k in (i, j) else None for k in range(signature.size)]
+            free = iter(range(signature.size - 2))
+            traced = [t if t else next(free) for t in traced]
+            assert len(contract([(operator, traced)], remaining)) == 0
+
+            swapped = list(range(signature.size))
+            swapped[i], swapped[j] = swapped[j], swapped[i]
+            assert contract([(operator, swapped)], signature) == operator
+
+
+@pytest.mark.parametrize("tensor_class", get_tensor_class_params(VERIFIED_CLASSES))
+def test_extraction_commutes_with_rotations(tensor_class: TensorClass):
+    """Rotating the tensor rotates every ICT: the operators are isotropic."""
+    rank, symmetry = tensor_class.rank, tensor_class.symmetry
+    rng = np.random.default_rng(35)
+    T = rng.standard_normal((3,) * rank)
+    if symmetry is not None:
+        T = impose_symmetry(T, symmetry)
+    q, r = np.linalg.qr(rng.standard_normal((3, 3)))
+    R = q * np.sign(np.diag(r))
+    R = R if np.linalg.det(R) > 0 else -R
+
+    def rotate(t: np.ndarray, order: int) -> np.ndarray:
+        for axis in range(order):
+            t = np.moveaxis(np.tensordot(R, t, axes=(1, axis)), 0, axis)
+        return t
+
+    for operators in get_reduction_cached(rank, symmetry).values():
+        extraction = operators["extraction"]
+        ell = extraction.signature.size - rank
+        np.testing.assert_allclose(
+            act(extraction, rotate(T, rank)),
+            rotate(act(extraction, T), ell),
+            rtol=0,
+            atol=1e-10,
+        )
